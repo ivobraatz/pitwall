@@ -175,11 +175,18 @@ As imagens Ubuntu da Oracle vêm com regras de `iptables` que recusam tudo além
 
 **(na VM)**
 
+Rode **uma vez só** (rodar de novo duplica as regras). O primeiro comando acha a linha do `REJECT`,
+que muda de imagem para imagem, e os outros inserem as regras logo antes dela:
+
 ```bash
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+N=$(sudo iptables -L INPUT -n --line-numbers | awk '$2=="REJECT" {print $1; exit}'); echo "REJECT na linha $N"
+sudo iptables -I INPUT "$N" -m state --state NEW -p tcp --dport 80 -j ACCEPT
+sudo iptables -I INPUT "$N" -m state --state NEW -p tcp --dport 443 -j ACCEPT
 sudo netfilter-persistent save
 ```
+
+Se o `echo` imprimir `REJECT na linha ` sem número, pare: não há REJECT na cadeia INPUT, e as portas já
+estão abertas no firewall da VM (pule os dois `iptables -I`).
 
 Confira:
 
@@ -189,6 +196,11 @@ sudo iptables -L INPUT -n --line-numbers
 
 As linhas `ACCEPT tcp dpt:80` e `ACCEPT tcp dpt:443` precisam aparecer **acima** da linha
 `REJECT all ... reject-with icmp-host-prohibited`.
+
+Se elas ficaram **abaixo** do REJECT ou duplicadas, apague cada uma pelo número, **de baixo para
+cima** (`sudo iptables -D INPUT <número>`), e insira de novo com o número da linha do REJECT
+(`sudo iptables -I INPUT <linha do REJECT> -m state --state NEW -p tcp --dport 80 -j ACCEPT`, idem
+para 443). Depois, `sudo netfilter-persistent save`.
 
 **Não instale nem ative o UFW**: ele conflita com essas regras da Oracle.
 
