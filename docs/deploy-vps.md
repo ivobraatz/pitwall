@@ -148,6 +148,9 @@ Escolha **uma** das duas opções.
 3. *Policy*: *Allow* para os e-mails da equipe (ou para um grupo).
 4. Teste numa janela anônima: `https://pitwall.<domínio>` precisa pedir o login do Access antes do
    console.
+5. Feche o acesso direto pelo IP do servidor (o Access só protege quem passa pela Cloudflare): ponha
+   as faixas da Cloudflare em `PITWALL_CONSOLE_ALLOWED_IPS` e recrie o Caddy. Os comandos estão em
+   [deploy-oracle.md, parte 11.3](deploy-oracle.md#113-aceitar-o-console-só-pela-cloudflare).
 
 **B. Tailscale.** O console não tem registro público. Ele fica acessível só pela tailnet.
 

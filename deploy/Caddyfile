@@ -20,6 +20,11 @@
 {$PITWALL_CONSOLE_DOMAIN} {
 	encode zstd gzip
 
+	# Cloudflare Access only guards traffic that goes through Cloudflare. PITWALL_CONSOLE_ALLOWED_IPS
+	# (space-separated) set to Cloudflare's ranges closes the direct route to this server's IP.
+	@outside not remote_ip {$PITWALL_CONSOLE_ALLOWED_IPS}
+	respond @outside 403
+
 	# The console proxies /v1/** to the API by itself, so this site only needs the console.
 	reverse_proxy console:3200
 }

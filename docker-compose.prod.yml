@@ -79,6 +79,9 @@ services:
     environment:
       PITWALL_API_DOMAIN: ${PITWALL_API_DOMAIN:-api.invalid}
       PITWALL_CONSOLE_DOMAIN: ${PITWALL_CONSOLE_DOMAIN:-console.invalid}
+      # Who may reach the console site. Behind Cloudflare Access: Cloudflare's ranges, so nobody can
+      # call this server's IP directly and skip Access. Default: everyone.
+      PITWALL_CONSOLE_ALLOWED_IPS: ${PITWALL_CONSOLE_ALLOWED_IPS:-0.0.0.0/0 ::/0}
     ports:
       - "80:80"
       - "443:443"
