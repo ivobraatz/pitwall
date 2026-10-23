@@ -4,7 +4,7 @@
   "description": "Connects a product to Pitwall: in-app tickets with diagnostics and session recordings, and the server-side bridge.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ivobraatz/pitwall.git",
+    "url": "git+https://github.com/ivobraatz/pitwall.git",
     "directory": "packages/sdk"
   },
   "license": "MIT",
