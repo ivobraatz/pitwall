@@ -1,7 +1,8 @@
 # .NET
 bin/
 obj/
-apps/api/Pitwall.Api/data/
+# Dev attachments (ContentRoot/data/blobs). Only blobs/: on Windows "data/" also matches the Data/ code folder.
+apps/api/Pitwall.Api/data/blobs/
 *.user
 # Node
 node_modules/
