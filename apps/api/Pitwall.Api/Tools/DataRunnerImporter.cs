@@ -231,8 +231,17 @@ public sealed class DataRunnerImporter(PitwallDb db, AttachmentStore store, ICon
         var provider = s["Provider"];
         if (string.Equals(provider, "s3", StringComparison.OrdinalIgnoreCase))
         {
-            var s3Config = new AmazonS3Config { ForcePathStyle = true };
-            if (!string.IsNullOrWhiteSpace(s["ServiceUrl"])) s3Config.ServiceURL = s["ServiceUrl"];
+            var s3Config = new AmazonS3Config
+            {
+                ForcePathStyle = true,
+                RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+                ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
+            };
+            if (!string.IsNullOrWhiteSpace(s["ServiceUrl"]))
+            {
+                s3Config.ServiceURL = s["ServiceUrl"];
+                s3Config.AuthenticationRegion = s["Region"] ?? "auto";
+            }
             else s3Config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(s["Region"] ?? "us-east-1");
             return new S3BlobStore(new AmazonS3Client(new BasicAWSCredentials(s["AccessKey"], s["SecretKey"]), s3Config),
                 s["Bucket"] ?? throw new InvalidOperationException("Import:SourceStorage:Bucket is required."));

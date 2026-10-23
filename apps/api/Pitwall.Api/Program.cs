@@ -35,8 +35,18 @@ builder.Services.AddSingleton<IBlobStore>(sp =>
     var storage = config.GetSection("Storage");
     if (string.Equals(storage["Provider"], "s3", StringComparison.OrdinalIgnoreCase))
     {
-        var s3Config = new AmazonS3Config { ForcePathStyle = true };
-        if (!string.IsNullOrWhiteSpace(storage["ServiceUrl"])) s3Config.ServiceURL = storage["ServiceUrl"];
+        var s3Config = new AmazonS3Config
+        {
+            ForcePathStyle = true,
+            // R2 and MinIO don't take every checksum the SDK now sends by default; only send them when the API requires.
+            RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+            ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
+        };
+        if (!string.IsNullOrWhiteSpace(storage["ServiceUrl"]))
+        {
+            s3Config.ServiceURL = storage["ServiceUrl"];
+            s3Config.AuthenticationRegion = storage["Region"] ?? "auto"; // R2 signs with "auto"
+        }
         else s3Config.RegionEndpoint = Amazon.RegionEndpoint.GetBySystemName(storage["Region"] ?? "us-east-1");
         var s3 = new AmazonS3Client(new BasicAWSCredentials(storage["AccessKey"], storage["SecretKey"]), s3Config);
         return new S3BlobStore(s3, storage["Bucket"] ?? throw new InvalidOperationException("Storage:Bucket is required."));

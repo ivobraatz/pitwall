@@ -273,9 +273,23 @@ A última linha deve imprimir `docker compose -f /opt/pitwall/docker-compose.pro
 
 ---
 
-## Parte 8 — Configurar o `.env`
+## Parte 8 — Chaves e o arquivo `.env`
 
-### 8.1 Criar o arquivo e gerar os segredos
+O `.env` guarda tudo que o Pitwall precisa. Antes de preenchê-lo, você vai buscar cada chave no
+serviço de onde ela vem. Abra o gerenciador de senhas e crie um item **"Pitwall produção"**: cada
+valor abaixo vai para lá assim que aparecer (vários aparecem uma vez só).
+
+| Variável do `.env` | De onde vem | Passo |
+|---|---|---|
+| `POSTGRES_PASSWORD`, `PITWALL_SECRET_KEY` | gerados na VM | 8.1 |
+| `SMTP_PASSWORD` | Resend | 8.2 |
+| `PITWALL_INBOX_EMAIL` | Email Routing da Cloudflare | 8.3 |
+| `STORAGE_BUCKET`, `STORAGE_SERVICE_URL`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` | Cloudflare R2 | 8.4 |
+| `ANTHROPIC_API_KEY` | Anthropic | 8.5 |
+| `PITWALL_ADMIN_EMAIL`, `PITWALL_ADMIN_PASSWORD` | você escolhe | 8.6 |
+| o resto | já vem pronto no modelo | 8.7 |
+
+### 8.1 Gerar as senhas internas (na VM)
 
 **(na VM)**
 
@@ -288,73 +302,162 @@ sed -i "s|^PITWALL_SECRET_KEY=.*|PITWALL_SECRET_KEY=$(openssl rand -base64 32)|"
 grep -E '^(POSTGRES_PASSWORD|PITWALL_SECRET_KEY)=' .env
 ```
 
-O último comando mostra os dois valores gerados. **Copie os dois para o gerenciador de senhas
-agora**, num item chamado "Pitwall produção":
+O último comando mostra os dois valores gerados. **Copie os dois para o item "Pitwall produção"
+agora:**
 
 - `PITWALL_SECRET_KEY`: **nunca pode mudar nem se perder.** Ela cifra os segredos de webhook e as
   sementes do 2FA guardadas no banco. Sem ela, um backup do banco não serve para nada.
-- `POSTGRES_PASSWORD`: só vale na primeira subida (cria o banco).
+- `POSTGRES_PASSWORD`: a senha do banco do Pitwall. Só vale na primeira subida (é quando o banco é
+  criado).
 
-### 8.2 Preencher o resto
+### 8.2 Resend: chave para enviar e-mail (`SMTP_PASSWORD`)
+
+O Pitwall manda e-mail para a equipe (chamado novo, resposta do cliente) pelo Resend, onde
+`braatz.com.br` já está verificado.
+
+1. Entre em https://resend.com e confira em **Domains** que `braatz.com.br` aparece como
+   **Verified**.
+2. Vá em **API Keys** (https://resend.com/api-keys) → **Create API Key**.
+3. *Name*: `pitwall`; *Permission*: **Sending access**; *Domain*: `braatz.com.br`.
+4. **Add**. A chave aparece **uma vez** e começa com `re_`. **Copie para o gerenciador de senhas**
+   como `SMTP_PASSWORD`.
+
+O remetente vai ser `pitwall@braatz.com.br`. Ele não precisa existir como caixa de e-mail: basta o
+domínio estar verificado no Resend.
+
+### 8.3 Cloudflare Email Routing: a caixa da equipe (`PITWALL_INBOX_EMAIL`)
+
+Os avisos vão para `suporte@braatz.com.br`, que a Cloudflare entrega no seu e-mail pessoal.
+
+1. https://dash.cloudflare.com → `braatz.com.br` → **Email** → **Email Routing** → **Routing
+   rules**.
+2. Se já existe uma regra para `suporte@braatz.com.br`, ou o **Catch-all address** está ativo
+   mandando para o seu e-mail, não precisa fazer nada.
+3. Se não existe: **Create address** → *Custom address* `suporte` → *Action* **Send to an email** →
+   *Destination* o seu e-mail pessoal → **Save**.
+
+Teste: mande um e-mail qualquer para `suporte@braatz.com.br` e confira que chegou no seu e-mail
+pessoal.
+
+### 8.4 Cloudflare R2: onde ficam os anexos (`STORAGE_*`)
+
+Os prints e as gravações de tela dos chamados ficam num bucket **privado** do R2 (o gratuito do R2
+cobre 10 GB). Aqui você cria dois buckets, um para os anexos e outro para os backups (parte 15), e
+uma chave de acesso que só enxerga esses dois.
+
+**Criar os buckets**
+
+1. https://dash.cloudflare.com → menu à esquerda **R2 Object Storage** → **Overview**.
+2. Anote o **Account ID** que aparece à direita da página (em *Account details*). É um código de 32
+   letras e números. Ao longo do guia ele é `<ACCOUNT-ID>`.
+3. **Create bucket** → *Bucket name* `pitwall-anexos` → *Location* **Automatic** → *Default storage
+   class* **Standard** → **Create bucket**.
+   - **Não** ative acesso público (*Public access* fica desligado, que é o padrão).
+   - **Não** escolha *jurisdiction* (EU/FedRAMP): ela muda o endereço do bucket.
+4. Volte para **R2 Object Storage** → **Create bucket** → `pitwall-backups`, com as mesmas opções.
+
+**Criar a chave de acesso**
+
+5. Em **R2 Object Storage** → **Overview**, clique em **API** (ou **Manage API tokens**, conforme a
+   versão do painel) → **Create Account API token** (se só houver **Create API token**, use esse).
+6. Preencha:
+   - *Token name*: `pitwall`
+   - *Permissions*: **Object Read & Write**
+   - *Specify bucket(s)*: **Apply to specific buckets only** → selecione `pitwall-anexos` e
+     `pitwall-backups`
+   - *TTL*: **Forever**
+   - *Client IP Address Filtering*: opcional. Se quiser, *Include* o `<IP-DA-VM>` (só a VM consegue
+     usar a chave; se um dia o IP da VM mudar, atualize aqui).
+7. **Create API Token**. A tela seguinte mostra os valores **uma vez**. Copie para o gerenciador de
+   senhas:
+   - **Access Key ID** → vai em `STORAGE_ACCESS_KEY`
+   - **Secret Access Key** → vai em `STORAGE_SECRET_KEY`
+   - o endereço em *Use jurisdiction-specific endpoints for S3 clients* (ou *S3 API*), no formato
+     `https://<ACCOUNT-ID>.r2.cloudflarestorage.com` → vai em `STORAGE_SERVICE_URL`, **sem** nome
+     de bucket no final.
+
+   (O *Token value* não é usado.)
+
+Os valores do `.env` ficam:
+
+```dotenv
+STORAGE_PROVIDER=s3
+STORAGE_BUCKET=pitwall-anexos
+STORAGE_SERVICE_URL=https://<ACCOUNT-ID>.r2.cloudflarestorage.com
+STORAGE_ACCESS_KEY=<Access Key ID>
+STORAGE_SECRET_KEY=<Secret Access Key>
+```
+
+### 8.5 Anthropic: notas de versão (`ANTHROPIC_API_KEY`)
+
+O Claude Haiku escreve as notas de versão a partir dos commits. Sem essa chave o resto do Pitwall
+funciona; só as notas não são escritas. Custa centavos por versão.
+
+1. Entre em https://console.anthropic.com.
+2. **Settings** → **Billing**: confira que há crédito (se não houver, **Buy credits**; US$ 5 duram
+   bastante para isso).
+3. **Settings** → **API Keys** → **Create Key** → *Name* `pitwall` → **Add**.
+4. A chave aparece **uma vez** e começa com `sk-ant-`. Copie para o gerenciador de senhas como
+   `ANTHROPIC_API_KEY`.
+
+### 8.6 Seu login no Pitwall (`PITWALL_ADMIN_EMAIL`, `PITWALL_ADMIN_PASSWORD`)
+
+O primeiro administrador é criado a partir destas duas linhas, na primeira subida. Depois do
+primeiro login você as apaga (parte 12).
+
+- `PITWALL_ADMIN_EMAIL`: o e-mail com que você vai entrar (por exemplo um `@braatz.com.br`). Use o
+  mesmo e-mail que vai liberar no Cloudflare Access (parte 11.4).
+- `PITWALL_ADMIN_PASSWORD`: gere uma senha de 24 caracteres no gerenciador de senhas, **sem o
+  caractere `$`** (o Docker Compose interpreta `$` no `.env`).
+
+### 8.7 Preencher o `.env`
+
+**(na VM)**
 
 ```bash
+cd /opt/pitwall
 nano .env
 ```
 
-Deixe o arquivo assim, trocando o que está entre `< >` (as duas linhas geradas no 8.1 já estão
-preenchidas; não mexa nelas):
+Apague o conteúdo que veio do modelo **menos as duas linhas** `POSTGRES_PASSWORD` e
+`PITWALL_SECRET_KEY` (geradas no 8.1) e deixe o arquivo assim, trocando os `< >` pelos valores que
+você guardou:
 
 ```dotenv
-POSTGRES_PASSWORD=<já gerado>
-PITWALL_SECRET_KEY=<já gerado>
+POSTGRES_PASSWORD=<já gerado no 8.1, não mexa>
+PITWALL_SECRET_KEY=<já gerado no 8.1, não mexa>
 PITWALL_CONSOLE_URL=https://pitwall.braatz.com.br
 PITWALL_INBOX_EMAIL=suporte@braatz.com.br
 PITWALL_REQUIRE_TOTP=true
-PITWALL_ADMIN_EMAIL=<seu e-mail de login no Pitwall>
-PITWALL_ADMIN_PASSWORD=<senha forte, gerada no gerenciador de senhas, sem o caractere $>
-ANTHROPIC_API_KEY=<sua chave da Anthropic, ou vazio>
-STORAGE_PROVIDER=fs
-STORAGE_BUCKET=
-STORAGE_SERVICE_URL=
-STORAGE_ACCESS_KEY=
-STORAGE_SECRET_KEY=
+PITWALL_ADMIN_EMAIL=<8.6>
+PITWALL_ADMIN_PASSWORD=<8.6>
+ANTHROPIC_API_KEY=<8.5, começa com sk-ant->
+STORAGE_PROVIDER=s3
+STORAGE_BUCKET=pitwall-anexos
+STORAGE_SERVICE_URL=https://<ACCOUNT-ID>.r2.cloudflarestorage.com
+STORAGE_ACCESS_KEY=<8.4, Access Key ID>
+STORAGE_SECRET_KEY=<8.4, Secret Access Key>
 SMTP_HOST=smtp.resend.com
 SMTP_PORT=587
 SMTP_USER=resend
-SMTP_PASSWORD=<API key do Resend criada para o Pitwall, começa com re_>
+SMTP_PASSWORD=<8.2, começa com re_>
 SMTP_FROM="Pitwall <pitwall@braatz.com.br>"
 PITWALL_API_DOMAIN=pitwall-api.braatz.com.br
 PITWALL_CONSOLE_DOMAIN=pitwall.braatz.com.br
 ```
 
-Notas:
+No nano, `Ctrl+K` apaga a linha onde está o cursor (útil para limpar o modelo) e o botão direito do
+mouse cola no terminal. Salve com `Ctrl+O`, Enter, e saia com `Ctrl+X`.
 
-- **Senha do admin sem `$`**: o Docker Compose interpreta `$` no `.env`. Se precisar de um, escreva
-  `$$`.
-- **`STORAGE_PROVIDER=fs`**: os anexos (prints e gravações) ficam no disco da VM, no volume
-  `pitwall_blobs`, que entra no backup da parte 15. É o mais simples. Para usar um bucket R2
-  privado, veja o apêndice A. Não use o Object Storage da Oracle: a API ainda não configura a
-  região de assinatura que a Oracle exige.
-- **E-mail (Resend):** crie uma chave só para o Pitwall em https://resend.com/api-keys → **Create
-  API Key** → *Name* `pitwall`, *Permission* **Sending access**, *Domain* `braatz.com.br` →
-  **Add**. Copie a chave (`re_…`, aparece uma vez) para o gerenciador de senhas e cole em
-  `SMTP_PASSWORD`. O remetente `pitwall@braatz.com.br` não precisa existir como caixa: basta o
-  domínio estar verificado no Resend.
-- **Caixa da equipe:** confira em Cloudflare → `braatz.com.br` → **Email** → **Email Routing** →
-  **Routing rules** que `suporte@braatz.com.br` chega no seu e-mail pessoal (uma regra para esse
-  endereço ou o *Catch-all* ativo). Se não houver, **Create address** → *Custom address*
-  `suporte` → *Action* **Send to an email** → seu e-mail pessoal → **Save**.
-
-Salve no nano: `Ctrl+O`, Enter, `Ctrl+X`.
-
-Confira que nada ficou com `<`:
+Confira que nada ficou por preencher:
 
 ```bash
 grep -n '<' .env
+grep -c . .env
 ```
 
-Se nada for impresso, está certo. (A única linha que pode aparecer é a do `SMTP_FROM`, que
-usa o formato `"Pitwall <pitwall@braatz.com.br>"`.)
+O primeiro comando só pode mostrar a linha do `SMTP_FROM` (o formato `"Pitwall <…>"` é esse mesmo).
+O segundo deve mostrar `20` (vinte linhas preenchidas).
 
 ---
 
@@ -644,13 +747,17 @@ Para cada sistema:
 2. No produto, logado como cliente: **Relatar um problema** → abra um chamado de teste.
 3. No console do Pitwall, o chamado aparece em **Chamados**; responda.
 4. No produto, a resposta aparece (e, no DataRunner, chega a notificação).
-5. Feche o chamado de teste.
+5. Anexe um print no chamado de teste. Em Cloudflare → **R2 Object Storage** → `pitwall-anexos`,
+   deve aparecer a pasta `tickets/`. Se o anexo falhar, veja `$COMPOSE logs api | grep -i s3`
+   (quase sempre é `STORAGE_SERVICE_URL` com o nome do bucket no fim, ou a chave sem acesso ao
+   bucket).
+6. Feche o chamado de teste.
 
 ---
 
 ## Parte 15 — Backups
 
-### 15.1 Dump diário do banco e dos anexos
+### 15.1 Dump diário do banco
 
 **(na VM)**
 
@@ -659,43 +766,38 @@ mkdir -p /opt/pitwall/backups
 crontab -e
 ```
 
-Se perguntar o editor, escolha `1` (nano). Cole no fim do arquivo as duas linhas (cada uma é uma
-linha só):
+Se perguntar o editor, escolha `1` (nano). Cole no fim do arquivo esta linha (é uma linha só):
 
 ```cron
 15 3 * * * docker compose -f /opt/pitwall/docker-compose.prod.yml exec -T postgres pg_dump -U pitwall -Fc pitwall > /opt/pitwall/backups/pitwall-$(date +\%F).dump 2>>/opt/pitwall/backups/backup.log && find /opt/pitwall/backups -name 'pitwall-*.dump' -mtime +14 -delete
-30 3 * * * docker run --rm -v pitwall_blobs:/data:ro -v /opt/pitwall/backups:/backup alpine tar czf /backup/blobs-$(date +\%F).tgz -C /data . && find /opt/pitwall/backups -name 'blobs-*.tgz' -mtime +14 -delete
 ```
 
 Salve (`Ctrl+O`, Enter, `Ctrl+X`). O `\%` é obrigatório no crontab. Mantém 14 dias.
 
+Os anexos não entram aqui: eles já estão no bucket `pitwall-anexos` do R2, fora da VM.
+
 Teste agora, sem esperar a madrugada:
 
 ```bash
-docker volume ls | grep pitwall_
 $COMPOSE exec -T postgres pg_dump -U pitwall -Fc pitwall > /opt/pitwall/backups/teste.dump
-docker run --rm -v pitwall_blobs:/data:ro -v /opt/pitwall/backups:/backup alpine tar czf /backup/teste-blobs.tgz -C /data .
 ls -lh /opt/pitwall/backups
-rm /opt/pitwall/backups/teste.dump /opt/pitwall/backups/teste-blobs.tgz
+rm /opt/pitwall/backups/teste.dump
 ```
 
-O primeiro comando deve listar `pitwall_blobs` e `pitwall_pg`. Os arquivos de teste devem ter
-tamanho maior que zero.
+O arquivo `teste.dump` deve ter tamanho maior que zero.
 
 ### 15.2 Cópia fora da Oracle (bucket R2)
 
 Um backup no mesmo disco não protege contra perder a VM.
 
-1. Cloudflare → **R2** → **Create bucket** → nome `pitwall-backups` → **Create**.
-2. **R2** → **Manage R2 API Tokens** → **Create API token** → *Permissions*: **Object Read & Write**;
-   *Specify bucket*: `pitwall-backups` → **Create**. Copie o *Access Key ID*, o *Secret Access Key*
-   e o endpoint `https://<account-id>.r2.cloudflarestorage.com`.
+O bucket `pitwall-backups` e a chave de acesso já foram criados no 8.4. Use os mesmos valores
+(*Access Key ID*, *Secret Access Key* e o `<ACCOUNT-ID>`).
 
 **(na VM)**
 
 ```bash
 sudo apt -y install rclone
-rclone config create r2 s3 provider Cloudflare access_key_id <ACCESS-KEY-ID> secret_access_key <SECRET-ACCESS-KEY> endpoint https://<account-id>.r2.cloudflarestorage.com acl private
+rclone config create r2 s3 provider Cloudflare access_key_id <Access Key ID> secret_access_key <Secret Access Key> endpoint https://<ACCOUNT-ID>.r2.cloudflarestorage.com acl private
 rclone copy /opt/pitwall/backups r2:pitwall-backups/pitwall
 rclone ls r2:pitwall-backups
 ```
@@ -726,11 +828,11 @@ apagando objetos com mais de 30 dias, se quiser limitar o espaço.
 ```bash
 $COMPOSE stop api
 $COMPOSE exec -T postgres pg_restore -U pitwall -d pitwall --clean --if-exists --no-owner < /opt/pitwall/backups/pitwall-AAAA-MM-DD.dump
-docker run --rm -v pitwall_blobs:/data -v /opt/pitwall/backups:/backup alpine sh -c "cd /data && tar xzf /backup/blobs-AAAA-MM-DD.tgz"
 $COMPOSE up -d api
 ```
 
-Lembre: o backup só abre com a mesma `PITWALL_SECRET_KEY` (parte 8.1).
+Lembre: o backup só abre com a mesma `PITWALL_SECRET_KEY` (parte 8.1). Os anexos continuam no R2 e
+não precisam ser restaurados.
 
 ---
 
@@ -867,33 +969,30 @@ Se a versão nova tiver mudado o banco, restaure também o `antes-da-atualizacao
 - [ ] Conta Oracle em Pay As You Go, com orçamento de US$ 1 e alerta.
 - [ ] VM `pitwall` (A1.Flex, Ubuntu 24.04 aarch64) com portas 80/443 na Security List e no iptables.
 - [ ] Docker instalado, logs limitados, `$COMPOSE` no `~/.bashrc`.
-- [ ] `.env` com `chmod 600`; `PITWALL_SECRET_KEY` e `POSTGRES_PASSWORD` no gerenciador de senhas.
+- [ ] `.env` com `chmod 600`; todas as chaves da parte 8 no item "Pitwall produção" do gerenciador de senhas.
 - [ ] `https://pitwall-api.braatz.com.br/health` responde `{"status":"ok"}`; DNS do `pitwall-api` cinza.
 - [ ] DNS do `pitwall` laranja, regra *Full (strict)* só para `pitwall.braatz.com.br`, `PITWALL_CONSOLE_ALLOWED_IPS` aplicado (IP direto dá 403).
 - [ ] Cloudflare Access pedindo e-mail antes do console.
 - [ ] Primeiro login, 2FA ativo, `PITWALL_ADMIN_*` vazios no `.env` e `api` recriado.
 - [ ] DataRunner, RH Flex e metrifree cadastrados, cada um com chave `backend`, chave `ci` e webhook.
 - [ ] Variáveis em cada sistema e `PITWALL_RELEASE_KEY` / `PITWALL_URL` no GitHub de cada um.
-- [ ] Backups: cron do banco e dos anexos, cópia diária para o R2, política do boot volume.
+- [ ] Anexos no bucket privado `pitwall-anexos` do R2 (o print de teste aparece lá).
+- [ ] Backups: cron do banco, cópia diária para `pitwall-backups` no R2, política do boot volume.
 - [ ] Monitor do UptimeRobot no `/health`.
 - [ ] Importação do DataRunner feita e `import.env` apagado.
 
 ---
 
-## Apêndice A — Anexos num bucket R2 em vez do disco
+## Apêndice A — Anexos no disco da VM, sem R2
 
-1. Cloudflare → **R2** → **Create bucket** → `pitwall-anexos` (privado, o padrão).
-2. **Manage R2 API Tokens** → **Create API token** → **Object Read & Write** só nesse bucket.
-3. **(na VM)** `nano /opt/pitwall/.env` e troque:
+Se um dia preferir não usar o R2, os anexos podem ficar no disco da VM (volume `pitwall_blobs`):
 
-   ```dotenv
-   STORAGE_PROVIDER=s3
-   STORAGE_BUCKET=pitwall-anexos
-   STORAGE_SERVICE_URL=https://<account-id>.r2.cloudflarestorage.com
-   STORAGE_ACCESS_KEY=<access key>
-   STORAGE_SECRET_KEY=<secret key>
+1. **(na VM)** `nano /opt/pitwall/.env` e deixe `STORAGE_PROVIDER=fs` (as outras `STORAGE_*` vazias).
+2. `$COMPOSE up -d api`.
+3. Inclua o volume no backup diário (`crontab -e`):
+
+   ```cron
+   30 3 * * * docker run --rm -v pitwall_blobs:/data:ro -v /opt/pitwall/backups:/backup alpine tar czf /backup/blobs-$(date +\%F).tgz -C /data . && find /opt/pitwall/backups -name 'blobs-*.tgz' -mtime +14 -delete
    ```
 
-4. `$COMPOSE up -d api`.
-
-Faça isso antes de ter anexos; trocar depois não move os arquivos que já estão no disco.
+Faça a escolha antes de ter anexos: trocar depois não move os arquivos que já existem.
