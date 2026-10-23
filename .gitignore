@@ -13,3 +13,7 @@ next-env.d.ts
 # Secrets
 .env
 !.env.example
+# Server state (docs/deploy-oracle.md): dumps and deploy/auto-update.sh bookkeeping
+backups/
+.deploy.lock
+.deploy-failed

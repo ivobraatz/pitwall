@@ -534,7 +534,7 @@ curl.exe -sS https://pitwall-api.braatz.com.br/health
 
 Resposta esperada: `{"status":"ok"}`.
 
-Se algo falhar aqui, veja a parte 19 (problemas comuns).
+Se algo falhar aqui, veja a parte 20 (problemas comuns).
 
 ---
 
@@ -936,6 +936,9 @@ Confira no console: **Chamados**, filtrando pelo sistema DataRunner. Rodar de no
 
 ## Parte 18 — Atualizar o Pitwall
 
+Depois da parte 19, isto acontece sozinho; os comandos abaixo são para atualizar à mão (ou
+entender o que o automático faz).
+
 Quando houver mudanças novas na `main` **(na VM)**:
 
 ```bash
@@ -966,7 +969,141 @@ Se a versão nova tiver mudado o banco, restaure também o `antes-da-atualizacao
 
 ---
 
-## Parte 19 — Problemas comuns
+## Parte 19 — Atualização automática (CI/CD)
+
+Com isto, todo commit que entra na `main` do Pitwall e **passa no CI** do GitHub chega sozinho na
+VM em até uns 5 minutos depois do CI terminar. Você não precisa entrar na VM para atualizar.
+
+**Como funciona.** Quem pergunta é a VM, não o GitHub: a cada 5 minutos um timer do sistema roda o
+`deploy/auto-update.sh`, que:
+
+1. busca a `main` no GitHub; se não há commit novo, não faz nada;
+2. consulta o resultado do workflow **CI** daquele commit; só segue se terminou com sucesso
+   (se ainda está rodando, espera a próxima volta; se falhou, ignora esse commit);
+3. faz um dump do banco em `/opt/pitwall/backups/antes-de-<commit>.dump` (guarda os 5 últimos);
+4. atualiza o código e roda `docker compose up -d --build` (as migrações rodam quando a API sobe);
+5. confere a saúde da API e do console por até 3 minutos;
+6. se a versão nova não subir, **volta o código para a anterior**, sobe de novo e marca o commit
+   como falho (ele não é tentado de novo; o próximo commit é).
+
+Por isso o GitHub não precisa de acesso à VM: nenhuma chave SSH do servidor fica em lugar nenhum e a
+porta 22 continua só para você.
+
+### 19.1 Conferir a VM
+
+**(na VM)**
+
+```bash
+cd /opt/pitwall
+git branch --show-current
+git status --short
+```
+
+- O primeiro comando tem que imprimir `main`. Se imprimir vazio (você está numa tag ou num commit
+  solto), rode `git switch main`.
+- O segundo não pode listar arquivos com `M` na frente (mudanças locais em arquivos do
+  repositório). O `.env` e a pasta `backups/` não aparecem: eles são ignorados pelo git.
+
+Traga a versão mais nova uma vez à mão, para o script e os arquivos do timer existirem na VM:
+
+```bash
+git pull
+$COMPOSE up -d --build
+```
+
+### 19.2 Instalar o que o script usa
+
+```bash
+sudo apt -y install jq
+ls -l /opt/pitwall/deploy/auto-update.sh
+```
+
+O `ls` deve mostrar `-rwxr-xr-x` (executável). Se não mostrar o `x`, rode
+`chmod +x /opt/pitwall/deploy/auto-update.sh`.
+
+### 19.3 Testar sem mudar nada
+
+```bash
+/opt/pitwall/deploy/auto-update.sh --dry-run
+```
+
+Respostas possíveis, todas normais:
+
+| Mensagem | Significado |
+|---|---|
+| `nada novo (abc1234)` | a VM já está no commit mais novo da `main` |
+| `atualizando abc1234 → def5678: …` e `(dry-run) pararia aqui` | há versão nova com CI verde; sem o `--dry-run`, ela seria instalada |
+| `CI de def5678 ainda não terminou (in_progress null)` | o CI do commit novo ainda está rodando |
+
+Se aparecer `command not found: jq`, volte ao 19.2.
+
+### 19.4 Ligar o timer
+
+```bash
+sudo cp /opt/pitwall/deploy/systemd/pitwall-update.service /etc/systemd/system/
+sudo cp /opt/pitwall/deploy/systemd/pitwall-update.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now pitwall-update.timer
+systemctl list-timers pitwall-update.timer
+```
+
+O último comando mostra a próxima execução (coluna `NEXT`), em até 5 minutos.
+
+Rode uma vez agora, para ver funcionando:
+
+```bash
+sudo systemctl start pitwall-update.service
+journalctl -u pitwall-update.service -n 20 --no-pager
+```
+
+Se não havia nada novo, o `journalctl` não mostra mensagem do script (ele só escreve quando há o que
+fazer); aparece apenas `Finished pitwall-update.service`.
+
+### 19.5 O dia a dia
+
+- **Publicar uma atualização:** faça commit e push na `main` do Pitwall (ou merge de um PR). O CI
+  roda no GitHub (uns 5 minutos); em até 5 minutos depois de ele ficar verde, a VM atualiza. Uma
+  atualização com build leva de 5 a 15 minutos na VM, durante os quais o Pitwall continua no ar com
+  a versão anterior até os containers novos subirem.
+- **Ver o que aconteceu:**
+
+  ```bash
+  journalctl -u pitwall-update.service --since today --no-pager
+  ```
+
+- **Forçar uma verificação agora:** `sudo systemctl start pitwall-update.service`.
+- **Pausar as atualizações automáticas** (por exemplo antes de mexer à mão no servidor):
+
+  ```bash
+  sudo systemctl stop pitwall-update.timer
+  ```
+
+  e para voltar: `sudo systemctl start pitwall-update.timer`.
+- **Um commit foi marcado como falho e você corrigiu o problema no servidor** (não no código):
+  apague a marca para ele ser tentado de novo:
+
+  ```bash
+  rm -f /opt/pitwall/.deploy-failed
+  sudo systemctl start pitwall-update.service
+  ```
+
+  Se o problema era no código, basta mandar um commit novo com a correção.
+- **Voltar o banco** depois de uma atualização que mudou o banco e deu errado: os dumps
+  `antes-de-<commit>.dump` ficam em `/opt/pitwall/backups/`; restaure como na parte 15.4.
+
+### 19.6 Ser avisado quando der errado
+
+O monitor do UptimeRobot (parte 16) avisa se o Pitwall sair do ar. Para saber também de uma
+atualização que voltou sozinha para a versão anterior, olhe o `journalctl` do 19.5 de vez em quando,
+ou procure por `não subiu` e `ATENÇÃO`:
+
+```bash
+journalctl -u pitwall-update.service --since "7 days ago" --no-pager | grep -E "não subiu|ATENÇÃO|não atualizo"
+```
+
+---
+
+## Parte 20 — Problemas comuns
 
 | Sintoma | Causa e solução |
 |---|---|
@@ -982,10 +1119,11 @@ Se a versão nova tiver mudado o banco, restaure também o `antes-da-atualizacao
 | A VM parou sozinha depois de dias | Recuperação de VM ociosa: passe a conta para Pay As You Go (1.2) e ligue a VM de novo |
 | Depois de reiniciar a VM o site não volta | `sudo iptables -L INPUT -n` (as regras do 5.3 continuam?) e `$COMPOSE ps`; se precisar, `sudo systemctl restart docker && $COMPOSE up -d` |
 | Webhook **Testar** falha | O sistema ainda não tem `…WebhookSecret`/`PITWALL_WEBHOOK_SECRET` igual ao gerado, ou a branch `feat/pitwall` ainda não está no ar, ou a URL está errada |
+| A VM não atualizou depois do push | `journalctl -u pitwall-update.service -n 50 --no-pager`. Causas comuns: CI vermelho ou ainda rodando, commit marcado em `.deploy-failed` (parte 19.5), mudanças locais no servidor (`git status`), timer parado (`systemctl list-timers`) |
 
 ---
 
-## Parte 20 — Checklist final
+## Parte 21 — Checklist final
 
 - [ ] Conta Oracle em Pay As You Go, com orçamento de US$ 1 e alerta.
 - [ ] VM `pitwall` (A1.Flex, Ubuntu 24.04 aarch64) com portas 80/443 na Security List e no iptables.
@@ -1000,6 +1138,7 @@ Se a versão nova tiver mudado o banco, restaure também o `antes-da-atualizacao
 - [ ] Anexos no bucket privado `pitwall-anexos` do R2 (o print de teste aparece lá).
 - [ ] Backups: cron do banco, cópia diária para `pitwall-backups` no R2, política do boot volume.
 - [ ] Monitor do UptimeRobot no `/health`.
+- [ ] Timer `pitwall-update.timer` ativo (`systemctl list-timers pitwall-update.timer`).
 - [ ] Importação do DataRunner feita e `import.env` apagado.
 
 ---

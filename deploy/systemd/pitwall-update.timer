@@ -1,0 +1,11 @@
+# Installed by docs/deploy-oracle.md (parte 19).
+[Unit]
+Description=Pitwall: check for a new version every 5 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=30s
+
+[Install]
+WantedBy=timers.target

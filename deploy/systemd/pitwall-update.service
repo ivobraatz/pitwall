@@ -1,0 +1,13 @@
+# Installed by docs/deploy-oracle.md (parte 19). Runs deploy/auto-update.sh once; the timer repeats it.
+[Unit]
+Description=Pitwall: deploy the newest commit that passed CI
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/pitwall
+ExecStart=/opt/pitwall/deploy/auto-update.sh
+# The first build on the server compiles the API and the console.
+TimeoutStartSec=45min
