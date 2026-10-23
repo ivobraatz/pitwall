@@ -287,7 +287,14 @@ valor abaixo vai para lá assim que aparecer (vários aparecem uma vez só).
 | `STORAGE_BUCKET`, `STORAGE_SERVICE_URL`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` | Cloudflare R2               | 8.4   |
 | `ANTHROPIC_API_KEY`                                                                 | Anthropic                   | 8.5   |
 | `PITWALL_ADMIN_EMAIL`, `PITWALL_ADMIN_PASSWORD`                                     | você escolhe                | 8.6   |
-| o resto                                                                             | já vem pronto no modelo     | 8.7   |
+| `PITWALL_CONSOLE_URL` = `https://pitwall.braatz.com.br` | valor fixo: endereço do console, usado nos links dos e-mails | 8.7 |
+| `PITWALL_REQUIRE_TOTP` = `true` | valor fixo: obriga o 2FA para a equipe | 8.7 |
+| `PITWALL_API_DOMAIN` = `pitwall-api.braatz.com.br`, `PITWALL_CONSOLE_DOMAIN` = `pitwall.braatz.com.br` | valores fixos: os nomes para os quais o Caddy emite certificado | 8.7 |
+| `SMTP_HOST` = `smtp.resend.com`, `SMTP_PORT` = `587`, `SMTP_USER` = `resend`, `SMTP_FROM` = `"Pitwall <pitwall@braatz.com.br>"` | valores fixos do Resend | 8.7 |
+| `PITWALL_CONSOLE_ALLOWED_IPS` | faixas de IP da Cloudflare, acrescentadas por comando mais tarde | 11.3 |
+| `PITWALL_STAFF_HOSTS` | não precisa: o padrão (`api`) já é o certo para este deploy | — |
+
+Os valores fixos já estão escritos no `.env` completo do passo 8.7: é só copiar.
 
 ### 8.1 Gerar as senhas internas (na VM)
 
