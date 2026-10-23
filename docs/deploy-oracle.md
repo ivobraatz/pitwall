@@ -279,20 +279,20 @@ O `.env` guarda tudo que o Pitwall precisa. Antes de preenchê-lo, você vai bus
 serviço de onde ela vem. Abra o gerenciador de senhas e crie um item **"Pitwall produção"**: cada
 valor abaixo vai para lá assim que aparecer (vários aparecem uma vez só).
 
-| Variável do `.env`                                                                  | De onde vem                 | Passo |
-| ----------------------------------------------------------------------------------- | --------------------------- | ----- |
-| `POSTGRES_PASSWORD`, `PITWALL_SECRET_KEY`                                           | gerados na VM               | 8.1   |
-| `SMTP_PASSWORD`                                                                     | Resend                      | 8.2   |
-| `PITWALL_INBOX_EMAIL`                                                               | Email Routing da Cloudflare | 8.3   |
-| `STORAGE_BUCKET`, `STORAGE_SERVICE_URL`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` | Cloudflare R2               | 8.4   |
-| `ANTHROPIC_API_KEY`                                                                 | Anthropic                   | 8.5   |
-| `PITWALL_ADMIN_EMAIL`, `PITWALL_ADMIN_PASSWORD`                                     | você escolhe                | 8.6   |
-| `PITWALL_CONSOLE_URL` = `https://pitwall.braatz.com.br` | valor fixo: endereço do console, usado nos links dos e-mails | 8.7 |
-| `PITWALL_REQUIRE_TOTP` = `true` | valor fixo: obriga o 2FA para a equipe | 8.7 |
-| `PITWALL_API_DOMAIN` = `pitwall-api.braatz.com.br`, `PITWALL_CONSOLE_DOMAIN` = `pitwall.braatz.com.br` | valores fixos: os nomes para os quais o Caddy emite certificado | 8.7 |
-| `SMTP_HOST` = `smtp.resend.com`, `SMTP_PORT` = `587`, `SMTP_USER` = `resend`, `SMTP_FROM` = `"Pitwall <pitwall@braatz.com.br>"` | valores fixos do Resend | 8.7 |
-| `PITWALL_CONSOLE_ALLOWED_IPS` | faixas de IP da Cloudflare, acrescentadas por comando mais tarde | 11.3 |
-| `PITWALL_STAFF_HOSTS` | não precisa: o padrão (`api`) já é o certo para este deploy | — |
+| Variável do `.env`                                                                                                              | De onde vem                                                      | Passo |
+| ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----- |
+| `POSTGRES_PASSWORD`, `PITWALL_SECRET_KEY`                                                                                       | gerados na VM                                                    | 8.1   |
+| `SMTP_PASSWORD`                                                                                                                 | Resend                                                           | 8.2   |
+| `PITWALL_INBOX_EMAIL`                                                                                                           | Email Routing da Cloudflare                                      | 8.3   |
+| `STORAGE_BUCKET`, `STORAGE_SERVICE_URL`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY`                                             | Cloudflare R2                                                    | 8.4   |
+| `ANTHROPIC_API_KEY`                                                                                                             | Anthropic                                                        | 8.5   |
+| `PITWALL_ADMIN_EMAIL`, `PITWALL_ADMIN_PASSWORD`                                                                                 | você escolhe                                                     | 8.6   |
+| `PITWALL_CONSOLE_URL` = `https://pitwall.braatz.com.br`                                                                         | valor fixo: endereço do console, usado nos links dos e-mails     | 8.7   |
+| `PITWALL_REQUIRE_TOTP` = `true`                                                                                                 | valor fixo: obriga o 2FA para a equipe                           | 8.7   |
+| `PITWALL_API_DOMAIN` = `pitwall-api.braatz.com.br`, `PITWALL_CONSOLE_DOMAIN` = `pitwall.braatz.com.br`                          | valores fixos: os nomes para os quais o Caddy emite certificado  | 8.7   |
+| `SMTP_HOST` = `smtp.resend.com`, `SMTP_PORT` = `587`, `SMTP_USER` = `resend`, `SMTP_FROM` = `"Pitwall <pitwall@braatz.com.br>"` | valores fixos do Resend                                          | 8.7   |
+| `PITWALL_CONSOLE_ALLOWED_IPS`                                                                                                   | faixas de IP da Cloudflare, acrescentadas por comando mais tarde | 11.3  |
+| `PITWALL_STAFF_HOSTS`                                                                                                           | não precisa: o padrão (`api`) já é o certo para este deploy      | —     |
 
 Os valores fixos já estão escritos no `.env` completo do passo 8.7: é só copiar.
 
@@ -602,15 +602,29 @@ este passo (apague antes a linha antiga com `nano .env`).
 
 1. Abra https://one.dash.cloudflare.com (Cloudflare **Zero Trust**). Na primeira vez, escolha um
    *team name* (qualquer, por exemplo `ivobraatz`) e o plano **Free** (até 50 usuários).
-2. **Access** → **Applications** → **Add an application** → **Self-hosted**.
-3. *Application name*: `Pitwall console`; *Session Duration*: `24 hours`.
-4. **Add public hostname**: *Subdomain* `pitwall`, *Domain* `braatz.com.br`, *Path* vazio.
+
+**Antes da aplicação: ativar o login por código no e-mail (One-time PIN).** Ele não vem ativo; sem
+isso, a aplicação só oferece a opção "Cloudflare".
+
+2. No Zero Trust, vá em **Settings** → **Authentication** → em *Login methods*, **Add new**.
+   (Em versões mais novas do painel o caminho é **Integrations** → **Identity providers** →
+   **Add an identity provider**.)
+3. Escolha **One-time PIN** → **Save**. Ele passa a aparecer na lista de *Login methods*.
+
+**A aplicação**
+
+4. **Access** → **Applications** → **Add an application** → **Self-hosted**.
+5. *Application name*: `Pitwall console`; *Session Duration*: `24 hours`.
+6. **Add public hostname**: *Subdomain* `pitwall`, *Domain* `braatz.com.br`, *Path* vazio.
    **Não** adicione o `pitwall-api`.
-5. Avance até **Policies** → **Add a policy**:
+7. Avance até **Policies** → **Add a policy**:
    - *Policy name*: `Equipe`; *Action*: **Allow**;
    - *Include* → *Selector*: **Emails** → *Value*: o seu e-mail (e o de quem mais for da equipe).
-6. *Login methods*: deixe **One-time PIN** (código por e-mail) marcado.
-7. Salve (**Save application**).
+8. *Login methods*: desligue **Accept all available identity providers** e marque só
+   **One-time PIN**. Se a lista ainda mostrar só "Cloudflare", salve a aplicação assim mesmo, faça
+   os passos 2 e 3 e depois volte em **Access** → **Applications** → `Pitwall console` → **Edit** →
+   *Login methods* para marcar o One-time PIN.
+9. Salve (**Save application**).
 
 Confira: numa **janela anônima**, abra `https://pitwall.braatz.com.br`. Deve aparecer a tela da
 Cloudflare pedindo e-mail; um código chega no seu e-mail; depois aparece o login do Pitwall.
