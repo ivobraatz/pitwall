@@ -242,11 +242,11 @@ sudo mkdir -p /opt/pitwall
 sudo chown ubuntu:ubuntu /opt/pitwall
 git clone https://github.com/ivobraatz/pitwall.git /opt/pitwall
 cd /opt/pitwall
-git checkout v0.1.0
+git log --oneline -1
 ```
 
-`git checkout v0.1.0` fixa a versão publicada. (Para usar o que está na `main`, rode
-`git switch main`.)
+O servidor roda a branch `main`. O `git log` mostra o commit em uso; anote-o, ele é o ponto de
+volta se uma atualização der errado (parte 18).
 
 Crie um atalho para os comandos do compose, valendo em qualquer pasta e em toda sessão:
 
@@ -784,13 +784,13 @@ Confira no console: **Chamados**, filtrando pelo sistema DataRunner. Rodar de no
 
 ## Parte 18 — Atualizar o Pitwall
 
-Quando sair uma versão nova (por exemplo `v0.2.0`) **(na VM)**:
+Quando houver mudanças novas na `main` **(na VM)**:
 
 ```bash
 cd /opt/pitwall
+git log --oneline -1
 $COMPOSE exec -T postgres pg_dump -U pitwall -Fc pitwall > /opt/pitwall/backups/antes-da-atualizacao.dump
-git fetch --tags
-git checkout v0.2.0
+git pull
 $COMPOSE up -d --build
 $COMPOSE ps
 curl -sS https://api.<seu-domínio>/health
@@ -798,13 +798,17 @@ curl -sS https://api.<seu-domínio>/health
 
 As migrações do banco rodam sozinhas quando a API sobe.
 
-**Voltar** para a versão anterior:
+O primeiro `git log` mostra o commit em uso antes de atualizar; anote-o.
+
+**Voltar** para ele, se a atualização der errado:
 
 ```bash
 cd /opt/pitwall
-git checkout v0.1.0
+git checkout <commit anotado>
 $COMPOSE up -d --build
 ```
+
+Depois, para seguir a `main` de novo: `git switch main`.
 
 Se a versão nova tiver mudado o banco, restaure também o `antes-da-atualizacao.dump` (parte 15.4).
 
