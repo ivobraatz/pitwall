@@ -279,15 +279,15 @@ O `.env` guarda tudo que o Pitwall precisa. Antes de preenchê-lo, você vai bus
 serviço de onde ela vem. Abra o gerenciador de senhas e crie um item **"Pitwall produção"**: cada
 valor abaixo vai para lá assim que aparecer (vários aparecem uma vez só).
 
-| Variável do `.env` | De onde vem | Passo |
-|---|---|---|
-| `POSTGRES_PASSWORD`, `PITWALL_SECRET_KEY` | gerados na VM | 8.1 |
-| `SMTP_PASSWORD` | Resend | 8.2 |
-| `PITWALL_INBOX_EMAIL` | Email Routing da Cloudflare | 8.3 |
-| `STORAGE_BUCKET`, `STORAGE_SERVICE_URL`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` | Cloudflare R2 | 8.4 |
-| `ANTHROPIC_API_KEY` | Anthropic | 8.5 |
-| `PITWALL_ADMIN_EMAIL`, `PITWALL_ADMIN_PASSWORD` | você escolhe | 8.6 |
-| o resto | já vem pronto no modelo | 8.7 |
+| Variável do `.env`                                                                  | De onde vem                 | Passo |
+| ----------------------------------------------------------------------------------- | --------------------------- | ----- |
+| `POSTGRES_PASSWORD`, `PITWALL_SECRET_KEY`                                           | gerados na VM               | 8.1   |
+| `SMTP_PASSWORD`                                                                     | Resend                      | 8.2   |
+| `PITWALL_INBOX_EMAIL`                                                               | Email Routing da Cloudflare | 8.3   |
+| `STORAGE_BUCKET`, `STORAGE_SERVICE_URL`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` | Cloudflare R2               | 8.4   |
+| `ANTHROPIC_API_KEY`                                                                 | Anthropic                   | 8.5   |
+| `PITWALL_ADMIN_EMAIL`, `PITWALL_ADMIN_PASSWORD`                                     | você escolhe                | 8.6   |
+| o resto                                                                             | já vem pronto no modelo     | 8.7   |
 
 ### 8.1 Gerar as senhas internas (na VM)
 
