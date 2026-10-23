@@ -1,0 +1,17 @@
+{
+  "name": "@pitwall/demo-product",
+  "private": true,
+  "type": "module",
+  "description": "A pretend product wired to Pitwall end to end: bridge, error reporting, webhooks and the browser widget.",
+  "scripts": {
+    "build": "esbuild app.js --bundle --format=esm --outfile=public/app.js --sourcemap",
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "dev": "pnpm build && pnpm start"
+  },
+  "dependencies": {
+    "@pitwall/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

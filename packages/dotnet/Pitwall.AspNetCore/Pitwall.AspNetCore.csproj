@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- net9.0 too: RH Flex is still on .NET 9. -->
+    <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <PackageId>Pitwall.AspNetCore</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Connects an ASP.NET Core product to Pitwall: the support bridge, server error reporting and signed webhooks.</Description>
+    <Authors>Ivo Braatz</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/ivobraatz/pitwall</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/ivobraatz/pitwall</PackageProjectUrl>
+    <PackageTags>pitwall;support;tickets;error-reporting;webhooks;aspnetcore</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

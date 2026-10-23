@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Produto demo · Pitwall</title>
+  <style>
+    /* The product themes the Pitwall widgets with its own tokens. */
+    :root { --pw-accent: #7c3aed; --pw-accent-fg: #fff; --pw-bg: #fff; --pw-surface: #fff; --pw-muted-bg: #f4f4f5; --pw-fg: #18181b; --pw-fg-muted: #52525b; --pw-fg-subtle: #a1a1aa; --pw-border: #e4e4e7; color-scheme: light; font-family: system-ui, sans-serif; color: #18181b; background: #fafafa; }
+    body { margin: 0; }
+    header { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: #fff; border-bottom: 1px solid #e4e4e7; }
+    header strong { font-size: 15px; }
+    nav { display: flex; gap: 4px; }
+    nav a { padding: 6px 10px; border-radius: 6px; color: #52525b; text-decoration: none; font-size: 14px; }
+    nav a.on { background: #f4f4f5; color: #18181b; }
+    header .right { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 13px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; }
+    button { font: inherit; padding: 7px 12px; border-radius: 6px; border: 1px solid #d4d4d8; background: #fff; cursor: pointer; }
+    button.primary { background: #7c3aed; color: #fff; border-color: transparent; }
+    table { border-collapse: collapse; width: 100%; background: #fff; margin: 16px 0; font-size: 14px; }
+    td, th { border: 1px solid #e4e4e7; padding: 8px 10px; text-align: left; }
+    .muted { color: #71717a; font-size: 14px; }
+    pre { background: #fff; border: 1px solid #e4e4e7; padding: 12px; white-space: pre-wrap; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Acme Analytics</strong>
+    <nav><a href="#/">Início</a><a href="#/support">Suporte</a><a href="#/webhooks">Webhooks</a></nav>
+    <div class="right">
+      <label>Entrar como
+        <select id="who">
+          <option value="ana">Ana (Acme)</option>
+          <option value="bruno">Bruno (Acme)</option>
+          <option value="carla">Carla (Globex)</option>
+        </select>
+      </label>
+      <button data-action="report">Relatar um problema</button>
+    </div>
+  </header>
+  <main id="view"></main>
+  <template id="home">
+    <h1>Relatórios</h1>
+    <p class="muted">Um produto de mentira ligado ao Pitwall. A tabela abaixo aparece mascarada nas gravações.</p>
+    <table>
+      <tr><th>Cliente</th><th>CPF</th><th>Receita</th></tr>
+      <tr><td>Maria Oliveira</td><td>123.456.789-00</td><td>R$ 12.400</td></tr>
+      <tr><td>João Pereira</td><td>987.654.321-00</td><td>R$ 8.950</td></tr>
+    </table>
+    <p><input placeholder="Filtro (o valor é mascarado)" /> <button class="primary" data-action="run">Rodar relatório</button> <span id="result" class="muted"></span></p>
+    <p class="muted">"Rodar relatório" falha com 500 de propósito: o servidor manda o erro ao Pitwall e o navegador oferece abrir um chamado.</p>
+  </template>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

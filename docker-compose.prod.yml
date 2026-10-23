@@ -1,0 +1,96 @@
+# The whole Pitwall on one box: Postgres, the API and the console.
+#
+# Public traffic goes through Caddy (profile "caddy"; see deploy/Caddyfile and docs/deploy-vps.md):
+#   api.<domínio>      the API, called by the products' backends (public by design)
+#   pitwall.<domínio>  the console, for the team: MUST sit behind Cloudflare Access or Tailscale
+# The console proxies /v1 to the API, so the console hostname must never be the products' path.
+#
+# Without the profile, the console is bound to 127.0.0.1 only (reach it through an SSH tunnel), so
+# nothing is public by accident. Postgres is never published. Before the caddy profile existed the
+# console was published on 0.0.0.0:3200; if you really want that back, change its ports line to
+# "3200:3200" (not recommended: plain HTTP, no access gate).
+#
+#   cp .env.example .env   # fill in the secrets (keep a copy of PITWALL_SECRET_KEY in your password manager)
+#   docker compose -f docker-compose.prod.yml --profile caddy up -d --build   # with TLS in front
+#   docker compose -f docker-compose.prod.yml up -d --build                   # no Caddy: loopback only
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pitwall
+      POSTGRES_USER: pitwall
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pitwall"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    depends_on: { postgres: { condition: service_healthy } }
+    environment:
+      ConnectionStrings__Pitwall: Host=postgres;Database=pitwall;Username=pitwall;Password=${POSTGRES_PASSWORD}
+      Pitwall__SecretKey: ${PITWALL_SECRET_KEY:?set PITWALL_SECRET_KEY (openssl rand -base64 32)}
+      Pitwall__ConsoleUrl: ${PITWALL_CONSOLE_URL:-}
+      Pitwall__InboxEmail: ${PITWALL_INBOX_EMAIL:-}
+      Pitwall__RequireTotp: ${PITWALL_REQUIRE_TOTP:-true}
+      # /v1/staff answers only when called as http://api:8080, i.e. by the console.
+      Pitwall__StaffHosts: ${PITWALL_STAFF_HOSTS:-api}
+      Pitwall__Bootstrap__Email: ${PITWALL_ADMIN_EMAIL:-}
+      Pitwall__Bootstrap__Password: ${PITWALL_ADMIN_PASSWORD:-}
+      Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
+      Storage__Provider: ${STORAGE_PROVIDER:-fs}
+      Storage__Bucket: ${STORAGE_BUCKET:-}
+      Storage__ServiceUrl: ${STORAGE_SERVICE_URL:-}
+      Storage__AccessKey: ${STORAGE_ACCESS_KEY:-}
+      Storage__SecretKey: ${STORAGE_SECRET_KEY:-}
+      Smtp__Host: ${SMTP_HOST:-}
+      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__User: ${SMTP_USER:-}
+      Smtp__Password: ${SMTP_PASSWORD:-}
+      Smtp__From: ${SMTP_FROM:-}
+    volumes:
+      - blobs:/data
+    ports:
+      - "127.0.0.1:5180:8080"
+    restart: unless-stopped
+
+  console:
+    build: { context: ., dockerfile: apps/console/Dockerfile }
+    depends_on: [api]
+    environment:
+      PITWALL_API_URL: http://api:8080
+    ports:
+      # Loopback only: with the caddy profile, Caddy is the one public door. Without it, use
+      # `ssh -L 3200:127.0.0.1:3200 <servidor>` to reach the console.
+      - "127.0.0.1:3200:3200"
+    restart: unless-stopped
+
+  # Optional: TLS (Let's Encrypt) and routing for the two hostnames. Enabled with --profile caddy.
+  # Both PITWALL_*_DOMAIN must be set in .env and resolve to this server before the first start.
+  # The defaults are deliberately not real hosts (".invalid"): Compose evaluates this service even
+  # without the profile, so a hard "required" check here would break the plain `up` command.
+  caddy:
+    profiles: ["caddy"]
+    image: caddy:2-alpine
+    environment:
+      PITWALL_API_DOMAIN: ${PITWALL_API_DOMAIN:-api.invalid}
+      PITWALL_CONSOLE_DOMAIN: ${PITWALL_CONSOLE_DOMAIN:-console.invalid}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api, console]
+    restart: unless-stopped
+
+volumes:
+  pg:
+  blobs:
+  caddy_data:
+  caddy_config:

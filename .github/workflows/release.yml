@@ -1,0 +1,82 @@
+name: Release
+
+# Publica o pitwall-sdk no npm e o Pitwall.AspNetCore no NuGet quando sai uma tag v<versão>.
+#
+# Como lançar uma versão (exemplo: 0.1.0):
+#   1. Suba a versão nos dois lugares:
+#        packages/sdk/package.json          "version": "0.1.0"
+#        packages/dotnet/Pitwall.AspNetCore/Pitwall.AspNetCore.csproj   <Version>0.1.0</Version>
+#   2. Commite as duas mudanças.
+#   3. Crie e envie a tag:  git tag v0.1.0 && git push origin v0.1.0
+#
+# O workflow falha antes de publicar se a tag e as duas versões não baterem.
+#
+# Secrets necessários no repositório (Settings > Secrets and variables > Actions):
+#   NPM_TOKEN       token de publicação do npm (escopo do pacote pitwall-sdk, ou automation token)
+#   NUGET_API_KEY   chave de API do nuget.org com permissão de push em Pitwall.AspNetCore
+#
+# GITHUB_TOKEN não é usado para publicar; o npm recebe a proveniência via id-token.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            10.0.x
+            9.0.x
+
+      - name: A tag confere com as versões dos pacotes
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          npm_version=$(node -p "require('./packages/sdk/package.json').version")
+          nuget_version=$(grep -oP '(?<=<Version>)[^<]+' packages/dotnet/Pitwall.AspNetCore/Pitwall.AspNetCore.csproj | head -n 1)
+          echo "tag=$tag npm=$npm_version nuget=$nuget_version"
+          if [ "$npm_version" != "$tag" ] || [ "$nuget_version" != "$tag" ]; then
+            echo "::error::a tag é $GITHUB_REF_NAME, mas packages/sdk/package.json está em $npm_version e o csproj em $nuget_version"
+            exit 1
+          fi
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter @pitwall/sdk build
+
+      - run: pnpm --filter @pitwall/sdk test
+
+      # Testcontainers sobe o Postgres; o runner ubuntu-latest já tem Docker.
+      - run: dotnet test Pitwall.slnx
+
+      - name: Publica o pitwall-sdk no npm
+        working-directory: packages/sdk
+        # O build já rodou acima; --ignore-scripts pula o prepublishOnly.
+        # O nome interno é @pitwall/sdk; no npm o pacote sai como pitwall-sdk.
+        run: |
+          npm pkg set name=pitwall-sdk
+          npm publish --provenance --access public --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Empacota e publica o Pitwall.AspNetCore no NuGet
+        run: |
+          dotnet pack packages/dotnet/Pitwall.AspNetCore -c Release -o out
+          dotnet nuget push "out/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

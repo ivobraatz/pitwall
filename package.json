@@ -1,0 +1,17 @@
+{
+  "name": "pitwall",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:stack": "node scripts/dev.mjs --no-demo",
+    "build": "pnpm -r build",
+    "dev:console": "pnpm --filter @pitwall/console dev",
+    "build:sdk": "pnpm --filter @pitwall/sdk build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "dotnet test Pitwall.slnx && pnpm --filter @pitwall/sdk test"
+  }
+}

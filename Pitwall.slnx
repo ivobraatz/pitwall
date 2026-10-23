@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/apps/" />
+  <Folder Name="/apps/api/">
+    <Project Path="apps/api/Pitwall.Api/Pitwall.Api.csproj" />
+    <Project Path="apps/api/Pitwall.Tests/Pitwall.Tests.csproj" />
+  </Folder>
+  <Folder Name="/packages/" />
+  <Folder Name="/packages/dotnet/">
+    <Project Path="packages/dotnet/Pitwall.AspNetCore/Pitwall.AspNetCore.csproj" />
+  </Folder>
+</Solution>

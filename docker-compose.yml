@@ -1,0 +1,20 @@
+# Local development: Postgres only. Run the API with `dotnet run` and the console with `pnpm dev`.
+# docker compose -f docker-compose.prod.yml up for the whole stack.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pitwall
+      POSTGRES_USER: pitwall
+      POSTGRES_PASSWORD: pitwall
+    ports:
+      - "5434:5432"
+    volumes:
+      - pitwall-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pitwall"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  pitwall-pg:

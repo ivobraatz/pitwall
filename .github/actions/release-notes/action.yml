@@ -1,0 +1,64 @@
+name: Pitwall release notes
+description: >
+  Sends the commits shipped since the last note to Pitwall, which writes the customer-facing
+  "what's new" with Claude Haiku, resolves the tickets the commits mention, and publishes it.
+  The calling workflow must check out with fetch-depth 0 and have `contents: write` to push the marker tag.
+
+inputs:
+  pitwall-url:
+    description: The Pitwall API URL.
+    required: true
+  release-key:
+    description: A product key with the `releases` scope (store it as a secret).
+    required: true
+  version:
+    description: Version to announce. Default: major.minor of version-from + commit count.
+    required: false
+    default: ''
+  version-from:
+    description: package.json whose "version" gives major.minor.
+    required: false
+    default: package.json
+  tag-prefix:
+    description: Marker tag prefix.
+    required: false
+    default: notes/
+  first-commit:
+    description: Where to start when there is no marker tag yet.
+    required: false
+    default: ''
+  settle-minutes:
+    description: Commits younger than this wait for the next run.
+    required: false
+    default: '30'
+  dry-run:
+    description: Show the note, publish nothing.
+    required: false
+    default: 'false'
+  context:
+    description: Extra words from the team for the writer.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - shell: bash
+      env:
+        PITWALL_URL: ${{ inputs.pitwall-url }}
+        PITWALL_RELEASE_KEY: ${{ inputs.release-key }}
+        VERSION: ${{ inputs.version }}
+        VERSION_FROM: ${{ inputs.version-from }}
+        TAG_PREFIX: ${{ inputs.tag-prefix }}
+        FIRST_COMMIT: ${{ inputs.first-commit }}
+        SETTLE_MINUTES: ${{ inputs.settle-minutes }}
+        DRY_RUN: ${{ inputs.dry-run == 'true' && '1' || '' }}
+        CONTEXT: ${{ inputs.context }}
+        PUSH_TAG: '1'
+      run: |
+        git config user.name "pitwall-release-notes"
+        git config user.email "pitwall-release-notes@users.noreply.github.com"
+        node "${{ github.action_path }}/publish.mjs"

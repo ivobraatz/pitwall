@@ -1,0 +1,9 @@
+**/bin
+**/obj
+**/node_modules
+**/.next
+**/dist
+**/*.tsbuildinfo
+**/.env
+apps/api/Pitwall.Api/data
+.git

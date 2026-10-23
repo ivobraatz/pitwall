@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      # Integration tests start their own Postgres through Testcontainers (Docker is on the runner).
+      - run: dotnet test Pitwall.slnx
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @pitwall/sdk build
+      - run: pnpm --filter @pitwall/sdk test
+      - run: pnpm --filter @pitwall/console typecheck
+      - run: pnpm --filter @pitwall/console build

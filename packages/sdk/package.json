@@ -1,0 +1,74 @@
+{
+  "name": "@pitwall/sdk",
+  "version": "0.1.0",
+  "description": "Connects a product to Pitwall: in-app tickets with diagnostics and session recordings, and the server-side bridge.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ivobraatz/pitwall.git",
+    "directory": "packages/sdk"
+  },
+  "license": "MIT",
+  "keywords": [
+    "support",
+    "tickets",
+    "session-replay",
+    "rrweb",
+    "error-tracking",
+    "changelog",
+    "web-components"
+  ],
+  "homepage": "https://github.com/ivobraatz/pitwall#readme",
+  "bugs": {
+    "url": "https://github.com/ivobraatz/pitwall/issues"
+  },
+  "type": "module",
+  "sideEffects": [
+    "./dist/ui/player.js"
+  ],
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./diagnostics": {
+      "types": "./dist/core/buffer.d.ts",
+      "import": "./dist/core/buffer.js"
+    },
+    "./player": {
+      "types": "./dist/ui/player.d.ts",
+      "import": "./dist/ui/player.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    },
+    "./fastify": {
+      "types": "./dist/server/fastify.d.ts",
+      "import": "./dist/server/fastify.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test test/*.test.mjs",
+    "prebuild": "node scripts/embed-rrweb-css.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@rrweb/record": "2.1.6",
+    "@rrweb/replay": "2.1.6",
+    "@rrweb/types": "2.1.6",
+    "lit": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.0"
+  }
+}

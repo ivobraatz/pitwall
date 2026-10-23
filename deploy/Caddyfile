@@ -1,0 +1,25 @@
+# Caddy in front of Pitwall (docker-compose.prod.yml, profile "caddy"). Caddy gets the certificates
+# itself; ports 80 and 443 of this server must be open. Hostnames come from the environment:
+#   PITWALL_API_DOMAIN      e.g. api.example.com      (the products' backends call it)
+#   PITWALL_CONSOLE_DOMAIN  e.g. pitwall.example.com  (the team's console)
+#
+# The console hostname MUST be gated: Cloudflare Access (the record proxied through Cloudflare, an
+# Access application on this hostname only) or Tailscale. Nothing here checks who is asking.
+
+{$PITWALL_API_DOMAIN} {
+	encode zstd gzip
+
+	# The staff surface (/v1/staff) is for the console only. The console reaches the API over the
+	# compose network (http://api:8080), never through this public hostname, so refuse it here.
+	@staff path /v1/staff /v1/staff/*
+	respond @staff 404
+
+	reverse_proxy api:8080
+}
+
+{$PITWALL_CONSOLE_DOMAIN} {
+	encode zstd gzip
+
+	# The console proxies /v1/** to the API by itself, so this site only needs the console.
+	reverse_proxy console:3200
+}
