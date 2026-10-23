@@ -606,10 +606,10 @@ este passo (apague antes a linha antiga com `nano .env`).
 **Antes da aplicação: ativar o login por código no e-mail (One-time PIN).** Ele não vem ativo; sem
 isso, a aplicação só oferece a opção "Cloudflare".
 
-2. No Zero Trust, vá em **Settings** → **Authentication** → em *Login methods*, **Add new**.
-   (Em versões mais novas do painel o caminho é **Integrations** → **Identity providers** →
-   **Add an identity provider**.)
-3. Escolha **One-time PIN** → **Save**. Ele passa a aparecer na lista de *Login methods*.
+2. No Zero Trust, no menu à esquerda: **Integrations** → **Identity providers**. (Não é em
+   *Settings*/*Access settings*: lá ficam só os métodos de MFA.)
+3. Em *Your identity providers*, **Add new identity provider** → **One-time PIN**. Ele passa a
+   aparecer na lista de provedores.
 
 **A aplicação**
 
