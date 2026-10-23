@@ -102,6 +102,7 @@ corepack pnpm --filter @pitwall/sdk test       # ponte, assinatura de webhook
 
 - Railway: [docs/deploy-railway.md](docs/deploy-railway.md)
 - VPS com Docker Compose: [docs/deploy-vps.md](docs/deploy-vps.md)
+- Oracle Cloud Always Free (VM ARM gratuita): [docs/deploy-oracle.md](docs/deploy-oracle.md)
 
 `docker-compose.prod.yml` sobe Postgres, API e console (copie `.env.example` para `.env`).
 
