@@ -9,20 +9,21 @@ certo. Faça na ordem.
 
 | Endereço | O que é | Quem acessa |
 |---|---|---|
-| `https://api.<seu-domínio>` | API do Pitwall | os backends do DataRunner, RH Flex e metrifree, e o CI deles |
-| `https://pitwall.<seu-domínio>` | console da equipe | só você e a equipe, depois do login do Cloudflare Access |
+| `https://pitwall-api.braatz.com.br` | API do Pitwall | os backends do DataRunner, RH Flex e metrifree, e o CI deles |
+| `https://pitwall.braatz.com.br` | console da equipe | só você e a equipe, depois do login do Cloudflare Access |
 
-Os nomes `api.` e `pitwall.` são sugestões; pode usar outros (por exemplo `pitwall-api.` e
-`suporte.`), desde que use os mesmos em todos os passos. Ao longo do guia, troque `<seu-domínio>`
-pelo seu domínio (por exemplo `datarunner.app`).
+O Pitwall atende todos os produtos, então fica no domínio da software house, `braatz.com.br`, e não
+no de um produto. Os dois nomes são de primeiro nível (`pitwall-api.` e `pitwall.`), para o
+certificado gratuito da Cloudflare cobrir o console quando ele passar pelo proxy.
 
 **Antes de começar, tenha à mão:**
 
-- Um domínio cujo DNS está na **Cloudflare** (a mesma conta que você já usa).
+- Acesso à zona **`braatz.com.br`** na Cloudflare (DNS, Email Routing e Zero Trust).
 - Um **gerenciador de senhas** (1Password, Bitwarden…). Várias chaves aparecem uma vez só.
 - Um cartão de crédito (a Oracle pede para verificar a conta; o Always Free não cobra).
-- Um e-mail que vai receber os avisos de chamado novo (por exemplo `suporte@<seu-domínio>`) e dados
-  de SMTP para enviar e-mail (por exemplo do Resend, do Brevo ou do seu provedor).
+- O domínio `braatz.com.br` verificado no **Resend** (já está) e uma API key do Resend para o
+  Pitwall (parte 8.2 mostra como criar). Os avisos de chamado novo vão para
+  `suporte@braatz.com.br`, que o Email Routing da Cloudflare entrega no seu e-mail pessoal.
 - Uma chave da Anthropic (`ANTHROPIC_API_KEY`) para as notas de versão. Opcional: sem ela o resto
   funciona.
 - Cerca de 1h30.
@@ -306,8 +307,8 @@ preenchidas; não mexa nelas):
 ```dotenv
 POSTGRES_PASSWORD=<já gerado>
 PITWALL_SECRET_KEY=<já gerado>
-PITWALL_CONSOLE_URL=https://pitwall.<seu-domínio>
-PITWALL_INBOX_EMAIL=<e-mail que recebe os avisos de chamado novo>
+PITWALL_CONSOLE_URL=https://pitwall.braatz.com.br
+PITWALL_INBOX_EMAIL=suporte@braatz.com.br
 PITWALL_REQUIRE_TOTP=true
 PITWALL_ADMIN_EMAIL=<seu e-mail de login no Pitwall>
 PITWALL_ADMIN_PASSWORD=<senha forte, gerada no gerenciador de senhas, sem o caractere $>
@@ -317,13 +318,13 @@ STORAGE_BUCKET=
 STORAGE_SERVICE_URL=
 STORAGE_ACCESS_KEY=
 STORAGE_SECRET_KEY=
-SMTP_HOST=<servidor SMTP, por exemplo smtp.resend.com>
+SMTP_HOST=smtp.resend.com
 SMTP_PORT=587
-SMTP_USER=<usuário SMTP, no Resend é "resend">
-SMTP_PASSWORD=<senha SMTP, no Resend é a API key>
-SMTP_FROM=<remetente, por exemplo Pitwall <suporte@seu-domínio>>
-PITWALL_API_DOMAIN=api.<seu-domínio>
-PITWALL_CONSOLE_DOMAIN=pitwall.<seu-domínio>
+SMTP_USER=resend
+SMTP_PASSWORD=<API key do Resend criada para o Pitwall, começa com re_>
+SMTP_FROM="Pitwall <pitwall@braatz.com.br>"
+PITWALL_API_DOMAIN=pitwall-api.braatz.com.br
+PITWALL_CONSOLE_DOMAIN=pitwall.braatz.com.br
 ```
 
 Notas:
@@ -334,7 +335,15 @@ Notas:
   `pitwall_blobs`, que entra no backup da parte 15. É o mais simples. Para usar um bucket R2
   privado, veja o apêndice A. Não use o Object Storage da Oracle: a API ainda não configura a
   região de assinatura que a Oracle exige.
-- **SMTP:** o remetente (`SMTP_FROM`) precisa ser de um domínio verificado no seu provedor de e-mail.
+- **E-mail (Resend):** crie uma chave só para o Pitwall em https://resend.com/api-keys → **Create
+  API Key** → *Name* `pitwall`, *Permission* **Sending access**, *Domain* `braatz.com.br` →
+  **Add**. Copie a chave (`re_…`, aparece uma vez) para o gerenciador de senhas e cole em
+  `SMTP_PASSWORD`. O remetente `pitwall@braatz.com.br` não precisa existir como caixa: basta o
+  domínio estar verificado no Resend.
+- **Caixa da equipe:** confira em Cloudflare → `braatz.com.br` → **Email** → **Email Routing** →
+  **Routing rules** que `suporte@braatz.com.br` chega no seu e-mail pessoal (uma regra para esse
+  endereço ou o *Catch-all* ativo). Se não houver, **Create address** → *Custom address*
+  `suporte` → *Action* **Send to an email** → seu e-mail pessoal → **Save**.
 
 Salve no nano: `Ctrl+O`, Enter, `Ctrl+X`.
 
@@ -344,8 +353,8 @@ Confira que nada ficou com `<`:
 grep -n '<' .env
 ```
 
-Se nada for impresso, está certo. (A única exceção aceitável é o `SMTP_FROM` no formato
-`Nome <email>`.)
+Se nada for impresso, está certo. (A única linha que pode aparecer é a do `SMTP_FROM`, que
+usa o formato `"Pitwall <pitwall@braatz.com.br>"`.)
 
 ---
 
@@ -354,8 +363,8 @@ Se nada for impresso, está certo. (A única exceção aceitável é o `SMTP_FRO
 O Caddy precisa que os nomes apontem direto para a VM na primeira subida, para emitir os
 certificados.
 
-1. https://dash.cloudflare.com → seu domínio → **DNS** → **Records** → **Add record**:
-   - *Type*: `A`; *Name*: `api`; *IPv4 address*: `<IP-DA-VM>`; *Proxy status*: **desligado**
+1. https://dash.cloudflare.com → `braatz.com.br` → **DNS** → **Records** → **Add record**:
+   - *Type*: `A`; *Name*: `pitwall-api`; *IPv4 address*: `<IP-DA-VM>`; *Proxy status*: **desligado**
      (nuvem cinza, "DNS only"); **Save**.
 2. **Add record** de novo:
    - *Type*: `A`; *Name*: `pitwall`; *IPv4 address*: `<IP-DA-VM>`; *Proxy status*: **desligado**
@@ -364,8 +373,8 @@ certificados.
 Confira **(no seu computador)**:
 
 ```powershell
-Resolve-DnsName api.<seu-domínio>
-Resolve-DnsName pitwall.<seu-domínio>
+Resolve-DnsName pitwall-api.braatz.com.br
+Resolve-DnsName pitwall.braatz.com.br
 ```
 
 Os dois devem responder `<IP-DA-VM>`. Se ainda não responder, espere alguns minutos.
@@ -396,8 +405,8 @@ Acompanhe o Caddy pegando os certificados:
 $COMPOSE logs -f caddy
 ```
 
-Procure por `certificate obtained successfully` para `api.<seu-domínio>` e para
-`pitwall.<seu-domínio>`. Saia com `Ctrl+C`.
+Procure por `certificate obtained successfully` para `pitwall-api.braatz.com.br` e para
+`pitwall.braatz.com.br`. Saia com `Ctrl+C`.
 
 Confira o primeiro admin:
 
@@ -410,7 +419,7 @@ Deve aparecer `Created the first admin, <seu e-mail>.`
 Teste a API **(no seu computador)**:
 
 ```powershell
-curl.exe -sS https://api.<seu-domínio>/health
+curl.exe -sS https://pitwall-api.braatz.com.br/health
 ```
 
 Resposta esperada: `{"status":"ok"}`.
@@ -423,23 +432,31 @@ Se algo falhar aqui, veja a parte 19 (problemas comuns).
 
 Ordem importa: primeiro o certificado (parte 10 ok), depois o proxy e o Access.
 
-### 11.1 SSL da zona
+### 11.1 SSL só para o console
 
-Cloudflare → seu domínio → **SSL/TLS** → **Overview** → modo **Full (strict)**.
+A zona `braatz.com.br` é a da software house; não mude o modo SSL da zona inteira (outros sites dela
+podem depender do modo atual). Crie uma regra só para o console:
 
-Em **SSL/TLS → Edge Certificates**, confira que **Always Use HTTPS** está **desligado** (o Caddy já
-redireciona para HTTPS e precisa da porta 80 aberta para renovar o certificado).
+1. Cloudflare → `braatz.com.br` → **Rules** → **Configuration Rules** → **Create rule**.
+2. *Rule name*: `Pitwall console SSL`.
+3. *If incoming requests match*: **Custom filter expression** → *Field* `Hostname`, *Operator*
+   `equals`, *Value* `pitwall.braatz.com.br`.
+4. *Then the settings are*: **SSL** → **Add** → **Full (strict)**.
+5. **Deploy**.
+
+Não precisa mexer em *Always Use HTTPS*: o Caddy renova o certificado mesmo com o redirecionamento da
+Cloudflare.
 
 ### 11.2 Ligar o proxy só no console
 
 Cloudflare → **DNS** → **Records** → registro `pitwall` → **Edit** → *Proxy status*: **ligado**
 (nuvem laranja) → **Save**.
 
-O registro `api` **continua cinza**.
+O registro `pitwall-api` **continua cinza**.
 
 ### 11.3 Aceitar o console só pela Cloudflare
 
-Sem isso, alguém que acesse o IP da VM direto, com o nome `pitwall.<seu-domínio>`, passaria por
+Sem isso, alguém que acesse o IP da VM direto, com o nome `pitwall.braatz.com.br`, passaria por
 fora do Access.
 
 **(na VM)**
@@ -462,8 +479,8 @@ $COMPOSE up -d caddy
 Confira **(no seu computador)**. Pelo nome (via Cloudflare) responde; pelo IP direto, não:
 
 ```powershell
-curl.exe -s -o NUL -w "%{http_code}`n" https://pitwall.<seu-domínio>/login
-curl.exe -sk -o NUL -w "%{http_code}`n" --resolve pitwall.<seu-domínio>:443:<IP-DA-VM> https://pitwall.<seu-domínio>/login
+curl.exe -s -o NUL -w "%{http_code}`n" https://pitwall.braatz.com.br/login
+curl.exe -sk -o NUL -w "%{http_code}`n" --resolve pitwall.braatz.com.br:443:<IP-DA-VM> https://pitwall.braatz.com.br/login
 ```
 
 O primeiro dá `200` (ou `302`, depois do 11.4); o segundo tem que dar `403`.
@@ -477,22 +494,22 @@ este passo (apague antes a linha antiga com `nano .env`).
    *team name* (qualquer, por exemplo `ivobraatz`) e o plano **Free** (até 50 usuários).
 2. **Access** → **Applications** → **Add an application** → **Self-hosted**.
 3. *Application name*: `Pitwall console`; *Session Duration*: `24 hours`.
-4. **Add public hostname**: *Subdomain* `pitwall`, *Domain* `<seu-domínio>`, *Path* vazio.
-   **Não** adicione o `api`.
+4. **Add public hostname**: *Subdomain* `pitwall`, *Domain* `braatz.com.br`, *Path* vazio.
+   **Não** adicione o `pitwall-api`.
 5. Avance até **Policies** → **Add a policy**:
    - *Policy name*: `Equipe`; *Action*: **Allow**;
    - *Include* → *Selector*: **Emails** → *Value*: o seu e-mail (e o de quem mais for da equipe).
 6. *Login methods*: deixe **One-time PIN** (código por e-mail) marcado.
 7. Salve (**Save application**).
 
-Confira: numa **janela anônima**, abra `https://pitwall.<seu-domínio>`. Deve aparecer a tela da
+Confira: numa **janela anônima**, abra `https://pitwall.braatz.com.br`. Deve aparecer a tela da
 Cloudflare pedindo e-mail; um código chega no seu e-mail; depois aparece o login do Pitwall.
 
 ---
 
 ## Parte 12 — Primeiro login e 2FA
 
-1. Em `https://pitwall.<seu-domínio>`, passe pelo Access e entre com `PITWALL_ADMIN_EMAIL` e
+1. Em `https://pitwall.braatz.com.br`, passe pelo Access e entre com `PITWALL_ADMIN_EMAIL` e
    `PITWALL_ADMIN_PASSWORD`.
 2. Como `PITWALL_REQUIRE_TOTP=true`, aparece um aviso pedindo o 2FA: clique em **Ir para Conta**
    (ou no menu **Conta e equipe**) → **Ativar autenticador** → escaneie o QR code no app autenticador (1Password, Google
@@ -584,13 +601,13 @@ No painel de onde cada sistema roda (Railway, por exemplo → serviço da API �
 
 | Sistema | Variável | Valor |
 |---|---|---|
-| DataRunner (API) | `Pitwall__BaseUrl` | `https://api.<seu-domínio>` |
+| DataRunner (API) | `Pitwall__BaseUrl` | `https://pitwall-api.braatz.com.br` |
 | | `Pitwall__ApiKey` | chave "DataRunner – backend" |
 | | `Pitwall__WebhookSecret` | segredo "DataRunner – webhook" |
-| RH Flex (API) | `Pitwall__BaseUrl` | `https://api.<seu-domínio>` |
+| RH Flex (API) | `Pitwall__BaseUrl` | `https://pitwall-api.braatz.com.br` |
 | | `Pitwall__ApiKey` | chave "RH Flex – backend" |
 | | `Pitwall__WebhookSecret` | segredo "RH Flex – webhook" |
-| metrifree | `PITWALL_URL` | `https://api.<seu-domínio>` |
+| metrifree | `PITWALL_URL` | `https://pitwall-api.braatz.com.br` |
 | | `PITWALL_KEY` | chave "metrifree – backend" |
 | | `PITWALL_WEBHOOK_SECRET` | segredo "metrifree – webhook" |
 
@@ -601,13 +618,13 @@ do sistema e aperte Enter):
 
 ```powershell
 gh secret set PITWALL_RELEASE_KEY -R ivobraatz/DataRunner
-gh variable set PITWALL_URL -R ivobraatz/DataRunner --body "https://api.<seu-domínio>"
+gh variable set PITWALL_URL -R ivobraatz/DataRunner --body "https://pitwall-api.braatz.com.br"
 
 gh secret set PITWALL_RELEASE_KEY -R ivobraatz/rhflex
-gh variable set PITWALL_URL -R ivobraatz/rhflex --body "https://api.<seu-domínio>"
+gh variable set PITWALL_URL -R ivobraatz/rhflex --body "https://pitwall-api.braatz.com.br"
 
 gh secret set PITWALL_RELEASE_KEY -R ivobraatz/metrifree
-gh variable set PITWALL_URL -R ivobraatz/metrifree --body "https://api.<seu-domínio>"
+gh variable set PITWALL_URL -R ivobraatz/metrifree --body "https://pitwall-api.braatz.com.br"
 ```
 
 O RH Flex usa também a variável `PITWALL_FIRST_COMMIT` no workflow de novidades (o commit a partir do
@@ -722,7 +739,7 @@ Lembre: o backup só abre com a mesma `PITWALL_SECRET_KEY` (parte 8.1).
 Se o Pitwall cair, os sistemas não conseguem abrir chamados. Crie um monitor externo gratuito:
 
 1. https://uptimerobot.com → crie a conta → **New monitor**.
-2. *Monitor type*: **HTTP(s)**; *URL*: `https://api.<seu-domínio>/health`; *Interval*: 5 minutos;
+2. *Monitor type*: **HTTP(s)**; *URL*: `https://pitwall-api.braatz.com.br/health`; *Interval*: 5 minutos;
    alerta pelo seu e-mail → **Create monitor**.
 
 (Não monitore o console: o Access bloqueia o robô, e a API já cobre o servidor.)
@@ -805,7 +822,7 @@ $COMPOSE exec -T postgres pg_dump -U pitwall -Fc pitwall > /opt/pitwall/backups/
 git pull
 $COMPOSE up -d --build
 $COMPOSE ps
-curl -sS https://api.<seu-domínio>/health
+curl -sS https://pitwall-api.braatz.com.br/health
 ```
 
 As migrações do banco rodam sozinhas quando a API sobe.
@@ -834,7 +851,8 @@ Se a versão nova tiver mudado o banco, restaure também o `antes-da-atualizacao
 | `curl https://api…/health` dá timeout | Falta a regra 80/443 na Security List (parte 4) **ou** no iptables (parte 5.3). Precisa das duas |
 | Caddy não pega o certificado | DNS ainda não aponta para a VM (`Resolve-DnsName`), nuvem laranja ligada antes da emissão (parte 9 pede cinza), ou porta 80 fechada. Veja `$COMPOSE logs caddy`. O Let's Encrypt limita tentativas: espere 10 minutos e rode `$COMPOSE restart caddy` |
 | Console dá 403 pelo navegador | O DNS do `pitwall` está cinza (sem proxy) mas o 11.3 já foi aplicado: ligue a nuvem laranja. Ou as faixas da Cloudflare mudaram: refaça o 11.3 |
-| Erro 526 da Cloudflare no console | SSL da zona em *Full (strict)* sem certificado válido no Caddy: confira o 10 (certificado emitido) |
+| Erro 526 da Cloudflare no console | Regra *Full (strict)* do 11.1 ativa, mas o Caddy ainda sem certificado: confira o 10 (certificado emitido) |
+| Erro 525 ou loop de redirecionamento no console | A regra do 11.1 não pegou e a zona está em *Flexible*: confira o *Hostname* da regra (`pitwall.braatz.com.br`) |
 | `api` reiniciando em loop | `$COMPOSE logs api`. Normalmente `.env` incompleto (`PITWALL_SECRET_KEY` vazio) ou Postgres ainda subindo |
 | Não chega e-mail | Dados de SMTP ou remetente não verificado no provedor. Veja `$COMPOSE logs api \| grep -i smtp` |
 | "Out of capacity" ao criar a VM | Sem ARM livre na região: outro *availability domain*, outro horário, ou conta Pay As You Go |
@@ -850,8 +868,8 @@ Se a versão nova tiver mudado o banco, restaure também o `antes-da-atualizacao
 - [ ] VM `pitwall` (A1.Flex, Ubuntu 24.04 aarch64) com portas 80/443 na Security List e no iptables.
 - [ ] Docker instalado, logs limitados, `$COMPOSE` no `~/.bashrc`.
 - [ ] `.env` com `chmod 600`; `PITWALL_SECRET_KEY` e `POSTGRES_PASSWORD` no gerenciador de senhas.
-- [ ] `https://api.<seu-domínio>/health` responde `{"status":"ok"}`; DNS do `api` cinza.
-- [ ] DNS do `pitwall` laranja, SSL Full (strict), `PITWALL_CONSOLE_ALLOWED_IPS` aplicado (IP direto dá 403).
+- [ ] `https://pitwall-api.braatz.com.br/health` responde `{"status":"ok"}`; DNS do `pitwall-api` cinza.
+- [ ] DNS do `pitwall` laranja, regra *Full (strict)* só para `pitwall.braatz.com.br`, `PITWALL_CONSOLE_ALLOWED_IPS` aplicado (IP direto dá 403).
 - [ ] Cloudflare Access pedindo e-mail antes do console.
 - [ ] Primeiro login, 2FA ativo, `PITWALL_ADMIN_*` vazios no `.env` e `api` recriado.
 - [ ] DataRunner, RH Flex e metrifree cadastrados, cada um com chave `backend`, chave `ci` e webhook.
