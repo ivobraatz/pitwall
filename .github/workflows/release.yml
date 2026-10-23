@@ -13,9 +13,10 @@ name: Release
 #
 # Secrets necessários no repositório (Settings > Secrets and variables > Actions):
 #   NPM_TOKEN       token de publicação do npm (escopo do pacote pitwall-sdk, ou automation token)
-#   NUGET_API_KEY   chave de API do nuget.org com permissão de push em Pitwall.AspNetCore
 #
-# GITHUB_TOKEN não é usado para publicar; o npm recebe a proveniência via id-token.
+# O NuGet não usa secret: no nuget.org há uma política de Trusted Publishing (dono ivobraatz,
+# repositório ivobraatz/pitwall, workflow release.yml) e o job troca o id-token por uma chave curta.
+# GITHUB_TOKEN não é usado para publicar; o npm recebe a proveniência via o mesmo id-token.
 
 on:
   push:
@@ -76,7 +77,14 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      # Trusted Publishing: o nuget.org troca o id-token deste job por uma chave que vale minutos.
+      - name: Login no NuGet (Trusted Publishing)
+        id: nuget
+        uses: NuGet/login@v1
+        with:
+          user: ivobraatz
+
       - name: Empacota e publica o Pitwall.AspNetCore no NuGet
         run: |
           dotnet pack packages/dotnet/Pitwall.AspNetCore -c Release -o out
-          dotnet nuget push "out/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet nuget push "out/*.nupkg" --api-key "${{ steps.nuget.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
