@@ -30,3 +30,32 @@ jobs:
       - run: pnpm --filter @pitwall/sdk test
       - run: pnpm --filter @pitwall/console typecheck
       - run: pnpm --filter @pitwall/console build
+
+  # The same compose file the server runs: a broken image or bucket stops the deploy here, because
+  # deploy/auto-update.sh only takes commits whose CI passed.
+  prod-stack:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-postgres
+      PITWALL_SECRET_KEY: AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=
+      SEAWEEDFS_ACCESS_KEY: pitwall
+      SEAWEEDFS_SECRET_KEY: ci-seaweedfs-secret
+      PITWALL_REQUIRE_TOTP: 'false'
+      PITWALL_ADMIN_EMAIL: admin@pitwall.test
+      PITWALL_ADMIN_PASSWORD: ci-admin-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: docker compose -f docker-compose.prod.yml up -d --build
+      - run: node scripts/smoke-prod.mjs
+        env:
+          ADMIN_EMAIL: admin@pitwall.test
+          ADMIN_PASSWORD: ci-admin-password
+      # The smoke test also passes when the API writes to disk, so prove the video reached the bucket.
+      - run: test "$(docker compose -f docker-compose.prod.yml exec -T seaweedfs du -sm /data | cut -f1)" -ge 30
+      - run: PITWALL_DIR="$PWD" bash deploy/backup.sh
+      - run: find backups/anexos -name '*.mp4' -size +29M | grep .
+      - if: failure()
+        run: docker compose -f docker-compose.prod.yml logs --tail=100

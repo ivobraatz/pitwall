@@ -1,4 +1,4 @@
-# The whole Pitwall on one box: Postgres, the API and the console.
+# The whole Pitwall on one box: Postgres, SeaweedFS (attachments), the API and the console.
 #
 # Public traffic goes through Caddy (profile "caddy"; see deploy/Caddyfile and docs/operacao/deploy-vps.md):
 #   api.<domínio>      the API, called by the products' backends (public by design)
@@ -28,9 +28,38 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # The bucket for ticket images and videos. Private: no published port, so only this compose network
+  # reaches it. Pinned: update it on purpose, never by accident. The admin UI has no login of its own,
+  # so it stays off. No healthcheck on purpose: the API retries until the bucket answers
+  # (S3BlobStore.EnsureBucketAsync).
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.50
+    command: mini -dir=/data -admin.ui=false
+    environment:
+      AWS_ACCESS_KEY_ID: ${SEAWEEDFS_ACCESS_KEY:?set SEAWEEDFS_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${SEAWEEDFS_SECRET_KEY:?set SEAWEEDFS_SECRET_KEY}
+    volumes:
+      - seaweedfs:/data
+    restart: unless-stopped
+
+  # Copies the bucket to ./backups and back; run only by deploy/backup.sh and the restore in the guide.
+  rclone:
+    profiles: ["backup"]
+    image: rclone/rclone:1.71
+    environment:
+      RCLONE_CONFIG_BUCKET_TYPE: s3
+      RCLONE_CONFIG_BUCKET_PROVIDER: Other
+      RCLONE_CONFIG_BUCKET_ENDPOINT: http://seaweedfs:8333
+      RCLONE_CONFIG_BUCKET_ACCESS_KEY_ID: ${SEAWEEDFS_ACCESS_KEY:-}
+      RCLONE_CONFIG_BUCKET_SECRET_ACCESS_KEY: ${SEAWEEDFS_SECRET_KEY:-}
+    volumes:
+      - ./backups:/backups
+
   api:
     build: { context: ., dockerfile: apps/api/Dockerfile }
-    depends_on: { postgres: { condition: service_healthy } }
+    depends_on:
+      postgres: { condition: service_healthy }
+      seaweedfs: { condition: service_started }
     environment:
       ConnectionStrings__Pitwall: Host=postgres;Database=pitwall;Username=pitwall;Password=${POSTGRES_PASSWORD}
       Pitwall__SecretKey: ${PITWALL_SECRET_KEY:?set PITWALL_SECRET_KEY (openssl rand -base64 32)}
@@ -42,11 +71,15 @@ services:
       Pitwall__Bootstrap__Email: ${PITWALL_ADMIN_EMAIL:-}
       Pitwall__Bootstrap__Password: ${PITWALL_ADMIN_PASSWORD:-}
       Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
-      Storage__Provider: ${STORAGE_PROVIDER:-fs}
-      Storage__Bucket: ${STORAGE_BUCKET:-}
-      Storage__ServiceUrl: ${STORAGE_SERVICE_URL:-}
-      Storage__AccessKey: ${STORAGE_ACCESS_KEY:-}
-      Storage__SecretKey: ${STORAGE_SECRET_KEY:-}
+      # By default, the SeaweedFS above. To use another bucket, set the STORAGE_* in .env and
+      # STORAGE_CREATE_BUCKET=false.
+      Storage__Provider: ${STORAGE_PROVIDER:-s3}
+      Storage__Bucket: ${STORAGE_BUCKET:-pitwall-anexos}
+      Storage__ServiceUrl: ${STORAGE_SERVICE_URL:-http://seaweedfs:8333}
+      Storage__Region: ${STORAGE_REGION:-us-east-1}
+      Storage__AccessKey: ${STORAGE_ACCESS_KEY:-${SEAWEEDFS_ACCESS_KEY}}
+      Storage__SecretKey: ${STORAGE_SECRET_KEY:-${SEAWEEDFS_SECRET_KEY}}
+      Storage__CreateBucket: ${STORAGE_CREATE_BUCKET:-true}
       Smtp__Host: ${SMTP_HOST:-}
       Smtp__Port: ${SMTP_PORT:-587}
       Smtp__User: ${SMTP_USER:-}
@@ -94,6 +127,7 @@ services:
 
 volumes:
   pg:
+  seaweedfs:
   blobs:
   caddy_data:
   caddy_config:
