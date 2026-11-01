@@ -62,7 +62,7 @@ ponte. A equipe usa o console do Pitwall.
 ## Ligar um sistema
 
 O guia de integração (ponte de suporte, relatório de erros, webhooks e o SDK do navegador) está em
-[docs/integracao.md](docs/integracao.md). O exemplo mais curto é o
+[docs/operacao/integracao.md](docs/operacao/integracao.md). O exemplo mais curto é o
 [produto demo](examples/demo-product).
 
 ## Rodar localmente
@@ -100,16 +100,16 @@ corepack pnpm --filter @pitwall/sdk test       # ponte, assinatura de webhook
 
 ## Deploy
 
-- Railway: [docs/deploy-railway.md](docs/deploy-railway.md)
-- VPS com Docker Compose: [docs/deploy-vps.md](docs/deploy-vps.md)
-- Oracle Cloud Always Free (VM ARM gratuita): [docs/deploy-oracle.md](docs/deploy-oracle.md)
+- Railway: [docs/operacao/deploy-railway.md](docs/operacao/deploy-railway.md)
+- VPS com Docker Compose: [docs/operacao/deploy-vps.md](docs/operacao/deploy-vps.md)
+- Oracle Cloud Always Free (VM ARM gratuita): [docs/operacao/deploy-oracle.md](docs/operacao/deploy-oracle.md)
 
 `docker-compose.prod.yml` sobe Postgres, API e console (copie `.env.example` para `.env`).
 
 ## Documentação
 
-- [docs/arquitetura.md](docs/arquitetura.md): segurança, dados e como as partes conversam.
-- [docs/integracao.md](docs/integracao.md): ligar um sistema ao Pitwall.
+- [docs/arquitetura/README.md](docs/arquitetura/README.md): segurança, dados e como as partes conversam.
+- [docs/operacao/integracao.md](docs/operacao/integracao.md): ligar um sistema ao Pitwall.
 - [CONTRIBUTING.md](CONTRIBUTING.md): como contribuir.
 - [SECURITY.md](SECURITY.md): como reportar vulnerabilidades.
 

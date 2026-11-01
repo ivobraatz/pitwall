@@ -86,7 +86,7 @@ main() {
   git reset --hard --quiet "$current"
   "${compose[@]}" up -d --build --remove-orphans
   if healthy; then
-    log "voltou para ${current:0:7}. Se a versão nova mudou o banco, restaure $dump (docs/deploy-oracle.md, parte 15.4)"
+    log "voltou para ${current:0:7}. Se a versão nova mudou o banco, restaure $dump (docs/operacao/deploy-oracle.md, parte 15.4)"
   else
     log "ATENÇÃO: nem a versão anterior respondeu. Veja: ${compose[*]} logs --tail=200 api"
   fi

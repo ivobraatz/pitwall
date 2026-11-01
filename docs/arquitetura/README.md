@@ -27,7 +27,7 @@ pessoa.
 | SDK navegador | Buffers de diagnóstico (log, requisições, erros, eventos), gravação rrweb (retroativa ~2 min + procedimento até 10 min), instrumentação de `fetch`, e os Web Components (`<pitwall-tickets>`, `<pitwall-ticket>`, `<pitwall-player>`, o diálogo, a barra de gravação, os avisos). Funciona em React, Vue ou HTML puro. |
 | SDK servidor / Pitwall.AspNetCore | Ponte, reporter de erros em lote, verificação de webhook. |
 
-Os dois pacotes são públicos: npm `pitwall-sdk` (o produto importa `@pitwall/sdk` por alias, sem token) e NuGet `Pitwall.AspNetCore`. Como integrar, em [integracao.md](integracao.md).
+Os dois pacotes são públicos: npm `pitwall-sdk` (o produto importa `@pitwall/sdk` por alias, sem token) e NuGet `Pitwall.AspNetCore`. Como integrar, em [integracao.md](../operacao/integracao.md).
 
 ## Fluxos
 

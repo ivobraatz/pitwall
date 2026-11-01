@@ -1,7 +1,7 @@
 # Ligando um sistema ao Pitwall
 
 Este guia diz o que um sistema precisa implementar para usar o Pitwall (chamados, erros de servidor,
-avisos e novidades). O [produto demo](../examples/demo-product) implementa tudo isso em um arquivo,
+avisos e novidades). O [produto demo](../../examples/demo-product) implementa tudo isso em um arquivo,
 e é a referência para testar. Os sistemas reais estão na seção [Sistemas já integrados](#sistemas-já-integrados-referência).
 
 - [Visão geral](#visão-geral)
@@ -543,7 +543,7 @@ o DataRunner faz em `apps/console/lib/pitwall.ts`.
 O contrato é HTTP e está em [Contrato HTTP](#contrato-http). Você precisa de três coisas: a ponte (chamar
 `/v1/support/**` com `Authorization: Bearer` e `Pitwall-Actor`), o envio de erros em lote para
 `/v1/ingest/errors` e a verificação do webhook (HMAC-SHA256 sobre `t.corpo`). O demo em
-[`examples/demo-product/server.mjs`](../examples/demo-product/server.mjs) faz os três com `node:http` puro, sem
+[`examples/demo-product/server.mjs`](../../examples/demo-product/server.mjs) faz os três com `node:http` puro, sem
 framework, em cerca de 90 linhas.
 
 ---
@@ -713,7 +713,7 @@ cabem em cerca de 4 horas. Depois da última, a entrega fica como `failed` no co
 
 **Idempotência:** trate cada `id` uma vez. Reentregas usam o mesmo `id`.
 
-Eventos e o formato de cada `data` estão em [arquitetura.md → Webhooks](arquitetura.md#webhooks).
+Eventos e o formato de cada `data` estão em [arquitetura.md → Webhooks](../arquitetura/README.md#webhooks).
 
 ---
 
