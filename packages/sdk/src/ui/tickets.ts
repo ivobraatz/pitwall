@@ -401,7 +401,7 @@ export class PitwallTicket extends LitElement {
                 <button aria-label=${tr('common.remove')} @click=${() => { this._files = this._files.filter((_, j) => j !== i); }}>${unsafeHTML(icons.x)}</button></span>`)}</div>` : nothing}
               <div class="line">
                 <label class="round" title=${tr('chat.attach')} style="cursor:pointer">${unsafeHTML(icons.paperclip)}
-                  <input class="sr-only" type="file" multiple accept="image/*,.txt,.csv,.pdf,.json" @change=${(e: Event) => { const el = e.target as HTMLInputElement; if (el.files) this._files = [...this._files, ...Array.from(el.files)].slice(0, 6); el.value = ''; }} /></label>
+                  <input class="sr-only" type="file" multiple accept="image/*,video/mp4,video/webm,video/quicktime,.txt,.csv,.pdf,.json" @change=${(e: Event) => { const el = e.target as HTMLInputElement; if (el.files) this._files = [...this._files, ...Array.from(el.files)].slice(0, 6); el.value = ''; }} /></label>
                 <textarea class="input" rows="1" maxlength="20000" placeholder=${tr('chat.placeholder')} .value=${this._body}
                   @input=${(e: Event) => { this._body = (e.target as HTMLTextAreaElement).value; }}
                   @paste=${(e: ClipboardEvent) => { const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith('image/')); if (imgs.length) { e.preventDefault(); this._files = [...this._files, ...imgs].slice(0, 6); } }}

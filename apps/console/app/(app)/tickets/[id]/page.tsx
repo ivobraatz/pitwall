@@ -193,7 +193,7 @@ function Thread({ d, onSent }: { d: Dossier; onSent: () => void }) {
         )}
         <div className="flex items-end gap-2 p-2">
           <label className="grid size-10 shrink-0 cursor-pointer place-items-center text-fg-muted transition-colors hover:bg-hover hover:text-fg" title="Anexar arquivo" aria-label="Anexar arquivo"><IconClip />
-            <input type="file" multiple className="sr-only" accept="image/*,.txt,.csv,.pdf,.json" onChange={(e) => { if (e.target.files) setFiles((c) => [...c, ...Array.from(e.target.files!)].slice(0, 6)); e.target.value = ''; }} />
+            <input type="file" multiple className="sr-only" accept="image/*,video/mp4,video/webm,video/quicktime,.txt,.csv,.pdf,.json" onChange={(e) => { if (e.target.files) setFiles((c) => [...c, ...Array.from(e.target.files!)].slice(0, 6)); e.target.value = ''; }} />
           </label>
           <Textarea rows={2} value={body} onChange={(e) => setBody(e.target.value)} placeholder={internal ? 'Anotação para a equipe…' : 'Resposta ao cliente (assinada como a equipe)…'}
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} className="min-h-[64px] bg-surface" />

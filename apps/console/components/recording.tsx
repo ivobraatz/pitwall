@@ -79,6 +79,29 @@ export function ImageThumb({ ticketId, attachment }: { ticketId: string; attachm
   );
 }
 
+/** A video someone attached. Fetched only when asked for: it can be 90 MB. */
+export function VideoCard({ ticketId, attachment }: { ticketId: string; attachment: Attachment }) {
+  const [state, setState] = React.useState<'idle' | 'loading' | 'error'>('idle');
+  const [url, setUrl] = React.useState<string | null>(null);
+  React.useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
+  const load = () => {
+    setState('loading');
+    fetchBlob(`/staff/tickets/${ticketId}/attachments/${attachment.id}`)
+      .then(({ blob }) => setUrl(URL.createObjectURL(blob)))
+      .catch(() => setState('error'));
+  };
+  if (url) return <video src={url} controls autoPlay className="max-h-[60vh] w-full max-w-2xl bg-fg" title={attachment.name} />;
+  return (
+    <div className="flex items-center gap-3 bg-surface py-2 pr-2 pl-3">
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[14px] font-semibold text-fg">{attachment.name}</div>
+        <div className="text-[13px] tabular-nums text-fg-muted">{state === 'error' ? 'Não foi possível carregar o vídeo.' : `Vídeo · ${bytes(attachment.sizeBytes)}`}</div>
+      </div>
+      <Button size="sm" loading={state === 'loading'} onClick={load}>Assistir</Button>
+    </div>
+  );
+}
+
 export function FileChip({ ticketId, attachment }: { ticketId: string; attachment: Attachment }) {
   return (
     <a href={`/v1/staff/tickets/${ticketId}/attachments/${attachment.id}?download=true`} className="flex h-9 items-center gap-2 bg-surface px-3 text-[13px] transition-colors hover:bg-hover">
@@ -92,9 +115,10 @@ export function AttachmentList({ ticketId, list, fallback }: { ticketId: string;
   return (
     <div className="mt-2 flex flex-col gap-2">
       {list.filter((a) => a.kind === 'recording').map((a) => <RecordingCard key={a.id} ticketId={ticketId} attachment={a} fallback={fallback} />)}
+      {list.filter((a) => a.contentType.startsWith('video/')).map((a) => <VideoCard key={a.id} ticketId={ticketId} attachment={a} />)}
       <div className="flex flex-wrap gap-2">
         {list.filter((a) => a.kind === 'image').map((a) => <ImageThumb key={a.id} ticketId={ticketId} attachment={a} />)}
-        {list.filter((a) => a.kind === 'file').map((a) => <FileChip key={a.id} ticketId={ticketId} attachment={a} />)}
+        {list.filter((a) => a.kind === 'file' && !a.contentType.startsWith('video/')).map((a) => <FileChip key={a.id} ticketId={ticketId} attachment={a} />)}
       </div>
     </div>
   );

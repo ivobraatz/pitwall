@@ -38,7 +38,7 @@ builder.Services.AddSingleton<IBlobStore>(sp =>
         var s3Config = new AmazonS3Config
         {
             ForcePathStyle = true,
-            // R2 and MinIO don't take every checksum the SDK now sends by default; only send them when the API requires.
+            // R2 doesn't take every checksum the SDK now sends by default; only send them when the API requires.
             RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
             ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED,
         };
@@ -146,6 +146,8 @@ if (!app.Environment.IsEnvironment("Testing"))
     var db = scope.ServiceProvider.GetRequiredService<PitwallDb>();
     await db.Database.MigrateAsync();
     await Bootstrap.EnsureFirstAdminAsync(db, config, app.Logger);
+    if (config.GetValue("Storage:CreateBucket", false) && app.Services.GetRequiredService<IBlobStore>() is S3BlobStore bucket)
+        await bucket.EnsureBucketAsync(app.Logger, CancellationToken.None);
 }
 
 // One-off commands instead of serving: `dotnet Pitwall.Api.dll import-datarunner [--dry-run]`.

@@ -59,16 +59,16 @@ public static class TicketViews
         if (!http.Request.HasFormContentType)
             return new(null, Results.BadRequest(new { message = "Expected a multipart form upload." }));
         var bodyLimit = http.Features.Get<IHttpMaxRequestBodySizeFeature>();
-        if (bodyLimit is { IsReadOnly: false }) bodyLimit.MaxRequestBodySize = AttachmentStore.MaxBytes + FormOverhead;
-        if (http.Request.ContentLength > AttachmentStore.MaxBytes + FormOverhead) return new(null, TooLarge());
+        if (bodyLimit is { IsReadOnly: false }) bodyLimit.MaxRequestBodySize = AttachmentStore.MaxVideoBytes + FormOverhead;
+        if (http.Request.ContentLength > AttachmentStore.MaxVideoBytes + FormOverhead) return new(null, TooLarge(AttachmentStore.MaxVideoBytes));
 
         var form = await http.Request.ReadFormAsync(ct);
         var file = form.Files.GetFile("file") ?? form.Files.FirstOrDefault();
         if (file is null || file.Length == 0) return new(null, Results.BadRequest(new { message = "No file received." }));
-        if (file.Length > AttachmentStore.MaxBytes) return new(null, TooLarge());
         var contentType = file.ContentType?.Split(';')[0].Trim().ToLowerInvariant();
         if (!AttachmentStore.IsAllowedType(contentType))
-            return new(null, Results.BadRequest(new { message = "Unsupported file type. Attach an image, a text or PDF file, or a recording." }));
+            return new(null, Results.BadRequest(new { message = "Unsupported file type. Attach an image, a video, a text or PDF file, or a recording." }));
+        if (file.Length > AttachmentStore.MaxBytesFor(contentType)) return new(null, TooLarge(AttachmentStore.MaxBytesFor(contentType)));
 
         var kindRaw = form["kind"].FirstOrDefault()?.ToLowerInvariant();
         var kind = AttachmentKinds.All.Contains(kindRaw) ? kindRaw!
@@ -108,8 +108,8 @@ public static class TicketViews
     {
         var stream = await store.GetAsync(a.StorageKey, ct);
         if (stream is null) return Results.NotFound();
-        // Never rendered as a page: images and PDFs may show inline, anything else downloads.
-        var inline = !download && (a.ContentType.StartsWith("image/", StringComparison.Ordinal) || a.ContentType == "application/pdf");
+        // Never rendered as a page: images, videos and PDFs may show inline, anything else downloads.
+        var inline = !download && (a.ContentType.StartsWith("image/", StringComparison.Ordinal) || AttachmentStore.IsVideo(a.ContentType) || a.ContentType == "application/pdf");
         return Results.Stream(stream, a.ContentType, fileDownloadName: inline ? null : a.Name, enableRangeProcessing: false);
     }
 
@@ -120,7 +120,7 @@ public static class TicketViews
         return name.Length <= 200 ? name : name[..200];
     }
 
-    private static IResult TooLarge() => Results.Json(
-        new { message = $"Attachment is too large. Maximum is {AttachmentStore.MaxBytes / (1024 * 1024)} MB." },
+    private static IResult TooLarge(long limit) => Results.Json(
+        new { message = $"Attachment is too large. Maximum is {limit / (1024 * 1024)} MB." },
         statusCode: StatusCodes.Status413PayloadTooLarge);
 }

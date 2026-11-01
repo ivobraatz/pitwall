@@ -145,9 +145,9 @@ public static class PitwallBridge
         request.Headers.Add("Pitwall-Actor", actor.Encode());
         if (HttpMethods.IsPost(http.Request.Method))
         {
-            // Attachments can be 25 MB; lift the product's own body cap for this route.
+            // Attachments can be 25 MB, videos 90 MB; lift the product's own body cap for this route.
             var limit = http.Features.Get<IHttpMaxRequestBodySizeFeature>();
-            if (limit is { IsReadOnly: false }) limit.MaxRequestBodySize = 27L * 1024 * 1024;
+            if (limit is { IsReadOnly: false }) limit.MaxRequestBodySize = 92L * 1024 * 1024;
             request.Content = new StreamContent(http.Request.Body);
             if (http.Request.ContentType is { } ct) request.Content.Headers.TryAddWithoutValidation("Content-Type", ct);
             if (http.Request.ContentLength is { } len) request.Content.Headers.ContentLength = len;

@@ -44,12 +44,12 @@ public sealed class FileSystemBlobStore(string root) : IBlobStore
     }
 }
 
-/// <summary>Any S3-compatible bucket (AWS S3, Cloudflare R2, MinIO). The bucket must not be public.</summary>
+/// <summary>Any S3-compatible bucket (SeaweedFS, AWS S3, Cloudflare R2). The bucket must not be public.</summary>
 public sealed class S3BlobStore(IAmazonS3 s3, string bucket) : IBlobStore
 {
     public async Task PutAsync(string key, Stream content, string contentType, CancellationToken ct)
     {
-        // S3 wants a length or a seekable stream; uploads are capped at 25 MB, so buffering is fine.
+        // S3 wants a length or a seekable stream. Uploads arrive seekable (the form is buffered to disk); this is the fallback.
         Stream body = content;
         if (!content.CanSeek)
         {
@@ -61,7 +61,7 @@ public sealed class S3BlobStore(IAmazonS3 s3, string bucket) : IBlobStore
         await s3.PutObjectAsync(new PutObjectRequest
         {
             BucketName = bucket, Key = key, InputStream = body, ContentType = contentType,
-            // R2 and MinIO reject the streaming-signature extensions the SDK uses by default.
+            // R2 rejects the streaming-signature extensions the SDK uses by default.
             UseChunkEncoding = false,
         }, ct);
     }
@@ -80,6 +80,30 @@ public sealed class S3BlobStore(IAmazonS3 s3, string bucket) : IBlobStore
     }
 
     public Task DeleteAsync(string key, CancellationToken ct) => s3.DeleteObjectAsync(bucket, key, ct);
+
+    /// <summary>
+    /// Creates the bucket when it is missing, for the SeaweedFS that ships with the compose file. Waits for
+    /// the server, which may still be starting. Failing here stops the API on purpose: better than
+    /// looking healthy and losing every attachment.
+    /// </summary>
+    public async Task EnsureBucketAsync(ILogger logger, CancellationToken ct)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket }, ct);
+                logger.LogInformation("Created the attachments bucket {Bucket}.", bucket);
+                return;
+            }
+            catch (AmazonS3Exception ex) when (ex.ErrorCode is "BucketAlreadyOwnedByYou" or "BucketAlreadyExists") { return; }
+            catch (Exception ex) when (ex is not OperationCanceledException && attempt < 30)
+            {
+                logger.LogInformation("Bucket {Bucket} not ready yet ({Reason}); trying again.", bucket, ex.Message);
+                await Task.Delay(TimeSpan.FromSeconds(2), ct);
+            }
+        }
+    }
 }
 
 /// <summary>
@@ -91,6 +115,13 @@ public sealed class AttachmentStore(IBlobStore blobs, ILogger<AttachmentStore> l
 {
     /// <summary>25 MB. A two-minute DOM recording gzips to well under 2 MB; this leaves room for screenshots and logs.</summary>
     public const long MaxBytes = 25L * 1024 * 1024;
+
+    /// <summary>90 MB for a video. The console sits behind Cloudflare, whose free plan refuses bodies over 100 MB.</summary>
+    public const long MaxVideoBytes = 90L * 1024 * 1024;
+
+    public static bool IsVideo(string? contentType) => contentType?.ToLowerInvariant() is "video/mp4" or "video/webm" or "video/quicktime";
+
+    public static long MaxBytesFor(string? contentType) => IsVideo(contentType) ? MaxVideoBytes : MaxBytes;
 
     /// <summary>Recordings are purged this long after the ticket closes; the conversation stays.</summary>
     public static readonly TimeSpan RecordingRetentionAfterClose = TimeSpan.FromDays(90);
@@ -121,11 +152,14 @@ public sealed class AttachmentStore(IBlobStore blobs, ILogger<AttachmentStore> l
         "text/plain" => ".txt",
         "text/csv" => ".csv",
         "application/pdf" => ".pdf",
+        "video/mp4" => ".mp4",
+        "video/webm" => ".webm",
+        "video/quicktime" => ".mov",
         _ => ".bin",
     };
 
-    /// <summary>Images, text, PDFs and the recording formats the SDK produces. Never HTML or SVG: those would execute.</summary>
-    public static bool IsAllowedType(string? contentType) => contentType?.ToLowerInvariant() is
+    /// <summary>Images, videos, text, PDFs and the recording formats the SDK produces. Never HTML or SVG: those would execute.</summary>
+    public static bool IsAllowedType(string? contentType) => IsVideo(contentType) || contentType?.ToLowerInvariant() is
         "image/png" or "image/jpeg" or "image/webp" or "image/gif"
         or "application/gzip" or "application/json" or "text/plain" or "text/csv" or "application/pdf";
 }
