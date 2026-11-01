@@ -13,6 +13,8 @@ WORKDIR /app
 COPY --from=build /out .
 ENV ASPNETCORE_URLS=http://+:8080 \
     Storage__Path=/data/blobs
+# Before VOLUME, so a new volume is born writable by the app user, not by root.
+RUN mkdir -p /data/blobs && chown -R app:app /data
 VOLUME /data
 EXPOSE 8080
 USER app

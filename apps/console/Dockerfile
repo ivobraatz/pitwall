@@ -16,6 +16,8 @@ WORKDIR /app
 ENV NODE_ENV=production PORT=3200 HOSTNAME=0.0.0.0
 COPY --from=build /repo/apps/console/.next/standalone ./
 COPY --from=build /repo/apps/console/.next/static ./apps/console/.next/static
+# The standalone output leaves public/ out on purpose: without this, the login photos answer 404.
+COPY --from=build /repo/apps/console/public ./apps/console/public
 USER node
 EXPOSE 3200
 CMD ["node", "apps/console/server.js"]
