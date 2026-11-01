@@ -1,15 +1,14 @@
 # Deploy do Pitwall no Railway
 
 Este guia põe o Pitwall em produção no Railway: um projeto com três serviços (Postgres, `api` e
-`console`), dois domínios e o console atrás de um portão de acesso. Para um servidor próprio, veja
-[deploy-vps.md](deploy-vps.md).
+`console`), dois domínios, o console atrás de um portão de acesso e deploy automático depois do CI
+verde. Para comparar ambientes, veja [deploy.md](deploy.md).
 
-> **Antes de começar:** o Railway marca os arquivos `railway.json` como *Config as Code*, que está
-> depreciado (eles deixam de ser lidos em 2026-12-01, e serviços novos não podem usá-los). Por isso,
-> as configurações abaixo devem ser feitas **no painel**, que é a fonte de verdade. Os dois arquivos
-> `apps/api/railway.json` e `apps/console/railway.json` repetem esses mesmos valores; se o Railway
-> ainda os ler para o seu serviço, eles só confirmam o que você configurou. Migrar para
-> *Infrastructure as Code* (`.railway/railway.ts`) é um passo futuro, não necessário agora.
+> **Antes de começar:** configure tudo **no painel**, que é a fonte de verdade. O Railway vem migrando o
+> *Config as Code* (`railway.json`) para *Infrastructure as Code*, e este guia registrou a data de
+> 2026-12-01 para os arquivos deixarem de ser lidos; confirme no painel do seu projeto. Os dois arquivos
+> `apps/api/railway.json` e `apps/console/railway.json` repetem os valores abaixo, então configurar pelo
+> painel funciona com ou sem eles.
 
 ---
 
@@ -83,11 +82,14 @@ openssl rand -base64 24    # uma senha forte para o Postgres, se você for defin
 | `Pitwall__Bootstrap__Email` | e-mail do primeiro admin | só no 1º boot | remova depois (seção 6) |
 | `Pitwall__Bootstrap__Password` | senha do primeiro admin | só no 1º boot | remova depois (seção 6) |
 | `Anthropic__ApiKey` | chave da Anthropic | recomendada | sem ela, as notas de versão não são escritas (o resto funciona) |
-| `Storage__Provider` | `s3` | sim | `s3` (R2 recomendado) ou `fs` (volume) |
-| `Storage__ServiceUrl` | `https://<conta>.r2.cloudflarestorage.com` | se `s3` | endpoint do R2 |
-| `Storage__Bucket` | nome do bucket privado | se `s3` | bucket **privado** |
-| `Storage__AccessKey` | chave de acesso do R2 | se `s3` | |
-| `Storage__SecretKey` | segredo do R2 | se `s3` | |
+| `Storage__Provider` | `fs` | sim | `fs` (volume), ou `s3` para SeaweedFS ou bucket externo. Veja abaixo |
+| `RAILWAY_RUN_UID` | `0` | com volume | os volumes do Railway são montados como root, e a API roda como usuário comum. Sem isto, todo anexo falha com 502 |
+| `Storage__ServiceUrl` | endereço do bucket | se `s3` | |
+| `Storage__Region` | `us-east-1` (SeaweedFS) ou `auto` (R2) | se `s3` | |
+| `Storage__Bucket` | `pitwall-anexos` | se `s3` | bucket **privado** |
+| `Storage__AccessKey` | chave de acesso | se `s3` | |
+| `Storage__SecretKey` | segredo | se `s3` | |
+| `Storage__CreateBucket` | `true` só com SeaweedFS | se `s3` | a API cria o bucket quando sobe |
 | `Smtp__Host` | host SMTP | recomendada | sem SMTP a equipe não recebe aviso por e-mail |
 | `Smtp__Port` | `587` | não | `465` usa SSL direto; outras portas, STARTTLS |
 | `Smtp__User` | usuário SMTP | se o SMTP exige login | |
@@ -100,15 +102,22 @@ openssl rand -base64 24    # uma senha forte para o Postgres, se você for defin
 ConnectionStrings__Pitwall=Host=${{Postgres.PGHOST}};Port=${{Postgres.PGPORT}};Database=${{Postgres.PGDATABASE}};Username=${{Postgres.PGUSER}};Password=${{Postgres.PGPASSWORD}}
 ```
 
-**Armazenamento: escolha uma das duas opções.**
+**Armazenamento: escolha uma das opções antes do primeiro anexo.** Trocar depois não move os arquivos.
 
-- **R2 (recomendado).** Crie um bucket **privado** no Cloudflare R2, gere um token de API com
-  leitura e escrita nesse bucket, e preencha `Storage__Provider=s3` mais `Storage__ServiceUrl`,
-  `Storage__Bucket`, `Storage__AccessKey` e `Storage__SecretKey`. Não precisa de volume.
-- **Volume.** Deixe `Storage__Provider=fs` (ou não defina; é o padrão) e crie um volume no
-  `api`: *Settings → Volumes → New Volume*, mount path **`/data`**. O Dockerfile já aponta
-  `Storage__Path` para `/data/blobs`. Sem volume, os anexos somem a cada deploy. (O `VOLUME` do
-  Dockerfile é ignorado pelo Railway; o volume precisa ser criado no painel.)
+- **Volume na API (recomendado).** É o mais simples e não depende de serviço externo. Em `api`: *Settings →
+  Volumes → New Volume*, mount path **`/data`**, com `Storage__Provider=fs` e `RAILWAY_RUN_UID=0`. O
+  Dockerfile já aponta `Storage__Path` para `/data/blobs`. Sem volume, os anexos somem a cada deploy. O
+  volume é cobrado por uso, e o tamanho máximo depende do plano: confira antes de aceitar muitos vídeos.
+- **SeaweedFS como terceiro serviço.** Use se quiser um bucket, como no servidor próprio. Crie
+  **New → Docker Image** → `chrislusf/seaweedfs:4.50`, com o nome `seaweedfs`; *Start Command*
+  `mini -dir=/data -admin.ui=false`; volume em `/data`; **sem domínio público**; e as variáveis
+  `AWS_ACCESS_KEY_ID` e `AWS_SECRET_ACCESS_KEY` (gere o segredo com `openssl rand -hex 24`). Na API:
+  `Storage__Provider=s3`, `Storage__ServiceUrl=http://seaweedfs.railway.internal:8333`,
+  `Storage__Region=us-east-1`, `Storage__Bucket=pitwall-anexos`, `Storage__CreateBucket=true`, e as mesmas
+  credenciais. Só funciona em ambientes criados depois de 16/10/2025, cuja rede privada também usa IPv4.
+  Se a API não subir e o log falar em bucket, use o volume.
+- **Bucket externo (S3, R2).** Crie um bucket **privado** e preencha `Storage__Provider=s3`,
+  `Storage__ServiceUrl`, `Storage__Region`, `Storage__Bucket`, `Storage__AccessKey` e `Storage__SecretKey`.
 
 ---
 
@@ -259,9 +268,20 @@ Se a sua versão do CLI não tiver `ssh`, rode `railway ssh --help` para conferi
 
 ## 9. Atualizar e reverter
 
-**Atualizar.** Com o repositório conectado, cada push na branch do serviço gera um deploy. As
-migrações rodam sozinhas no boot da API. Antes de um deploy com mudança de banco, faça um
-**backup** (seção 10).
+**Atualizar.** Com o repositório conectado, cada push na `main` gera um deploy de `api` e de `console`. As
+migrações rodam sozinhas no boot da API. Antes de um deploy com mudança de banco, faça um **backup**
+(seção 10).
+
+**Só publicar com CI verde (CI/CD).** Faça isto em `api` **e** em `console`:
+
+1. *Settings → Source*: confira que a branch é `main` e que o deploy automático está ligado.
+2. Ligue **Wait for CI**. A opção só aparece porque o `ci.yml` roda em push na `main`.
+3. Mande um commit e acompanhe em *Deployments*: o deploy fica como **Waiting** até o GitHub Actions
+   terminar. Se algum workflow falhar, ele é ignorado. Se os workflows não terminarem em 2 horas, também.
+
+Há relatos de deploys que não saem com essa opção ligada, então confira o primeiro. Se ele não sair, faça um
+deploy manual em *Deployments* e abra um chamado no Railway; não desligue a opção sem avisar a equipe, porque
+sem ela um commit com CI vermelho vai ao ar.
 
 **Reverter.** Em *Deployments*, escolha o deploy anterior bem-sucedido → *Rollback*. Atenção: as
 migrações são só para frente. Se a versão nova aplicou uma migração que a versão antiga não
@@ -282,7 +302,16 @@ entende, reverter o código pode quebrar o banco; nesse caso, restaure o backup 
   pg_dump "$DATABASE_PUBLIC_URL" -Fc -f pitwall-$(date +%F).dump
   ```
 
-  Guarde o `.dump` fora do Railway (por exemplo, num bucket R2 privado).
+  Guarde o `.dump` fora do Railway, numa máquina sua. Para agendar nessa máquina, com `pg_dump` da
+  mesma versão do Postgres ou mais nova, e a URL em `~/.pitwall-db-url` (`chmod 600`):
+
+  ```cron
+  15 3 * * * pg_dump "$(cat ~/.pitwall-db-url)" -Fc -f ~/pitwall-backups/pitwall-$(date +\%F).dump && find ~/pitwall-backups -name 'pitwall-*.dump' -mtime +90 -delete
+  ```
+- **Anexos.** Agende os backups do volume em *Settings → Backups* do serviço que tem o volume. Os limites:
+  o recurso exige o plano Pro, a restauração só vale para o mesmo projeto e ambiente, e apagar (*wipe*) o
+  volume apaga os backups dele. **Esse backup não protege contra perder a conta do Railway.** Se você
+  precisa de uma cópia fora dele, use um bucket externo para os anexos.
 - **Restaurar** (num Postgres vazio ou para substituir o atual, com cuidado):
 
   ```bash
@@ -338,12 +367,15 @@ de teste no sistema real. Teste manualmente:
 
 - **Config as Code.** Ver o aviso no início deste guia.
 - **Região e réplicas.** Mantenha uma réplica do `api` (migrações e a fila de webhooks rodam nele).
+- **Cópia dos anexos fora do Railway.** Com volume ou SeaweedFS, não há. Veja a seção 10.
 
 ---
 
 ## 13. Checklist final
 
-- [ ] Projeto `pitwall` com `Postgres`, `api` (porta 8080, volume `/data` só com `fs`) e `console` (porta 3200).
+- [ ] Projeto `pitwall` com `Postgres`, `api` (porta 8080; volume `/data` e `RAILWAY_RUN_UID=0` com `fs`) e `console` (porta 3200).
+- [ ] Anexo de teste enviado e aberto no console, e ainda abrindo depois de um redeploy.
+- [ ] **Wait for CI** ligado em `api` e `console`, com um deploy conferido.
 - [ ] `api`: todas as variáveis da seção 3, inclusive `PORT=8080`; `Pitwall__SecretKey` guardada no gerenciador de senhas.
 - [ ] `console`: `PITWALL_API_URL=http://api.railway.internal:8080`.
 - [ ] `curl -s -o /dev/null -w '%{http_code}' https://api.<domínio>/v1/staff/auth/me` dá `404` (`Pitwall__StaffHosts`).
@@ -353,5 +385,5 @@ de teste no sistema real. Teste manualmente:
 - [ ] Primeiro admin entrou, 2FA ativado, `Pitwall__Bootstrap__*` removidos.
 - [ ] Sistemas criados, chaves e webhooks (com segredo e Ping) cadastrados; variáveis de cada produto e do GitHub configuradas.
 - [ ] Importação do DataRunner: dry-run, importação, conferência, variáveis `Import__*` removidas.
-- [ ] Backup do Postgres agendado e `Pitwall__SecretKey` no gerenciador de senhas.
+- [ ] Dump do Postgres agendado fora do Railway, backup do volume ativo e `Pitwall__SecretKey` no gerenciador de senhas.
 - [ ] Monitores externos de `/health` e do console criados.

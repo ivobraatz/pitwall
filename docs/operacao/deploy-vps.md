@@ -1,9 +1,9 @@
 # Deploy do Pitwall em VPS (Docker Compose)
 
 Este guia põe o Pitwall em produção num servidor próprio (Ubuntu LTS, por exemplo), com Docker
-Compose, Postgres, a API, o console e o Caddy na frente para TLS. Para o Railway, veja
-[deploy-railway.md](deploy-railway.md). Os dois guias usam os mesmos conceitos e a mesma checklist de
-sistemas.
+Compose, Postgres, SeaweedFS (anexos), a API, o console, o Caddy na frente para TLS, backups e
+atualização automática depois do CI verde. Para comparar ambientes, veja [deploy.md](deploy.md). Numa
+VM gratuita da Oracle, siga o passo a passo mais detalhado em [deploy-oracle.md](deploy-oracle.md).
 
 ---
 
@@ -26,11 +26,11 @@ Internet ──► Caddy (80/443, TLS)
                └─ pitwall.<domínio>  ──► console:3200  (atrás do Access/Tailscale)
                                           └─ /v1/** ──► api:8080 (rede interna do compose)
 
-Só na rede interna do compose: postgres (sem porta publicada), api em 127.0.0.1:5180
+Só na rede interna do compose: postgres e seaweedfs (sem porta publicada), api em 127.0.0.1:5180
 ```
 
-No compose, o `api` e o `console` só escutam em `127.0.0.1`; o Postgres não é publicado. Quem fica
-público são só as portas 80 e 443 do Caddy.
+No compose, o `api` e o `console` só escutam em `127.0.0.1`; o Postgres e o SeaweedFS não são
+publicados. Quem fica público são só as portas 80 e 443 do Caddy.
 
 Para não esquecer o perfil nos comandos, defina uma vez por sessão:
 
@@ -83,31 +83,43 @@ cd /opt/pitwall
 ## 3. Configurar o `.env`
 
 ```bash
-cp .env.example .env
-chmod 600 .env
-nano .env
+bash deploy/gerar-env.sh
 ```
 
-Preencha (os nomes são os do `.env.example`):
+O script pergunta o e-mail do primeiro admin, a chave do SMTP e a da Anthropic, gera as senhas, grava
+o `.env` só com permissão para o seu usuário e mostra os valores gerados: **copie-os para o gerenciador
+de senhas**. Ele recusa sobrescrever um `.env` existente, para não perder a `PITWALL_SECRET_KEY`.
+
+**Os domínios e o SMTP vêm com os valores da Braatz.** Em outro domínio ou provedor de SMTP, ajuste com
+`nano .env`:
 
 | Variável | Valor |
 |---|---|
-| `POSTGRES_PASSWORD` | senha do Postgres (`openssl rand -base64 24`). Só vale na **primeira** criação do banco |
-| `PITWALL_SECRET_KEY` | `openssl rand -base64 32`. **Guarde no gerenciador de senhas antes de subir.** Nunca troque |
 | `PITWALL_CONSOLE_URL` | `https://pitwall.<domínio>` |
 | `PITWALL_INBOX_EMAIL` | e-mail da caixa da equipe (aviso de chamado novo ou resposta) |
-| `PITWALL_REQUIRE_TOTP` | `true` |
-| `PITWALL_STAFF_HOSTS` | opcional; padrão `api`. `/v1/staff` só responde a quem chama a API por `http://api:8080` (o console). Uma segunda trava, além do Caddy |
-| `PITWALL_ADMIN_EMAIL`, `PITWALL_ADMIN_PASSWORD` | primeiro admin. Só no primeiro boot; remova depois (seção 6) |
-| `ANTHROPIC_API_KEY` | chave da Anthropic (notas de versão). Sem ela, o resto funciona |
-| `STORAGE_PROVIDER` | `s3` (R2 recomendado) ou `fs` (volume) |
-| `STORAGE_BUCKET`, `STORAGE_SERVICE_URL`, `STORAGE_ACCESS_KEY`, `STORAGE_SECRET_KEY` | se `s3`. Bucket **privado** do R2 |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | SMTP para os avisos da equipe |
 | `PITWALL_API_DOMAIN` | `api.<domínio>` (o Caddy pega o certificado desse nome) |
 | `PITWALL_CONSOLE_DOMAIN` | `pitwall.<domínio>` |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | SMTP para os avisos da equipe |
 
-Com `STORAGE_PROVIDER=fs` (ou sem definir), os anexos ficam no volume `blobs` (`/data/blobs` dentro
-do `api`). Não precisa de bucket, mas o volume precisa de backup (seção 9).
+As demais já vêm prontas:
+
+| Variável | Valor |
+|---|---|
+| `POSTGRES_PASSWORD` | gerada. Só vale na **primeira** criação do banco |
+| `PITWALL_SECRET_KEY` | gerada. **Nunca troque** |
+| `SEAWEEDFS_ACCESS_KEY`, `SEAWEEDFS_SECRET_KEY` | credenciais do bucket de anexos, geradas |
+| `PITWALL_REQUIRE_TOTP` | `true` |
+| `PITWALL_ADMIN_EMAIL`, `PITWALL_ADMIN_PASSWORD` | primeiro admin. Só no primeiro boot; remova depois (seção 6) |
+| `ANTHROPIC_API_KEY` | chave da Anthropic (notas de versão). Sem ela, o resto funciona |
+| `PITWALL_STAFF_HOSTS` | opcional; padrão `api`. `/v1/staff` só responde a quem chama a API por `http://api:8080` (o console). Uma segunda trava, além do Caddy |
+
+**Anexos.** Por padrão vão para o bucket privado `pitwall-anexos`, no SeaweedFS que sobe junto. A API
+cria o bucket sozinha. Para usar um bucket externo, veja o
+[Apêndice A do guia da Oracle](deploy-oracle.md#apêndice-a--anexos-em-outro-bucket-s3-ou-r2-sem-seaweedfs).
+Para gravar direto no volume, sem SeaweedFS, use `STORAGE_PROVIDER=fs`.
+
+> `STORAGE_PROVIDER=fs` tem prioridade sobre o SeaweedFS: com ele no `.env`, tudo funciona, mas nada vai
+> para o bucket, e o `deploy/backup.sh` não copia os anexos.
 
 **Antes de subir:** crie os registros DNS `A` de `api.<domínio>` e `pitwall.<domínio>` apontando para
 o IP do servidor. Se você usa a nuvem laranja da Cloudflare, deixe o SSL/TLS da zona em **Full
@@ -119,14 +131,14 @@ o IP do servidor. Se você usa a nuvem laranja da Cloudflare, deixe o SSL/TLS da
 
 ```bash
 $COMPOSE up -d --build
-$COMPOSE ps                          # postgres, api, console e caddy devem estar "running" (postgres "healthy")
+$COMPOSE ps                          # postgres, seaweedfs, api, console e caddy devem estar "running" (postgres "healthy")
 $COMPOSE logs -f caddy               # acompanhe a emissão dos certificados; Ctrl+C para sair
 curl -sS https://api.<domínio>/health   # {"status":"ok"}
 ```
 
 Na primeira subida o `api` roda as migrações e, se `Pitwall__Bootstrap__*` estiver definido e a
 equipe estiver vazia, cria o primeiro admin. Confira com `$COMPOSE logs api`: você deve ver
-`Created the first admin, <e-mail>.`.
+`Created the first admin, <e-mail>.` e `Created the attachments bucket pitwall-anexos.`.
 
 Se o Caddy não conseguir o certificado, quase sempre é DNS que ainda não propagou ou a porta 80
 fechada. O Let's Encrypt limita tentativas; espere alguns minutos antes de tentar de novo.
@@ -275,31 +287,26 @@ Confira no console (produto `datarunner`).
 
 ## 9. Backups
 
-**Dump lógico diário do Postgres** (cron do servidor). O dump é feito pelo próprio container, por
-isso não precisa de senha. Abra o crontab com `crontab -e` e adicione:
-
-```cron
-15 3 * * * cd /opt/pitwall && docker compose -f docker-compose.prod.yml exec -T postgres pg_dump -U pitwall -Fc pitwall > /opt/pitwall/backups/pitwall-$(date +\%F).dump 2>>/opt/pitwall/backups/backup.log && find /opt/pitwall/backups -name 'pitwall-*.dump' -mtime +14 -delete
-```
-
-Antes, crie a pasta: `mkdir -p /opt/pitwall/backups`. O `\%` é obrigatório no crontab (o `%` é
-caractere especial ali). Esse comando mantém 14 dias de dumps. Teste uma vez manualmente, sem esperar
-a madrugada:
+O `deploy/backup.sh` grava em `/opt/pitwall/backups` o dump do banco (14 dias) e um espelho dos anexos
+em `anexos/`. Um anexo apagado vai para `anexos-apagados/` e fica 30 dias. O espelho ocupa no disco o
+mesmo que os anexos.
 
 ```bash
-cd /opt/pitwall && $COMPOSE exec -T postgres pg_dump -U pitwall -Fc pitwall > /opt/pitwall/backups/teste.dump && ls -lh /opt/pitwall/backups/teste.dump
+bash /opt/pitwall/deploy/backup.sh
+(crontab -l 2>/dev/null; echo "15 3 * * * bash /opt/pitwall/deploy/backup.sh >> /opt/pitwall/backups/backup.log 2>&1") | crontab -
 ```
 
-**Anexos em volume (só com `STORAGE_PROVIDER=fs`).** Confira o nome do volume com `docker volume ls`
-(normalmente `pitwall_blobs`) e agende o arquivo:
+**Fora do servidor.** Backups só no mesmo disco não protegem contra a perda do servidor. Faça outra
+máquina buscar a pasta por `rsync`, com uma chave SSH que só permite leitura: os comandos estão na
+[parte 15.2 do guia da Oracle](deploy-oracle.md#152-copiar-para-a-sua-máquina). Troque `ubuntu` pelo
+usuário do seu servidor.
+
+Com `STORAGE_PROVIDER=fs`, o `deploy/backup.sh` não copia os anexos: faça também um arquivo do volume
+`blobs` (confira o nome com `docker volume ls`):
 
 ```cron
 30 3 * * * docker run --rm -v pitwall_blobs:/data:ro -v /opt/pitwall/backups:/backup alpine tar czf /backup/blobs-$(date +\%F).tgz -C /data . && find /opt/pitwall/backups -name 'blobs-*.tgz' -mtime +14 -delete
 ```
-
-**Fora do servidor.** Backups só no mesmo disco não protegem contra perda do servidor. Copie a pasta
-`/opt/pitwall/backups` para outro lugar (um bucket R2 privado, por exemplo, com `rclone` ou o cliente
-do seu provedor).
 
 **Restaurar um dump** (substitui o banco; pare o `api` antes para ninguém gravar durante a
 restauração):
@@ -308,6 +315,12 @@ restauração):
 $COMPOSE stop api
 $COMPOSE exec -T postgres pg_restore -U pitwall -d pitwall --clean --if-exists --no-owner < /opt/pitwall/backups/pitwall-AAAA-MM-DD.dump
 $COMPOSE up -d api
+```
+
+**Restaurar os anexos** do espelho, depois de subir o Pitwall (a API recria o bucket se ele sumiu):
+
+```bash
+$COMPOSE --profile backup run --rm --no-deps rclone copy /backups/anexos bucket:pitwall-anexos
 ```
 
 **`PITWALL_SECRET_KEY` é parte do backup.** Sem ela, os webhooks e os TOTP selados no banco não
@@ -379,11 +392,46 @@ As migrações rodam sozinhas no boot da API.
 a versão nova aplicou uma migração que a antiga não entende, restaure o dump feito antes (seção 9)
 depois de voltar o código. Para retornar ao ramo principal, use `git switch main`.
 
+**Atualização automática (CI/CD).** Com o timer, todo commit na `main` que passa no CI chega sozinho ao
+servidor em até uns 5 minutos depois de o CI terminar. O servidor pergunta ao GitHub, e o GitHub não
+precisa de acesso a ele. Antes de atualizar, o `deploy/auto-update.sh` faz um dump do banco. Depois,
+confere a saúde da API e do console e, se a versão nova não subir, volta o código sozinho.
+
+O script exige o repositório em `/opt/pitwall`, na `main`, sem mudanças locais. Ele lê as portas
+`127.0.0.1:5180` e `:3200` e o perfil `caddy`.
+
+```bash
+sudo apt -y install jq
+/opt/pitwall/deploy/auto-update.sh --dry-run    # só diz o que faria
+sudo cp /opt/pitwall/deploy/systemd/pitwall-update.* /etc/systemd/system/
+```
+
+O serviço roda com o usuário `ubuntu`. **Se o seu usuário for outro, ou o repositório for um fork**, ajuste
+antes de ligar:
+
+```bash
+sudo sed -i "s/^User=.*/User=$USER/" /etc/systemd/system/pitwall-update.service
+# Só em fork (precisa ser público):
+sudo sed -i '/^\[Service\]/a Environment=PITWALL_REPO=<dono>/<repositório>' /etc/systemd/system/pitwall-update.service
+```
+
+Ligue e confira:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now pitwall-update.timer
+systemctl list-timers pitwall-update.timer
+journalctl -u pitwall-update.service --since today --no-pager
+```
+
+Para pausar, `sudo systemctl stop pitwall-update.timer`. As mensagens e os casos de falha estão na
+[parte 19 do guia da Oracle](deploy-oracle.md#parte-19--atualização-automática-cicd).
+
 ---
 
 ## 12. Pontos em aberto
 
-- **Anexos em `fs`** dependem do volume `blobs` e do backup dele. Em produção, prefira R2 (`s3`).
+- **Bucket:** o SeaweedFS fica fixado no `docker-compose.prod.yml`; atualize a versão de propósito, por commit, para o CI testar.
 - **Trocar a senha do Postgres** depois da primeira subida exige `ALTER USER` dentro do banco; mudar
   `POSTGRES_PASSWORD` no `.env` sozinho não muda o banco já criado.
 - **Config do Caddy.** O `deploy/Caddyfile` bloqueia `/v1/staff` no hostname da API. Se um sistema
@@ -401,5 +449,6 @@ depois de voltar o código. Para retornar ao ramo principal, use `git switch mai
 - [ ] Primeiro admin entrou, 2FA ativado, `PITWALL_ADMIN_*` removidos do `.env` e `api` recriado.
 - [ ] Sistemas, chaves e webhooks cadastrados; variáveis de cada produto e do GitHub configuradas.
 - [ ] Importação do DataRunner: dry-run, importação, `import.env` apagado.
-- [ ] Cron de backup do Postgres (e dos anexos, se `fs`) testado e copiado para fora do servidor.
+- [ ] Cron do `deploy/backup.sh` testado e cópia em outra máquina funcionando (e arquivo do volume, se `fs`).
+- [ ] Timer de atualização ligado; `journalctl -u pitwall-update.service` sem erro.
 - [ ] Monitores externos de `/health` e do console; limite de logs do Docker configurado.

@@ -100,11 +100,14 @@ corepack pnpm --filter @pitwall/sdk test       # ponte, assinatura de webhook
 
 ## Deploy
 
-- Railway: [docs/operacao/deploy-railway.md](docs/operacao/deploy-railway.md)
-- VPS com Docker Compose: [docs/operacao/deploy-vps.md](docs/operacao/deploy-vps.md)
-- Oracle Cloud Always Free (VM ARM gratuita): [docs/operacao/deploy-oracle.md](docs/operacao/deploy-oracle.md)
+Comece por [docs/operacao/deploy.md](docs/operacao/deploy.md): qual ambiente escolher e como o CI/CD
+funciona em cada um.
 
-`docker-compose.prod.yml` sobe Postgres, API e console (copie `.env.example` para `.env`).
+- Oracle Cloud Always Free (VM ARM gratuita): [docs/operacao/deploy-oracle.md](docs/operacao/deploy-oracle.md)
+- VPS ou servidor próprio: [docs/operacao/deploy-vps.md](docs/operacao/deploy-vps.md)
+- Railway: [docs/operacao/deploy-railway.md](docs/operacao/deploy-railway.md)
+
+`docker-compose.prod.yml` sobe Postgres, SeaweedFS (anexos), API e console (`deploy/gerar-env.sh` cria o `.env`).
 
 ## Documentação
 
