@@ -29,6 +29,11 @@ namespace Pitwall.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("color");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -42,11 +47,24 @@ namespace Pitwall.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("disabled_at");
 
+                    b.Property<string>("LogoContentType")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("logo_content_type");
+
+                    b.Property<DateTime?>("LogoUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("logo_updated_at");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)")
                         .HasColumnName("name");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
 
                     b.Property<string>("Slug")
                         .IsRequired()
@@ -67,8 +85,16 @@ namespace Pitwall.Data.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("webhook_url");
 
+                    b.Property<string>("WebsiteUrl")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("website_url");
+
                     b.HasKey("Id")
                         .HasName("pk_products");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_products_owner_id");
 
                     b.HasIndex("Slug")
                         .IsUnique()
@@ -822,6 +848,12 @@ namespace Pitwall.Data.Migrations
 
             modelBuilder.Entity("Pitwall.Domain.Product", b =>
                 {
+                    b.HasOne("Pitwall.Domain.StaffUser", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_products_staff_owner_id");
+
                     b.OwnsOne("Pitwall.Domain.ProductSettings", "Settings", b1 =>
                         {
                             b1.Property<Guid>("ProductId");
@@ -852,6 +884,8 @@ namespace Pitwall.Data.Migrations
                                 .HasForeignKey("ProductId")
                                 .HasConstraintName("fk_products_products_id");
                         });
+
+                    b.Navigation("Owner");
 
                     b.Navigation("Settings")
                         .IsRequired();

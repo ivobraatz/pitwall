@@ -16,6 +16,20 @@ public class Product
     /// the readers are; the console shows it under the name.
     /// </summary>
     public string? Description { get; set; }
+    /// <summary>The product's own address (<c>https://datarunner.app</c>), linked from the console.</summary>
+    public string? WebsiteUrl { get; set; }
+    /// <summary>
+    /// The colour the console marks the product with everywhere (<c>#2cc4c9</c>). Null = one picked
+    /// from the slug, so a product that never chose still keeps the same colour.
+    /// </summary>
+    public string? Color { get; set; }
+    /// <summary>Content type of the logo in the blob store (see <see cref="ProductLogos"/>); null = no logo.</summary>
+    public string? LogoContentType { get; set; }
+    /// <summary>When the logo last changed: versions its URL, so browsers can cache it for good.</summary>
+    public DateTime? LogoUpdatedAt { get; set; }
+    /// <summary>The team member who answers for the product: who the others ask first.</summary>
+    public Guid? OwnerId { get; set; }
+    public StaffUser? Owner { get; set; }
     /// <summary>Where events go (<c>https://api.datarunner.app/api/v1/webhooks/pitwall</c>); null = no webhooks.</summary>
     public string? WebhookUrl { get; set; }
     /// <summary>The HMAC secret, sealed with the instance key — Pitwall has to sign with it, so it cannot be a hash.</summary>

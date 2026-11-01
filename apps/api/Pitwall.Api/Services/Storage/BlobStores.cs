@@ -129,3 +129,24 @@ public sealed class AttachmentStore(IBlobStore blobs, ILogger<AttachmentStore> l
         "image/png" or "image/jpeg" or "image/webp" or "image/gif"
         or "application/gzip" or "application/json" or "text/plain" or "text/csv" or "application/pdf";
 }
+
+/// <summary>
+/// A product's logo on top of the blob store. Raster only, checked by its first bytes rather than
+/// by what the browser claims: an SVG could carry script, and the console shows logos on every page.
+/// </summary>
+public static class ProductLogos
+{
+    /// <summary>512 KB. A logo is shown at 64px at most; anything bigger is a photo by mistake.</summary>
+    public const long MaxBytes = 512 * 1024;
+
+    public static string Key(Guid productId) => $"products/{productId:N}/logo";
+
+    /// <summary>The image type the bytes actually are (PNG, JPEG or WebP), or null for anything else.</summary>
+    public static string? Sniff(ReadOnlySpan<byte> head)
+    {
+        if (head.StartsWith((ReadOnlySpan<byte>)[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])) return "image/png";
+        if (head.StartsWith((ReadOnlySpan<byte>)[0xFF, 0xD8, 0xFF])) return "image/jpeg";
+        if (head.Length >= 12 && head[..4].SequenceEqual("RIFF"u8) && head[8..12].SequenceEqual("WEBP"u8)) return "image/webp";
+        return null;
+    }
+}

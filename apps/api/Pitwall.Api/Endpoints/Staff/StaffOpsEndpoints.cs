@@ -5,6 +5,7 @@ using Pitwall.Auth;
 using Pitwall.Data;
 using Pitwall.Domain;
 using Pitwall.Services.Releases;
+using Pitwall.Services.Storage;
 using Pitwall.Services.Webhooks;
 
 namespace Pitwall.Endpoints.Staff;
@@ -88,8 +89,10 @@ public static class StaffErrorEndpoints
 /// <summary>Products: their keys, their webhook, their settings. Changing any of it is an admin's job.</summary>
 public static class StaffProductEndpoints
 {
+    /// <remarks>On a PATCH, a field left out stays as it is; an empty string clears WebsiteUrl, Color and OwnerId.</remarks>
     public sealed record ProductRequest(
-        string? Slug, string? Name, string? Description, string? WebhookUrl, ProductSettings? Settings, bool? Disabled);
+        string? Slug, string? Name, string? Description, string? WebhookUrl, ProductSettings? Settings, bool? Disabled,
+        string? WebsiteUrl = null, string? Color = null, string? OwnerId = null);
     public sealed record KeyRequest(string? Name, string[]? Scopes);
 
     public static IEndpointRouteBuilder MapStaffProductEndpoints(this IEndpointRouteBuilder app)
@@ -97,12 +100,12 @@ public static class StaffProductEndpoints
         var group = app.MapGroup("/v1/staff/products").RequireAuthorization(Policies.Staff).WithTags("Staff");
         var admin = group.MapGroup("").RequireAuthorization(Policies.StaffAdmin);
 
-        group.MapGet("", async (PitwallDb db, CancellationToken ct) => Results.Ok(await db.Products.AsNoTracking()
+        group.MapGet("", async (PitwallDb db, CancellationToken ct) => Results.Ok(await db.Products.AsNoTracking().Include(p => p.Owner)
             .OrderBy(p => p.Name).Select(p => View(p)).ToListAsync(ct)));
 
         group.MapGet("/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
         {
-            var p = await db.Products.AsNoTracking().Include(x => x.Keys).FirstOrDefaultAsync(x => x.Id == id, ct);
+            var p = await db.Products.AsNoTracking().Include(x => x.Keys).Include(x => x.Owner).FirstOrDefaultAsync(x => x.Id == id, ct);
             if (p is null) return Results.NotFound();
             return Results.Ok(new
             {
@@ -128,6 +131,7 @@ public static class StaffProductEndpoints
                 WebhookUrl = Clean.Cut(req.WebhookUrl, 500), Settings = Normalize(req.Settings ?? new ProductSettings()),
                 CreatedAt = now, UpdatedAt = now,
             };
+            if (await ApplyProfile(product, req, db, ct) is { } invalid) return invalid;
             db.Products.Add(product);
             await db.SaveChangesAsync(ct);
             return Results.Ok(View(product));
@@ -147,9 +151,58 @@ public static class StaffProductEndpoints
             }
             if (req.Settings is not null) p.Settings = Normalize(req.Settings);
             if (req.Disabled is { } disabled) p.DisabledAt = disabled ? p.DisabledAt ?? DateTime.UtcNow : null;
+            if (await ApplyProfile(p, req, db, ct) is { } invalid) return invalid;
             p.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync(ct);
+            await db.Entry(p).Reference(x => x.Owner).LoadAsync(ct);
             return Results.Ok(View(p));
+        });
+
+        // The logo is read on every console page, so its URL carries a version and the response is cached for good.
+        group.MapGet("/{id:guid}/logo", async (Guid id, HttpContext http, PitwallDb db, IBlobStore blobs, CancellationToken ct) =>
+        {
+            var type = await db.Products.Where(p => p.Id == id).Select(p => p.LogoContentType).FirstOrDefaultAsync(ct);
+            if (type is null) return Results.NotFound();
+            var stream = await blobs.GetAsync(ProductLogos.Key(id), ct);
+            if (stream is null) return Results.NotFound();
+            http.Response.Headers.CacheControl = "private, max-age=31536000, immutable";
+            return Results.Stream(stream, type, enableRangeProcessing: false);
+        });
+
+        admin.MapPut("/{id:guid}/logo", async (Guid id, HttpContext http, PitwallDb db, IBlobStore blobs, CancellationToken ct) =>
+        {
+            var p = await db.Products.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (p is null) return Results.NotFound();
+            if (!http.Request.HasFormContentType) return Results.BadRequest(new { message = "Envie a imagem como upload (multipart)." });
+            if (http.Request.ContentLength > ProductLogos.MaxBytes + 16 * 1024) return LogoTooLarge();
+            var file = (await http.Request.ReadFormAsync(ct)).Files.FirstOrDefault();
+            if (file is null || file.Length == 0) return Results.BadRequest(new { message = "Nenhuma imagem recebida." });
+            if (file.Length > ProductLogos.MaxBytes) return LogoTooLarge();
+
+            var bytes = new MemoryStream();
+            await using (var upload = file.OpenReadStream()) await upload.CopyToAsync(bytes, ct);
+            var type = ProductLogos.Sniff(bytes.GetBuffer().AsSpan(0, (int)Math.Min(bytes.Length, 16)));
+            if (type is null) return Results.BadRequest(new { message = "A logo precisa ser PNG, JPEG ou WebP." });
+            bytes.Position = 0;
+            await blobs.PutAsync(ProductLogos.Key(id), bytes, type, ct);
+            p.LogoContentType = type;
+            p.LogoUpdatedAt = p.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+            await db.Entry(p).Reference(x => x.Owner).LoadAsync(ct);
+            return Results.Ok(View(p));
+        }).DisableAntiforgery();
+
+        admin.MapDelete("/{id:guid}/logo", async (Guid id, PitwallDb db, IBlobStore blobs, CancellationToken ct) =>
+        {
+            var p = await db.Products.FirstOrDefaultAsync(x => x.Id == id, ct);
+            if (p is null) return Results.NotFound();
+            p.LogoContentType = null;
+            p.LogoUpdatedAt = null;
+            p.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+            // The row goes first: an orphaned object is only wasted space.
+            await blobs.DeleteAsync(ProductLogos.Key(id), ct);
+            return Results.NoContent();
         });
 
         // The plaintext is in this response and nowhere else, ever.
@@ -224,10 +277,45 @@ public static class StaffProductEndpoints
 
     private static object View(Product p) => new
     {
-        p.Id, p.Slug, p.Name, p.Description, p.WebhookUrl,
+        p.Id, p.Slug, p.Name, p.Description, p.WebsiteUrl, p.Color,
+        logoUrl = p.LogoUpdatedAt is { } at ? $"/v1/staff/products/{p.Id}/logo?v={at.Ticks:x}" : null,
+        owner = p.Owner is { } o ? new { o.Id, o.Name, o.Email } : null,
+        p.WebhookUrl,
         hasWebhookSecret = p.WebhookSecretSealed != null,
         p.Settings, p.CreatedAt, p.UpdatedAt, p.DisabledAt,
     };
+
+    /// <summary>The fields that describe the product to the team: site, colour, owner. Null leaves one as it is.</summary>
+    private static async Task<IResult?> ApplyProfile(Product p, ProductRequest req, PitwallDb db, CancellationToken ct)
+    {
+        if (req.WebsiteUrl is not null)
+        {
+            var url = req.WebsiteUrl.Trim();
+            if (url.Length == 0) p.WebsiteUrl = null;
+            else if (url.Length > 300 || !Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+                return Results.BadRequest(new { message = "O endereço do sistema precisa ser uma URL http(s) completa." });
+            else p.WebsiteUrl = url;
+        }
+        if (req.Color is not null)
+        {
+            var color = req.Color.Trim().ToLowerInvariant();
+            if (color.Length == 0) p.Color = null;
+            else if (color.Length != 7 || color[0] != '#' || !color[1..].All(char.IsAsciiHexDigit))
+                return Results.BadRequest(new { message = "A cor é um hexadecimal como #2cc4c9." });
+            else p.Color = color;
+        }
+        if (req.OwnerId is not null)
+        {
+            if (req.OwnerId.Trim().Length == 0) p.OwnerId = null;
+            else if (!Guid.TryParse(req.OwnerId, out var ownerId) || !await db.Staff.AnyAsync(s => s.Id == ownerId && s.DisabledAt == null, ct))
+                return Results.BadRequest(new { message = "O responsável precisa ser alguém ativo da equipe." });
+            else p.OwnerId = ownerId;
+        }
+        return null;
+    }
+
+    private static IResult LogoTooLarge() => Results.Json(
+        new { message = $"A logo pode ter até {ProductLogos.MaxBytes / 1024} KB." }, statusCode: StatusCodes.Status413PayloadTooLarge);
 
     private static ProductSettings Normalize(ProductSettings s) => new()
     {

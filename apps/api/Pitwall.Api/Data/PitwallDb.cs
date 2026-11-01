@@ -31,6 +31,10 @@ public class PitwallDb(DbContextOptions<PitwallDb> options) : DbContext(options)
             e.Property(p => p.Name).HasMaxLength(80);
             e.Property(p => p.Description).HasMaxLength(1000);
             e.Property(p => p.WebhookUrl).HasMaxLength(500);
+            e.Property(p => p.WebsiteUrl).HasMaxLength(300);
+            e.Property(p => p.Color).HasMaxLength(7);
+            e.Property(p => p.LogoContentType).HasMaxLength(40);
+            e.HasOne(p => p.Owner).WithMany().HasForeignKey(p => p.OwnerId).OnDelete(DeleteBehavior.SetNull);
             e.OwnsOne(p => p.Settings, s => s.ToJson());
         });
 
