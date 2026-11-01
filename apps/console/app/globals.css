@@ -1,52 +1,61 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/figtree/wght.css";
+@import "@fontsource-variable/league-spartan/wght.css";
 
 /*
- * Design system "Clássico" (design-system-classico.md). Tokens live only here; components use the
- * Tailwind names below, never literal colors. data-mode on <html> picks the values (see layout.tsx).
- * Warning has no entry in the spec; it borrows the chart orange.
+ * Pitwall brand (docs/marca/README.md). The pit board is the reference: a carbon board, white letters,
+ * one signal yellow. Tokens live only here; components use the Tailwind names below, never
+ * literal colors. data-mode on <html> picks the values (see layout.tsx).
+ *
+ * House rules: flat fills, nothing fades into anything, nothing at rest floats, square corners.
+ * Surfaces are told apart by a step in tone, not by a line.
  */
 :root {
-  --ds-font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
-  --ds-font-mono: "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
-  --ease: cubic-bezier(.4, 0, .2, 1); --dur-fast: 150ms;
-  --viz-1: #79cbf9; --viz-2: #4085ec; --viz-3: #753087; --viz-4: #e56289;
-  --viz-5: #ff9869; --viz-6: #ffd976; --viz-7: #4cb6bd; --viz-8: #79d8b6;
-  --ds-on-accent: #ffffff;
-  --ds-accent: #6447fb; --ds-accent-hover: #735afa; --ds-focus: #6447fb;
-  --ds-success: rgb(26 191 151);
+  --ds-font-sans: "Figtree Variable", "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --ds-font-display: "League Spartan Variable", "League Spartan", "Figtree Variable", ui-sans-serif, system-ui, sans-serif;
+  --ds-font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; /* taste-skill-ignore: the code face, used only by <code>/<pre> */
+  --ease: cubic-bezier(.2, .7, .2, 1); --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --dur-fast: 140ms; --dur: 240ms;
+  --ds-accent: #ffd400; --ds-accent-hover: #ffe14d; --ds-on-accent: #0b0c0d;
 }
 
-:root, :root[data-mode="dark"] {
+/* Dark is the default: the board itself. .opposite turns a tile to the other tone. */
+:root, :root[data-mode="dark"], :root[data-mode="light"] .opposite {
   color-scheme: dark;
-  --ds-bg-deep: #22262a; --ds-bg: #2c3136; --ds-bg-alt: #22262a;
-  --ds-bg-surface: #22262a; --ds-bg-overlay: #2c3136; --ds-bg-well: #2c3136;
-  --ds-bg-chip: #353b41; --ds-bg-hover: #353b41; --ds-bg-active: #4a5158;
-  --ds-overlay-scrim: rgb(0 0 0 / .5);
-  --ds-fg-primary: #ffffff; --ds-fg-secondary: #cfd5db; --ds-fg-tertiary: #adb5bd; --ds-fg-quaternary: #8b949c; --ds-fg-disabled: #68717a;
-  --ds-border-subtle: #353b41; --ds-border-default: #4a5158; --ds-border-strong: #68717a; --ds-border-loud: #8b949c;
-  --ds-sel: rgb(125 105 228 / .15); --ds-sel-hover: rgb(125 105 228 / .22); --ds-sel-fg: rgb(170 153 255);
-  --ds-accent-bg: rgb(28 23 61); --ds-accent-fg: rgb(148 129 244);
-  --ds-button-primary: #ffffff; --ds-button-primary-fg: #000000; --ds-button-primary-hover: #eaedf0;
-  --ds-button-outline: #4a5158; --ds-button-outline-hover: #68717a;
-  --ds-danger: rgb(251 85 101); --ds-warning: #ff9869;
-  --ds-shadow-popover: 0 4px 20px rgb(0 0 0 / .15), 0 0 1px #68717a;
+  --ds-bg-deep: #08090a; --ds-bg: #0f1112; --ds-bg-alt: #0b0c0d;
+  --ds-bg-surface: #181a1c; --ds-bg-overlay: #1f2225; --ds-bg-well: #111314;
+  --ds-bg-chip: #25292c; --ds-bg-hover: #202326; --ds-bg-active: #2d3135;
+  --ds-overlay-scrim: rgb(0 0 0 / .6);
+  --ds-fg-primary: #f5f5f3; --ds-fg-secondary: #d3d6d9; --ds-fg-tertiary: #a6acb1; --ds-fg-quaternary: #8a9197; --ds-fg-disabled: #5d6469;
+  --ds-border-subtle: #212427; --ds-border-default: #2f3337; --ds-border-strong: #464c51; --ds-border-loud: #60676c;
+  --ds-sel: #2d3135; --ds-sel-hover: #34393d; --ds-sel-fg: #ffd400;
+  --ds-accent-bg: rgb(255 212 0 / .14); --ds-accent-fg: #ffd400; --ds-focus: #ffd400;
+  --ds-button-primary: #ffd400; --ds-button-primary-fg: #0b0c0d; --ds-button-primary-hover: #ffe14d;
+  --ds-button-outline: #34393d; --ds-button-outline-hover: #60676c;
+  --ds-danger: #ff5f52; --ds-warning: #ff9b3d; --ds-success: #34d08c; --ds-info: #5eb0ff; --ds-running: #2cc4c9;
+  --ds-on-status: #0b0c0d;
+  --ds-shadow-popover: 0 16px 40px rgb(0 0 0 / .5);
+  --viz-1: #ffd400; --viz-2: #5eb0ff; --viz-3: #ff5f52; --viz-4: #34d08c;
+  --viz-5: #ff9b3d; --viz-6: #2cc4c9; --viz-7: #f27fb2; --viz-8: #c3c8cc;
 }
 
-:root[data-mode="light"] {
+:root[data-mode="light"], :root[data-mode="dark"] .opposite, :root:not([data-mode="light"]) .opposite {
   color-scheme: light;
-  --ds-bg-deep: #eaedf0; --ds-bg: #f8f8f8; --ds-bg-alt: #ffffff;
-  --ds-bg-surface: #ffffff; --ds-bg-overlay: #ffffff; --ds-bg-well: #f8f8f8;
-  --ds-bg-chip: #eaedf0; --ds-bg-hover: #dfe3e7; --ds-bg-active: #cfd5db;
-  --ds-overlay-scrim: rgb(0 0 0 / .3);
-  --ds-fg-primary: #22262a; --ds-fg-secondary: #4a5158; --ds-fg-tertiary: #68717a; --ds-fg-quaternary: #8b949c; --ds-fg-disabled: #adb5bd;
-  --ds-border-subtle: #eaedf0; --ds-border-default: #cfd5db; --ds-border-strong: #adb5bd; --ds-border-loud: #8b949c;
-  --ds-sel: rgb(176 192 251 / .15); --ds-sel-hover: rgb(176 192 251 / .30); --ds-sel-fg: #6447fb;
-  --ds-accent-bg: #eff2fe; --ds-accent-fg: #6447fb;
-  --ds-button-primary: #000000; --ds-button-primary-fg: #ffffff; --ds-button-primary-hover: #2c3136;
-  --ds-button-outline: #dfe3e7; --ds-button-outline-hover: #adb5bd;
-  --ds-danger: rgb(233 31 4); --ds-warning: rgb(184 82 20);
-  --ds-shadow-popover: 0 4px 20px rgb(0 0 0 / .08), 0 0 1px #adb5bd;
+  --ds-bg-deep: #e4e6e8; --ds-bg: #eef0f1; --ds-bg-alt: #f7f8f8;
+  --ds-bg-surface: #ffffff; --ds-bg-overlay: #ffffff; --ds-bg-well: #f4f5f6;
+  --ds-bg-chip: #e6e8ea; --ds-bg-hover: #f0f2f3; --ds-bg-active: #dde0e3;
+  --ds-overlay-scrim: rgb(8 9 10 / .4);
+  --ds-fg-primary: #0d0f10; --ds-fg-secondary: #33383d; --ds-fg-tertiary: #535a61; --ds-fg-quaternary: #687077; --ds-fg-disabled: #a3a9ae;
+  --ds-border-subtle: #e8eaec; --ds-border-default: #d4d8db; --ds-border-strong: #b2b8bd; --ds-border-loud: #868d93;
+  --ds-sel: rgb(255 212 0 / .24); --ds-sel-hover: rgb(255 212 0 / .36); --ds-sel-fg: #4d3c00;
+  --ds-accent-bg: rgb(255 212 0 / .26); --ds-accent-fg: #6b5300; --ds-focus: #0d0f10;
+  --ds-button-primary: #ffd400; --ds-button-primary-fg: #0b0c0d; --ds-button-primary-hover: #f0c700;
+  --ds-button-outline: #d4d8db; --ds-button-outline-hover: #868d93;
+  --ds-danger: #cf2a1e; --ds-warning: #b0500e; --ds-success: #0e8554; --ds-info: #1c66c9; --ds-running: #10858a;
+  --ds-on-status: #ffffff;
+  --ds-shadow-popover: 0 16px 40px rgb(8 9 10 / .14);
+  --viz-1: #d9b300; --viz-2: #1c66c9; --viz-3: #cf2a1e; --viz-4: #0e8554;
+  --viz-5: #d0670f; --viz-6: #10858a; --viz-7: #c2457f; --viz-8: #687077;
 }
 
 /* Tailwind names → tokens. `inline` keeps utilities reading the mode-dependent variables. */
@@ -87,13 +96,19 @@
   --color-danger: var(--ds-danger);
   --color-warning: var(--ds-warning);
   --color-success: var(--ds-success);
+  --color-info: var(--ds-info);
+  --color-running: var(--ds-running);
+  --color-on-status: var(--ds-on-status);
   --font-sans: var(--ds-font-sans);
-  --font-mono: var(--ds-font-mono);
+  --font-display: var(--ds-font-display);
+  --font-mono: var(--ds-font-mono); /* taste-skill-ignore */
   --shadow-popover: var(--ds-shadow-popover);
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 8px;
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 }
 
 /* The Pitwall widgets (the player) read the --pw-* tokens, so they match the console. */
@@ -107,13 +122,54 @@
   --pw-fg-muted: var(--ds-fg-secondary);
   --pw-fg-subtle: var(--ds-fg-tertiary);
   --pw-border: var(--ds-border-default);
+  --pw-danger: var(--ds-danger);
+  --pw-success: var(--ds-success);
+  --pw-warning: var(--ds-warning);
+  --pw-font: var(--ds-font-sans);
+  --pw-mono: var(--ds-font-mono); /* taste-skill-ignore */
+  --pw-radius: 0px;
 }
 
 html, body { height: 100%; }
 body {
-  background: var(--ds-bg); color: var(--ds-fg-secondary);
-  font-family: var(--ds-font-sans); font-size: 13px; line-height: 17px; font-weight: 500;
+  background: var(--ds-bg); color: var(--ds-fg-primary);
+  font-family: var(--ds-font-sans); font-size: 14px; line-height: 20px; font-weight: 400;
+  font-feature-settings: "tnum" 0;
+  -webkit-font-smoothing: antialiased;
 }
-::selection { background: var(--ds-sel-hover); }
-:focus-visible { outline: 2px solid var(--ds-focus); outline-offset: 1px; }
-@media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+code, pre, kbd, samp { font-family: var(--ds-font-mono); font-size: 12.5px; }
+.code-block { font-family: var(--ds-font-mono); font-size: 12.5px; }
+.opposite { background: var(--ds-bg-surface); color: var(--ds-fg-primary); }
+::selection { background: var(--ds-accent); color: var(--ds-on-accent); }
+:focus-visible { outline: 2px solid var(--ds-focus); outline-offset: 2px; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--ds-accent); width: 16px; height: 16px; }
+
+/* Display type: the board's letters. */
+.display { font-family: var(--ds-font-display); font-weight: 700; letter-spacing: -0.035em; line-height: .92; }
+.figures { font-variant-numeric: tabular-nums; }
+
+/* Motion. Transform and opacity only; content is visible without it. */
+@keyframes rise { from { opacity: 0; transform: translateY(20px); } }
+@keyframes fade { from { opacity: 0; } }
+@keyframes shutter {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@keyframes settle { from { transform: scale(1.12); } }
+@keyframes drift { from { transform: scale(1.04) translate3d(0, 0, 0); } to { transform: scale(1.1) translate3d(-1.5%, -1%, 0); } }
+@keyframes slot { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+
+.rise { animation: rise .55s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms); }
+.fade-in { animation: fade .4s var(--ease) both; animation-delay: calc(var(--i, 0) * 70ms); }
+.shutter { animation: shutter 1.1s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 90ms); }
+.shutter > img { animation: settle 1.4s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 90ms); }
+.drift { animation: drift 24s var(--ease) infinite alternate; }
+.blink { animation: slot 2s steps(1) infinite; }
+@keyframes grow-y { from { transform: scaleY(0); } }
+@keyframes grow-x { from { transform: scaleX(0); } }
+.bar { transform-origin: bottom; animation: grow-y .7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.grow-x { transform-origin: left; animation: grow-x .8s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 60ms); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

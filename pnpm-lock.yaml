@@ -10,7 +10,10 @@ importers:
 
   apps/console:
     dependencies:
-      '@fontsource-variable/inter':
+      '@fontsource-variable/figtree':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource-variable/league-spartan':
         specifier: ^5.3.0
         version: 5.3.0
       '@pitwall/sdk':
@@ -245,8 +248,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@fontsource-variable/inter@5.3.0':
-    resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
+  '@fontsource-variable/figtree@5.3.0':
+    resolution: {integrity: sha512-VRVodD7OiG7apQwE8/2fMjaqpY/a0qRJqL5HtYj8CKIVps+9amaFcdfKmDIf7iqYQx6iPLlArVXAfKeIZmVcNQ==}
+
+  '@fontsource-variable/league-spartan@5.3.0':
+    resolution: {integrity: sha512-dn7OVujDOZ6//Bs0TEhi7QTZvwOJ8YNdNfviT29AC219TKaimMpWtyMGTCdN7IB3ho6HxQj7VEbolHah2tER3g==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -922,7 +928,9 @@ snapshots:
   '@esbuild/win32-x64@0.25.12':
     optional: true
 
-  '@fontsource-variable/inter@5.3.0': {}
+  '@fontsource-variable/figtree@5.3.0': {}
+
+  '@fontsource-variable/league-spartan@5.3.0': {}
 
   '@img/colour@1.1.0':
     optional: true

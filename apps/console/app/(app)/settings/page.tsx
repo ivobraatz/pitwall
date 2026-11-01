@@ -22,8 +22,8 @@ function Password() {
     } catch (e) { toast('error', e instanceof Error ? e.message : 'Erro.'); } finally { setBusy(false); }
   };
   return (
-    <Card title="Senha">
-      <div className="flex flex-col gap-3 p-4">
+    <Card title="Senha" className="rise">
+      <div className="flex flex-col gap-5 px-5 pt-2 pb-6">
         <Field label="Senha atual"><Input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} /></Field>
         <Field label="Nova senha" hint="Pelo menos 12 caracteres."><Input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} /></Field>
         <div><Button variant="primary" loading={busy} onClick={submit} disabled={!current || next.length < 12}>Trocar senha</Button></div>
@@ -49,17 +49,17 @@ function Totp() {
     catch (e) { toast('error', e instanceof Error ? e.message : 'Erro.'); }
   };
   return (
-    <Card title="Autenticador (2FA)" actions={me?.totpEnabled ? <Pill tone="ok">ativo</Pill> : <Pill tone="warn">desligado</Pill>}>
-      <div className="flex flex-col gap-3 p-4 text-[13px]">
-        <p className="text-fg-muted">O console reúne dados de clientes de todos os sistemas. Um segundo fator fecha a porta para uma senha vazada.</p>
+    <Card title="Autenticador (2FA)" className="rise" style={{ '--i': 1 } as React.CSSProperties} actions={me?.totpEnabled ? <Pill tone="ok">Ativo</Pill> : <Pill tone="warn">Desligado</Pill>}>
+      <div className="flex flex-col gap-4 px-5 pt-2 pb-6 text-[14px]">
+        <p className="max-w-lg leading-[1.5] text-fg-secondary">O console reúne dados de clientes de todos os sistemas. Um segundo fator fecha a porta para uma senha vazada.</p>
         {me?.totpEnabled ? (
           <div className="flex items-end gap-2"><Field label="Senha para desligar" className="flex-1"><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
             <Button variant="danger" onClick={disable} disabled={!password}>Desligar</Button></div>
         ) : enroll ? (
           <>
             <p>Adicione no app autenticador (Google Authenticator, 1Password, Authy…) com a chave abaixo ou abrindo o link no celular:</p>
-            <Input readOnly className="font-mono" value={enroll.secret} onFocus={(e) => e.target.select()} />
-            <a className="truncate font-mono text-[11px] text-accent-fg" href={enroll.uri}>{enroll.uri}</a>
+            <Input readOnly code value={enroll.secret} onFocus={(e) => e.target.select()} />
+            <a className="truncate text-accent-fg hover:underline" href={enroll.uri}><code>{enroll.uri}</code></a>
             <div className="flex items-end gap-2"><Field label="Código de 6 dígitos" className="flex-1"><Input inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value)} /></Field>
               <Button variant="primary" onClick={confirm} disabled={code.length < 6}>Confirmar</Button></div>
           </>
@@ -86,11 +86,13 @@ function Team() {
     catch (e) { toast('error', e instanceof Error ? e.message : 'Erro.'); }
   };
   return (
-    <Card title="Equipe" actions={admin && <Button size="sm" onClick={() => setOpen(true)}>Adicionar pessoa</Button>}>
+    <Card title="Equipe" className="rise" style={{ '--i': 2 } as React.CSSProperties} actions={admin && <Button size="sm" onClick={() => setOpen(true)}>Adicionar pessoa</Button>}>
+      <div className="flex flex-col gap-1 px-2 pb-2">
       {team.data?.map((m) => (
-        <div key={m.id} className="flex items-center gap-3 border-b border-border px-4 py-2.5 text-[13px] last:border-0">
-          <div className="min-w-0 flex-1"><div className="font-medium">{m.name} {m.disabled && <Pill tone="error">desativado</Pill>}</div>
-            <div className="text-[12px] text-fg-muted">{m.email} · último acesso {rel(m.lastLoginAt)}</div></div>
+        <div key={m.id} className="flex flex-wrap items-center gap-3 bg-well px-3 py-3 text-[14px]">
+          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-chip text-[13px] font-bold text-fg">{m.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}</span>
+          <div className="min-w-0 flex-1"><div className="flex items-center gap-2 font-semibold text-fg">{m.name} {m.disabled && <Pill tone="error">desativado</Pill>}</div>
+            <div className="mt-0.5 text-[13px] text-fg-muted">{m.email} · último acesso {rel(m.lastLoginAt)}</div></div>
           {m.totpEnabled ? <Pill tone="ok">2FA</Pill> : <Pill tone="warn">sem 2FA</Pill>}
           {admin && m.id !== me?.id ? (
             <>
@@ -100,17 +102,18 @@ function Team() {
           ) : <Pill>{m.role === 'admin' ? 'Admin' : 'Atendente'}</Pill>}
         </div>
       ))}
+      </div>
       <Dialog open={open} onClose={() => setOpen(false)} title="Adicionar pessoa">
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <Field label="Nome"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <Field label="E-mail"><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-          <Field label="Papel"><Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} options={[{ value: 'agent', label: 'Atendente — responde chamados' }, { value: 'admin', label: 'Admin — também gerencia sistemas e equipe' }]} /></Field>
-          <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button><Button variant="primary" onClick={add}>Adicionar</Button></div>
+          <Field label="Papel"><Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} options={[{ value: 'agent', label: 'Atendente: responde chamados' }, { value: 'admin', label: 'Admin: também gerencia sistemas e equipe' }]} /></Field>
+          <div className="mt-2 flex justify-end gap-2"><Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button><Button variant="primary" onClick={add}>Adicionar</Button></div>
         </div>
       </Dialog>
       <Dialog open={!!created} onClose={() => setCreated(null)} title="Senha temporária">
-        <p className="mb-2 text-[13px] text-fg-muted">Entregue por um canal seguro. {created?.email} troca no primeiro acesso.</p>
-        <Input readOnly className="font-mono" value={created?.temporaryPassword ?? ''} onFocus={(e) => e.target.select()} />
+        <p className="mb-4 text-[14px] leading-[1.5] text-fg-secondary">Entregue por um canal seguro. {created?.email} troca no primeiro acesso.</p>
+        <Input readOnly code value={created?.temporaryPassword ?? ''} onFocus={(e) => e.target.select()} />
       </Dialog>
     </Card>
   );
@@ -119,9 +122,9 @@ function Team() {
 export default function SettingsPage() {
   return (
     <>
-      <PageHeader title="Conta e equipe" />
-      <div className="grid gap-4 xl:grid-cols-2">
-        <div className="flex flex-col gap-4"><Password /><Totp /></div>
+      <PageHeader title="Conta e equipe" subtitle="A sua senha e o segundo fator, e quem mais está no muro." />
+      <div className="grid gap-2 xl:grid-cols-2">
+        <div className="flex flex-col gap-2"><Password /><Totp /></div>
         <Team />
       </div>
     </>

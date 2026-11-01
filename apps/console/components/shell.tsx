@@ -5,19 +5,19 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type Me, type Summary } from '@/lib/api';
-import { cn } from './ui';
+import { Lockup, Mark } from './brand';
+import { ProductMark, ProductStripe } from './product';
+import { Icon, cn } from './ui';
 
 export const MeContext = React.createContext<Me | null>(null);
 export function useMe() { return React.useContext(MeContext); }
 
-const icon = (paths: React.ReactNode) => function Icon() {
-  return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{paths}</svg>;
-};
-const IconTickets = icon(<><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4Z" /><path d="M14 5v14" strokeDasharray="2 3" /></>);
-const IconErrors = icon(<><path d="M12 4 3 19h18Z" /><path d="M12 10v4M12 16.5v.5" /></>);
-const IconReleases = icon(<><path d="M5 19c0-6 4-11 14-14-1 10-6 14-14 14Z" /><path d="m5 19 6-6" /></>);
-const IconProducts = icon(<><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></>);
-const IconSettings = icon(<><circle cx="12" cy="8" r="3.2" /><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" /></>);
+// The four channels of the pit wall: radio (tickets), telemetry (errors), the bulletin (releases), the cars (systems).
+const IconTickets = () => <Icon size={20} d={<><path d="M4 6h16v9H9l-5 4Z" /><path d="M8 10h8" /></>} />;
+const IconErrors = () => <Icon size={20} d={<path d="M3 13h4l2-6 4 12 2.5-8L17 13h4" />} />;
+const IconReleases = () => <Icon size={20} d={<><path d="M5 4h14v16H5Z" /><path d="M9 9h6M9 13h6M9 17h3" /></>} />;
+const IconProducts = () => <Icon size={20} d={<><path d="M4 5h16v4H4ZM4 10.5h11v4H4ZM4 16h7v4H4Z" /></>} />;
+const IconSettings = () => <Icon size={20} d={<><path d="M12 12.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /><path d="M5 20c.8-3.4 3.6-5.5 7-5.5s6.2 2.1 7 5.5" /></>} />;
 
 const NAV = [
   { href: '/', label: 'Chamados', Icon: IconTickets, match: (p: string) => p === '/' || p.startsWith('/tickets') },
@@ -27,40 +27,45 @@ const NAV = [
   { href: '/settings', label: 'Conta e equipe', Icon: IconSettings, match: (p: string) => p.startsWith('/settings') },
 ];
 
-/** Side panel: the products, filterable, each with open tickets and 24h errors. Picking one filters the queue. */
+/** The timing tower: each system with its team colour, open tickets and 24h errors. Picking one filters the queue. */
 function ProductPanel({ products }: { products: Summary['products'] }) {
   const params = useSearchParams();
   const [filter, setFilter] = React.useState('');
   const selected = params.get('product');
   const shown = products.filter((p) => p.name.toLowerCase().includes(filter.toLowerCase()));
-  const item = (active: boolean) => cn('flex h-7 items-center gap-2 rounded-sm px-2 text-[13px]', active ? 'bg-sel text-sel-fg hover:bg-sel-hover' : 'text-fg-secondary hover:bg-hover');
+  const item = (active: boolean) => cn('group flex h-10 items-center gap-3 pr-3 text-[14px] transition-colors duration-150', active ? 'bg-sel text-fg' : 'text-fg-secondary hover:bg-hover hover:text-fg');
   return (
-    <>
-      <div className="px-3 pb-2">
-        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrar sistemas…" aria-label="Filtrar sistemas"
-          className="h-7 w-full rounded-sm border border-border bg-surface px-2.5 text-[13px] text-fg outline-none placeholder:text-fg-subtle hover:border-border-strong focus:border-focus focus:ring-2 focus:ring-focus" />
+    <div className="mt-6 flex min-h-0 flex-col">
+      <div className="flex items-baseline px-5 pb-2 text-[13px] font-semibold text-fg-muted">
+        <span>Na pista</span><span className="ml-auto tabular-nums">{products.length}</span>
       </div>
-      <div className="flex items-center px-4 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-fg-subtle">
-        <span>Sistemas</span><span className="ml-auto tabular-nums">{products.length}</span>
-      </div>
-      <div className="flex flex-col px-2">
-        <Link href="/" className={item(!selected)}>Todos os sistemas</Link>
+      {products.length > 6 && (
+        <div className="px-3 pb-2">
+          <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrar sistemas" aria-label="Filtrar sistemas"
+            className="h-9 w-full bg-surface px-3 text-[14px] text-fg outline-none placeholder:text-fg-subtle focus:bg-hover" />
+        </div>
+      )}
+      <div className="flex min-h-0 flex-col gap-0.5 overflow-y-auto px-3">
+        <Link href="/" className={item(!selected)}><span className="h-full w-1 bg-fg-subtle" />Todos os sistemas</Link>
         {shown.map((p) => (
-          <Link key={p.id} href={`/?product=${p.id}`} className={item(selected === p.id)}>
+          <Link key={p.id} href={`/?product=${p.id}`} className={item(selected === p.id)} title="chamados abertos · erros nas últimas 24h">
+            <ProductStripe product={p} className="h-full w-1" />
+            <ProductMark product={p} size={20} />
             <span className="truncate">{p.name}</span>
-            <span className="ml-auto flex shrink-0 items-center gap-1.5 text-[11px] tabular-nums text-fg-muted" title="chamados abertos · erros nas últimas 24h">
-              {p.awaitingUs > 0 && <span className="size-1.5 rounded-full bg-warning" title="aguardando a equipe" />}
-              {p.open}<span className="text-fg-subtle">·</span><span className={p.errors24h > 0 ? 'text-danger' : ''}>{p.errors24h}</span>
+            <span className="ml-auto flex shrink-0 items-center gap-2 text-[13px] tabular-nums">
+              {p.awaitingUs > 0 && <span className="size-2 bg-warning" title="aguardando a equipe" />}
+              <span className="text-fg">{p.open}</span>
+              <span className={cn('w-6 text-right', p.errors24h > 0 ? 'font-semibold text-danger' : 'text-fg-subtle')}>{p.errors24h}</span>
             </span>
           </Link>
         ))}
-        {shown.length === 0 && <p className="px-2 py-2 text-[12px] text-fg-muted">Nenhum sistema.</p>}
+        {shown.length === 0 && <p className="px-2 py-2 text-[13px] text-fg-muted">Nenhum sistema.</p>}
       </div>
-    </>
+    </div>
   );
 }
 
-/** Signed-in frame: rail, context panel, the session check, and a redirect to /login when it lapses. */
+/** Signed-in frame: the side bar, the session check, and a redirect to /login when it lapses. */
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -80,7 +85,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }), [queryClient, router]);
 
   if (!me.data) {
-    return <div className="grid h-full place-items-center text-fg-subtle"><span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /></div>;
+    return <div className="grid h-full place-items-center"><Mark size={40} className="blink" /></div>;
   }
 
   const logout = async () => {
@@ -89,59 +94,71 @@ export function Shell({ children }: { children: React.ReactNode }) {
     router.replace('/login');
   };
   const initials = me.data.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const unanswered = summary.data?.unanswered ?? 0;
+  const onQueue = pathname === '/' || pathname.startsWith('/tickets');
 
   return (
     <MeContext.Provider value={me.data}>
       <div className="flex h-full">
-        {/* Rail, 56px: icons, the active one in a rounded outline; the account sits at the foot. */}
-        <aside className="hidden w-14 shrink-0 flex-col items-center gap-1 border-r border-border bg-deep py-3 md:flex">
-          <Link href="/" className="mb-3 grid size-8 place-items-center rounded-md bg-accent text-[14px] font-bold text-on-accent" title="Pitwall">P</Link>
-          {NAV.map(({ href, label, Icon, match }) => {
-            const active = match(pathname);
-            return (
-              <Link key={href} href={href} title={label} aria-label={label}
-                className={cn('relative grid size-9 place-items-center rounded-lg border transition-colors duration-150', active ? 'border-border-loud bg-active text-fg' : 'border-transparent text-fg-muted hover:bg-hover hover:text-fg')}>
-                <Icon />
-                {href === '/' && summary.data && summary.data.unanswered > 0 && (
-                  <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-accent px-1 text-center text-[10px] font-bold leading-4 text-on-accent" title="Aguardando a equipe">{summary.data.unanswered}</span>
-                )}
-              </Link>
-            );
-          })}
-          <div className="relative mt-auto">
+        {/* Side bar: a rail of icons on tablets, the full board (names + timing tower) from lg up. */}
+        <aside className="hidden w-[72px] shrink-0 flex-col bg-alt py-4 md:flex lg:w-64">
+          <Link href="/" className="mb-6 flex h-10 items-center justify-center text-[26px] lg:justify-start lg:px-5" aria-label="Pitwall, início">
+            <span className="lg:hidden"><Mark size={32} /></span>
+            <span className="hidden lg:inline-flex"><Lockup size={30} /></span>
+          </Link>
+          <nav className="flex flex-col gap-0.5 px-3">
+            {NAV.map(({ href, label, Icon: NavIcon, match }) => {
+              const active = match(pathname);
+              return (
+                <Link key={href} href={href} title={label} aria-current={active ? 'page' : undefined}
+                  className={cn('relative flex h-11 items-center justify-center gap-3 text-[15px] transition-colors duration-150 lg:justify-start lg:px-3',
+                    active ? 'bg-active font-semibold text-fg' : 'text-fg-muted hover:bg-hover hover:text-fg')}>
+                  <span className={cn(active && 'text-accent-fg')}><NavIcon /></span>
+                  <span className="hidden lg:inline">{label}</span>
+                  {href === '/' && unanswered > 0 && (
+                    <span className="absolute top-1 right-1 min-w-5 bg-accent px-1 text-center text-[13px] leading-5 font-bold text-on-accent tabular-nums lg:static lg:ml-auto" title="Aguardando a equipe">{unanswered}</span>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="hidden min-h-0 flex-1 lg:flex lg:flex-col">
+            {onQueue && summary.data && <React.Suspense><ProductPanel products={summary.data.products} /></React.Suspense>}
+          </div>
+          <div className="relative mt-auto px-3 pt-4">
             <button onClick={() => setMenu((v) => !v)} aria-label="Conta" aria-expanded={menu}
-              className="grid size-8 place-items-center rounded-full bg-chip text-[12px] font-semibold text-fg hover:bg-hover">{initials}</button>
+              className="flex h-12 w-full items-center justify-center gap-3 text-left transition-colors hover:bg-hover lg:justify-start lg:px-2">
+              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-chip text-[13px] font-bold text-fg">{initials}</span>
+              <span className="hidden min-w-0 lg:block">
+                <span className="block truncate text-[14px] font-semibold text-fg">{me.data.name}</span>
+                <span className="block truncate text-[13px] text-fg-muted">{me.data.role === 'admin' ? 'Admin' : 'Atendente'}</span>
+              </span>
+            </button>
             {menu && (
-              <div className="absolute bottom-0 left-11 z-[9999] w-56 rounded-lg border border-border bg-overlay p-1 shadow-popover" onMouseLeave={() => setMenu(false)}>
-                <div className="px-2 py-1.5"><div className="truncate font-semibold text-fg">{me.data.name}</div><div className="truncate text-[12px] text-fg-muted">{me.data.email}</div></div>
-                <div className="my-1 border-t border-border-subtle" />
-                <Link href="/settings" onClick={() => setMenu(false)} className="flex h-7 items-center rounded-sm px-2 text-[13px] text-fg-secondary hover:bg-hover">Conta e equipe</Link>
-                <button onClick={logout} className="flex h-7 w-full items-center rounded-sm px-2 text-left text-[13px] text-danger hover:bg-hover">Sair</button>
+              <div className="rise absolute bottom-0 left-full z-[9999] ml-2 w-64 bg-overlay p-1.5 shadow-popover lg:bottom-full lg:left-3 lg:mb-2 lg:ml-0" onMouseLeave={() => setMenu(false)}>
+                <div className="px-3 py-2.5"><div className="truncate font-semibold text-fg">{me.data.name}</div><div className="truncate text-[13px] text-fg-muted">{me.data.email}</div></div>
+                <Link href="/settings" onClick={() => setMenu(false)} className="flex h-10 items-center px-3 text-[14px] text-fg-secondary hover:bg-hover hover:text-fg">Conta e equipe</Link>
+                <button onClick={logout} className="flex h-10 w-full items-center px-3 text-left text-[14px] text-danger hover:bg-hover">Sair</button>
               </div>
             )}
           </div>
         </aside>
-        {/* Context panel: only where the queue lives, since picking a product filters it. */}
-        {(pathname === '/' || pathname.startsWith('/tickets')) && (
-          <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-alt lg:flex">
-            <div className="flex h-12 items-center px-4"><span className="text-[14px] font-semibold text-fg">Pitwall</span></div>
-            {summary.data && <React.Suspense><ProductPanel products={summary.data.products} /></React.Suspense>}
-          </aside>
-        )}
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center gap-3 border-b border-border bg-alt px-4 py-2 md:hidden">
-            <span className="font-semibold text-fg">Pitwall</span>
-            <nav className="flex gap-3 overflow-x-auto text-[13px]">
-              {NAV.map((n) => <Link key={n.href} href={n.href} className={n.match(pathname) ? 'font-semibold whitespace-nowrap text-sel-fg' : 'text-fg-muted whitespace-nowrap'}>{n.label}</Link>)}
+          <div className="flex items-center gap-4 bg-alt px-4 py-3 md:hidden">
+            <Link href="/" aria-label="Pitwall"><Mark size={28} /></Link>
+            <nav className="flex gap-1 overflow-x-auto text-[14px]">
+              {NAV.map((n) => (
+                <Link key={n.href} href={n.href} className={cn('flex h-9 items-center px-3 whitespace-nowrap', n.match(pathname) ? 'bg-active font-semibold text-fg' : 'text-fg-muted')}>{n.label}</Link>
+              ))}
             </nav>
           </div>
           {(me.data.mustChangePassword || me.data.totpRequired) && pathname !== '/settings' && (
-            <div className="border-b border-warning/30 bg-warning/10 px-6 py-2 text-[13px] text-fg">
-              {me.data.mustChangePassword ? 'Troque a senha temporária.' : 'Esta instalação exige o autenticador.'}{' '}
-              <Link href="/settings" className="underline">Ir para Conta</Link>
+            <div className="flex items-center gap-3 bg-warning px-6 py-2.5 text-[14px] font-semibold text-on-status">
+              {me.data.mustChangePassword ? 'Troque a senha temporária antes de seguir.' : 'Esta instalação exige o autenticador.'}
+              <Link href="/settings" className="underline underline-offset-2">Ir para Conta</Link>
             </div>
           )}
-          <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-6 md:px-8"><div className="mx-auto max-w-6xl">{children}</div></main>
+          <main className="min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-8 md:px-8 lg:px-12 lg:py-10"><div className="mx-auto max-w-[1360px]">{children}</div></main>
         </div>
       </div>
     </MeContext.Provider>

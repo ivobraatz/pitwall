@@ -52,7 +52,9 @@ export interface ProductSettings {
   retroactiveRecording: boolean; customerTicketUrl: string | null;
 }
 export interface Product extends ProductRef {
-  description: string | null; webhookUrl: string | null; hasWebhookSecret: boolean; settings: ProductSettings;
+  description: string | null; websiteUrl: string | null; color: string | null; logoUrl: string | null;
+  owner: { id: string; name: string; email: string } | null;
+  webhookUrl: string | null; hasWebhookSecret: boolean; settings: ProductSettings;
   createdAt: string; updatedAt: string; disabledAt: string | null;
 }
 export interface ProductKey { id: string; name: string; prefix: string; scopes: string[]; createdAt: string; lastUsedAt: string | null; revokedAt: string | null }

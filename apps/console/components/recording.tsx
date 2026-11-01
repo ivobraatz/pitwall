@@ -45,11 +45,11 @@ export function RecordingCard({ ticketId, attachment, fallback }: { ticketId: st
 
   return (
     <>
-      <div className="flex items-center gap-3 rounded-md border border-border bg-bg px-3 py-2">
-        <span className="text-accent-fg">▶</span>
+      <div className="flex items-center gap-3 bg-surface py-2 pr-2 pl-3">
+        <span className="grid size-9 shrink-0 place-items-center bg-accent text-on-accent" aria-hidden><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7 4v16l13-8Z" /></svg></span>
         <div className="min-w-0 flex-1">
-          <div className="text-[13px]">{meta.mode === 'procedure' ? 'Gravação dos passos' : 'Gravação do que aconteceu antes'}</div>
-          <div className="font-mono text-[11px] text-fg-subtle">
+          <div className="text-[14px] font-semibold text-fg">{meta.mode === 'procedure' ? 'Gravação dos passos' : 'Gravação do que aconteceu antes'}</div>
+          <div className="text-[13px] tabular-nums text-fg-muted">
             {meta.durationMs != null && `${duration(meta.durationMs)} · `}{meta.eventCount != null && `${meta.eventCount} eventos · `}{bytes(attachment.sizeBytes)}
             {meta.masked === false && <span className="text-warning"> · dados visíveis</span>}
           </div>
@@ -59,7 +59,7 @@ export function RecordingCard({ ticketId, attachment, fallback }: { ticketId: st
       <Dialog open={open} onClose={() => setOpen(false)} title={`Gravação${meta.startedAt ? ` · ${new Date(meta.startedAt).toLocaleString('pt-BR')}` : ''}`} wide>
         {error ? <p className="text-[13px] text-danger">{error}</p>
           : events ? <Player events={events} diagnostics={meta.diagnostics ?? fallback} />
-          : <div className="grid h-[40vh] place-items-center text-[13px] text-fg-muted">Carregando gravação…</div>}
+          : <div className="grid h-[40vh] place-items-center text-[14px] text-fg-muted">Carregando a câmera onboard…</div>}
       </Dialog>
     </>
   );
@@ -73,16 +73,16 @@ export function ImageThumb({ ticketId, attachment }: { ticketId: string; attachm
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [ticketId, attachment.id]);
   return (
-    <a href={url ?? '#'} target="_blank" rel="noopener" className="block overflow-hidden rounded-md border border-border bg-bg" title={attachment.name}>
-      {url ? <img src={url} alt={attachment.name} className="h-24 w-36 object-cover" /> : <div className="grid h-24 w-36 place-items-center text-[11px] text-fg-subtle">{attachment.name}</div>}
+    <a href={url ?? '#'} target="_blank" rel="noopener" className="block overflow-hidden bg-surface transition-opacity hover:opacity-85" title={attachment.name}>
+      {url ? <img src={url} alt={attachment.name} className="h-24 w-36 object-cover" /> : <div className="grid h-24 w-36 place-items-center px-2 text-center text-[13px] text-fg-muted">{attachment.name}</div>}
     </a>
   );
 }
 
 export function FileChip({ ticketId, attachment }: { ticketId: string; attachment: Attachment }) {
   return (
-    <a href={`/v1/staff/tickets/${ticketId}/attachments/${attachment.id}?download=true`} className="flex items-center gap-2 rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] hover:bg-hover">
-      <span className="max-w-48 truncate">{attachment.name}</span><span className="font-mono text-fg-subtle">{bytes(attachment.sizeBytes)}</span>
+    <a href={`/v1/staff/tickets/${ticketId}/attachments/${attachment.id}?download=true`} className="flex h-9 items-center gap-2 bg-surface px-3 text-[13px] transition-colors hover:bg-hover">
+      <span className="max-w-48 truncate">{attachment.name}</span><span className="tabular-nums text-fg-muted">{bytes(attachment.sizeBytes)}</span>
     </a>
   );
 }

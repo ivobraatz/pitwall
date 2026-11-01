@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type ReleaseDetail } from '@/lib/api';
 import { Button, Card, ErrorBox, Field, Input, PageHeader, Pill, Shimmer, Textarea, dateTime, useToast } from '@/components/ui';
+import { ProductMark, ProductName } from '@/components/product';
 
 type Edit = { title: string; summary: string; new: string; improvements: string };
 const LOCALE: Record<string, string> = { pt: 'Português', en: 'English', es: 'Español' };
@@ -47,11 +48,11 @@ export default function ReleasePage() {
   return (
     <>
       <PageHeader
-        title={<>Versão <span className="font-mono">{r.version}</span></>}
-        subtitle={<>{r.product.name} · {r.commitShas.length} commits · criada {dateTime(r.createdAt)}{r.publishedAt && ` · publicada ${dateTime(r.publishedAt)}`}</>}
+        title={<span className="flex items-center gap-4"><ProductMark product={r.product} size={44} label /><span className="tabular-nums">{r.version}</span></span>}
+        subtitle={<><ProductName product={r.product} size={18} className="align-[-0.2em] font-semibold text-fg-secondary" /> · {r.commitShas.length} commits · criada {dateTime(r.createdAt)}{r.publishedAt && ` · publicada ${dateTime(r.publishedAt)}`}</>}
         actions={r.notes.length > 0 && (
           <>
-            <Pill tone={r.status === 'published' ? 'ok' : 'warn'}>{r.status === 'published' ? 'Publicada' : 'Rascunho'}</Pill>
+            <Pill tone={r.status === 'published' ? 'ok' : 'accent'}>{r.status === 'published' ? 'Publicada' : 'Rascunho'}</Pill>
             <Button loading={save.isPending} onClick={() => save.mutate()}>Salvar</Button>
             {r.status === 'published'
               ? <Button variant="danger" loading={unpublish.isPending} onClick={() => unpublish.mutate()}>Despublicar</Button>
@@ -60,20 +61,20 @@ export default function ReleasePage() {
         )}
       />
       {r.ticketCodes.length > 0 && (
-        <div className="mb-4 rounded-md border border-success/30 bg-success/5 px-4 py-2 text-[13px]">
+        <div className="rise mb-2 flex items-center gap-3 bg-success/12 px-5 py-3.5 text-[14px] text-fg"><span className="size-2.5 shrink-0 bg-success" />
           Os commits citaram {r.ticketCodes.join(', ')}: esses chamados foram resolvidos com a versão {r.version}.
         </div>
       )}
       {r.notes.length === 0 ? (
-        <Card><p className="p-4 text-[13px] text-fg-muted">Nada nesta versão era visível para clientes, então não há nota. Os chamados citados nos commits foram resolvidos mesmo assim.</p></Card>
+        <Card><p className="px-5 py-6 text-[15px] leading-[1.5] text-fg-muted">Nada nesta versão era visível para clientes, então não há nota. Os chamados citados nos commits foram resolvidos mesmo assim.</p></Card>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {r.notes.map((n) => {
+        <div className="grid gap-2 lg:grid-cols-2">
+          {r.notes.map((n, i) => {
             const e = edits[n.locale];
             if (!e) return null;
             return (
-              <Card key={n.locale} title={LOCALE[n.locale] ?? n.locale} actions={<span className="font-mono text-[11px] text-fg-subtle">/{n.slug}</span>}>
-                <div className="flex flex-col gap-3 p-4">
+              <Card key={n.locale} className="rise" style={{ '--i': i } as React.CSSProperties} title={LOCALE[n.locale] ?? n.locale} actions={<code className="text-fg-muted">/{n.slug}</code>}>
+                <div className="flex flex-col gap-5 px-5 pt-2 pb-6">
                   <Field label="Título"><Input value={e.title} maxLength={80} onChange={(ev) => patch(n.locale, { title: ev.target.value })} /></Field>
                   <Field label="Resumo"><Input value={e.summary} maxLength={240} onChange={(ev) => patch(n.locale, { summary: ev.target.value })} /></Field>
                   <Field label="Novo" hint="Um item por linha. **negrito** no nome do recurso."><Textarea rows={5} value={e.new} onChange={(ev) => patch(n.locale, { new: ev.target.value })} /></Field>
@@ -84,8 +85,8 @@ export default function ReleasePage() {
           })}
         </div>
       )}
-      <Card className="mt-4" title="Commits">
-        <div className="flex flex-wrap gap-1.5 p-4 font-mono text-[11px] text-fg-muted">{r.commitShas.map((s) => <span key={s} className="rounded bg-chip px-1.5">{s.slice(0, 10)}</span>)}</div>
+      <Card className="mt-2" title="Commits">
+        <div className="flex flex-wrap gap-1 px-5 pt-1 pb-5 text-fg-secondary">{r.commitShas.map((s) => <code key={s} className="bg-well px-2 py-1">{s.slice(0, 10)}</code>)}</div>
       </Card>
     </>
   );
