@@ -18,9 +18,10 @@ Detalhes e portas estão no [README](README.md#rodar-localmente).
 ```bash
 dotnet test Pitwall.slnx                       # unitários + integração (Postgres via Testcontainers, precisa de Docker)
 corepack pnpm --filter @pitwall/sdk test       # SDK: ponte, assinatura de webhook
+corepack pnpm --filter pitwall-mcp test        # MCP: tools, erros, nada de token na saída
 ```
 
-Antes de abrir um PR, rode os dois e confira que o build do console passa
+Antes de abrir um PR, rode os três e confira que o build do console passa
 (`corepack pnpm --filter @pitwall/console build`).
 
 ## Commits

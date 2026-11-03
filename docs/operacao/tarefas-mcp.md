@@ -1,0 +1,101 @@
+# Tarefas da equipe pelo MCP
+
+O console tem um quadro de **Tarefas** para o trabalho manual da equipe: configurar um painel
+externo, testar num aparelho, obter uma credencial. Ele fica separado dos chamados de cliente. O
+Claude Code registra e confere essas tarefas pelo servidor MCP do Pitwall (`pitwall-mcp`), usando
+um token pessoal de quem está na sessão.
+
+O desenho e as decisões estão em [`arquitetura/tarefas-equipe.md`](../arquitetura/tarefas-equipe.md).
+
+## 1. Criar o token
+
+1. No console da sua instalação, abra **Conta e equipe → Tokens pessoais**.
+2. Dê um nome que diga onde ele vai ser usado ("Claude Code no notebook") e escolha a validade:
+   90 dias por padrão, ou 30 dias, 1 ano ou sem expiração.
+3. Clique em **Novo token**. O `pwt_…` aparece **uma vez**, junto com o comando `claude mcp add`
+   já preenchido com o endereço do console. Copie.
+
+Qualquer pessoa da equipe (atendente ou admin) cria os próprios tokens, até 10 ativos. O token vale só para `/v1/staff/tasks/*`: não lê chamados,
+sistemas nem a equipe, e não cria outros tokens.
+
+## 2. Conectar o Claude Code
+
+```sh
+claude mcp add pitwall --scope user \
+  --env PITWALL_URL=https://<seu-dominio> \
+  --env PITWALL_TOKEN=pwt_xxxxxxxxxxxx \
+  -- npx -y pitwall-mcp
+```
+
+`PITWALL_URL` é o endereço do **console**, o mesmo que você abre no navegador. O MCP fala com o
+proxy do console, que repassa o cabeçalho `Authorization` para a API.
+
+Enquanto o pacote não estiver publicado no npm, use o build do repositório:
+
+```sh
+corepack pnpm --filter pitwall-mcp build
+claude mcp add pitwall --scope user \
+  --env PITWALL_URL=https://<seu-dominio> \
+  --env PITWALL_TOKEN=pwt_xxxxxxxxxxxx \
+  -- node <caminho-do-repo>/packages/mcp/dist/index.js
+```
+
+Em desenvolvimento, `PITWALL_URL=http://localhost:3200`.
+
+## 3. Testar
+
+- No Claude Code, `/mcp` mostra `pitwall` conectado e 8 tools.
+- Peça "mostre o board_summary". A resposta traz a contagem por coluna.
+- Sem o Claude, use o inspetor:
+
+  ```sh
+  PITWALL_URL=https://<seu-dominio> PITWALL_TOKEN=pwt_… \
+    npx @modelcontextprotocol/inspector node packages/mcp/dist/index.js
+  ```
+
+## 4. Revogar
+
+Em **Conta e equipe → Tokens pessoais**, clique em **Revogar** e confirme. A próxima chamada do
+MCP já responde que o token é inválido. Se a pessoa for desativada na equipe, os tokens dela param
+de valer em até 1 minuto.
+
+## 5. Trecho para o `CLAUDE.md` de cada sistema
+
+Copie no `CLAUDE.md` do repositório de cada sistema e troque o slug (veja os slugs com a tool
+`list_products` ou em **Sistemas** no console):
+
+```md
+## Tarefas da equipe (Pitwall MCP)
+Sistema neste repositório: product = "<slug>".
+- Início da sessão: rode board_summary(product) e list_tasks(status=[blocked, doing]) e list_tasks(status=[done], updatedSince=<7 dias>).
+  Para cada blocked, leia get_task (nota de bloqueio e comentários), tente resolver ou verificar, e registre o resultado com comment_task.
+  Mova para done só o que você verificou de fato; se ainda falha, deixe blocked e comente o que encontrou.
+- Durante: se a pessoa disser "conferi T-XXXXX", leia get_task e verifique no código, nos logs ou no ambiente.
+- Fim da sessão: para cada passo manual que sobrou (painel externo, credencial, teste em aparelho, deploy), rode list_tasks(q=…) para não duplicar e então create_task com product, passos exatos e "como verificar".
+- Nunca crie tarefa para o que você mesmo pode fazer agora. Nunca duplique: atualize ou comente a existente.
+```
+
+## 6. O quadro no console
+
+- **Colunas:** A fazer, Fazendo, Bloqueado e Concluído. Arraste dentro da coluna e entre colunas.
+  Soltar em Bloqueado pede a nota: o erro que você viu, que é o que o Claude lê para conferir.
+- **Atalhos:** `N` cria em "A fazer", `/` busca, `Esc` fecha, `?` mostra a lista. Com teclado:
+  Tab até o cartão, Espaço pega, setas movem (esquerda e direita trocam de coluna), Espaço solta,
+  Enter abre.
+- **Atualização:** o quadro busca o que mudou a cada 12 s com a aba visível, e ao voltar para a aba.
+- **Filtros** ficam na URL (`/tasks?product=demo&claude=1`), e o cartão aberto também
+  (`?task=T-7K2QM`), então dá para mandar o link.
+- **Arquivar concluídas** tira do quadro as tarefas em Concluído. Elas continuam na busca
+  (`list_tasks` com `includeArchived`).
+
+## Problemas comuns
+
+| Sintoma | Causa e saída |
+|---|---|
+| "Token inválido, expirado ou revogado." | Token revogado, vencido ou de pessoa desativada. Gere outro. |
+| "Não consegui falar com …" | `PITWALL_URL` errada, sem `https://`, ou console fora do ar. |
+| "Tarefa ou produto não encontrado." em toda tool | `PITWALL_URL` aponta para o hostname público da **API**. Com `Pitwall:StaffHosts`, ele devolve 404 para `/v1/staff`. Use o endereço do console. |
+| "A resposta de … não é do Pitwall." | A URL abre outro site, ou há uma tela de login na frente do console (Cloudflare Access, Tailscale Funnel com autenticação, proxy com senha). O MCP não passa por login de navegador. No Cloudflare Access, crie uma aplicação para o caminho `/v1/staff/tasks` com uma política **Bypass** (a rota continua exigindo o token) ou use um *service token* do Access. |
+| "O token não tem o escopo tasks." | Token criado direto no banco sem escopo. Crie pelo console. |
+| "Limite de requisições." | 120 escritas por minuto por pessoa (console e tokens somados). Espere um minuto. |
+| `/mcp` mostra `pitwall` com erro | Rode o comando do `claude mcp add` à mão para ver o erro no stderr. O token nunca aparece nesse log. |

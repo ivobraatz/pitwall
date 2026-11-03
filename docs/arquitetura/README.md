@@ -26,8 +26,9 @@ pessoa.
 | Console (`apps/console`) | Next.js; faz proxy de `/v1` para a API, então a sessão é cookie de primeira parte. |
 | SDK navegador | Buffers de diagnóstico (log, requisições, erros, eventos), gravação rrweb (retroativa ~2 min + procedimento até 10 min), instrumentação de `fetch`, e os Web Components (`<pitwall-tickets>`, `<pitwall-ticket>`, `<pitwall-player>`, o diálogo, a barra de gravação, os avisos). Funciona em React, Vue ou HTML puro. |
 | SDK servidor / Pitwall.AspNetCore | Ponte, reporter de erros em lote, verificação de webhook. |
+| MCP (`packages/mcp`) | Servidor MCP `pitwall-mcp` (stdio) para o Claude Code: 8 tools sobre o quadro de tarefas da equipe (`/v1/staff/tasks`), autenticado por token pessoal `pwt_…`. Fala com o console, não com a API. |
 
-Os dois pacotes são públicos: npm `pitwall-sdk` (o produto importa `@pitwall/sdk` por alias, sem token) e NuGet `Pitwall.AspNetCore`. Como integrar, em [integracao.md](../operacao/integracao.md).
+Os pacotes são públicos: npm `pitwall-sdk` (o produto importa `@pitwall/sdk` por alias, sem token), npm `pitwall-mcp` e NuGet `Pitwall.AspNetCore`. Como integrar, em [integracao.md](../operacao/integracao.md).
 
 ## Fluxos
 
@@ -49,6 +50,14 @@ chamados citados por código ou cujo "corrigido em" bate com um commit/versão (
 nota falhe) → o Claude Haiku 5.5 escreve a nota (structured outputs, todas as línguas numa chamada) →
 publica ou deixa como rascunho → `release.published` por webhook.
 
+**Tarefa da equipe.** Numa sessão do Claude Code, o passo manual que sobrou ("configurar o webhook no
+painel") vira `create_task` no MCP → `POST /v1/staff/tasks` com o token pessoal (origem `claude`,
+autor "Nome (Claude)") → o cartão aparece no quadro do console em até 12 s (polling com delta por
+`updatedSince`). A pessoa arrasta entre colunas; ao bloquear, escreve o erro que viu. Na sessão seguinte,
+`board_summary` e `list_tasks(blocked)` trazem o que mudou, `get_task` lê a nota e o histórico, e o
+Claude comenta o que verificou. Tarefa nunca vira chamado, não dispara webhook e não aparece para
+produto nem cliente. Guia: [tarefas-mcp.md](../operacao/tarefas-mcp.md).
+
 ## Modelo de dados
 
 ```
@@ -64,6 +73,11 @@ server_errors   product_id, trace_id, customer_ref, user_ref, method, path, rout
 releases        product_id, version, status (draft|published|silent), change_kind, commit_shas[], ticket_codes[]
 release_notes   release_id, locale, slug, title, summary, new_items[], improvements[], body_markdown
 staff / staff_sessions / webhook_deliveries
+team_tasks      product_id?, code (T-XXXXX), title, body, status (todo|doing|blocked|done), position (fracionário),
+                priority, labels[], due_date, assignee_id, source (claude|manual), created_by_ref/name,
+                blocked_note, checklist jsonb, links jsonb, done_at, archived_at, timestamps…
+team_task_comments / team_task_events (created|moved|updated|blocked|archived|unarchived|commented, data jsonb)
+staff_tokens    staff_user_id, name, prefix, hash, scopes[] (tasks), last_used_at, expires_at, revoked_at
 ```
 
 ## Segurança e dados
@@ -82,6 +96,10 @@ staff / staff_sessions / webhook_deliveries
   rate limit no login. Recomendado: console atrás de Cloudflare Access ou Tailscale. Com
   `Pitwall:StaffHosts`, `/v1/staff` só responde pelo endereço privado que o console usa; o hostname
   público, o dos sistemas, devolve 404.
+- **Tokens pessoais.** `pwt_…`, só o hash é guardado e o texto aparece uma vez. O único escopo é `tasks`:
+  o token alcança `/v1/staff/tasks/*` e nada mais (as outras rotas da equipe só aceitam a sessão, e só a
+  sessão cria ou revoga tokens). Revogar vale na hora; desativar a pessoa, em até 1 minuto. Escritas
+  com token não precisam do cabeçalho CSRF, porque o navegador não anexa um Bearer sozinho.
 - **Gravações.** rrweb grava DOM, não pixels; com "ocultar dados" (padrão) textos de tabela,
   `[data-pw-mask]` e todos os inputs viram asteriscos; senhas nunca. Nada sai do navegador sem a
   pessoa anexar e revisar. Os anexos ficam num bucket privado, servidos só por endpoints autenticados.
