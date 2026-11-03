@@ -1,0 +1,51 @@
+{
+  "name": "pitwall-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for the Pitwall team task board: Claude Code reads, creates, moves and comments on the team's manual tasks.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ivobraatz/pitwall.git",
+    "directory": "packages/mcp"
+  },
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "kanban",
+    "tasks",
+    "pitwall"
+  ],
+  "homepage": "https://github.com/ivobraatz/pitwall#readme",
+  "bugs": {
+    "url": "https://github.com/ivobraatz/pitwall/issues"
+  },
+  "type": "module",
+  "bin": {
+    "pitwall-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsc -p tsconfig.json && node --test test/*.test.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3"
+  }
+}

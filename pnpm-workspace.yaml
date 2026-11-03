@@ -1,4 +1,5 @@
 packages:
   - "packages/sdk"
+  - "packages/mcp"
   - "apps/console"
   - "examples/*"
