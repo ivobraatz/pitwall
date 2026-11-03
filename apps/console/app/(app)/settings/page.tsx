@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type StaffMember } from '@/lib/api';
 import { Button, Card, Dialog, Field, Input, PageHeader, Pill, Select, rel, useToast } from '@/components/ui';
 import { useMe } from '@/components/shell';
+import { PersonalTokens } from '@/components/settings/tokens';
 
 function Password() {
   const toast = useToast();
@@ -122,10 +123,10 @@ function Team() {
 export default function SettingsPage() {
   return (
     <>
-      <PageHeader title="Conta e equipe" subtitle="A sua senha e o segundo fator, e quem mais está no muro." />
+      <PageHeader title="Conta e equipe" subtitle="A sua senha, o segundo fator e os tokens do MCP, e quem mais está no muro." />
       <div className="grid gap-2 xl:grid-cols-2">
         <div className="flex flex-col gap-2"><Password /><Totp /></div>
-        <Team />
+        <div className="flex flex-col gap-2"><Team /><PersonalTokens style={{ '--i': 3 } as React.CSSProperties} /></div>
       </div>
     </>
   );

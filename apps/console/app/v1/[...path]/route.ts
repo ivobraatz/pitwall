@@ -7,7 +7,7 @@ import type { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-const FORWARD_REQUEST = ['content-type', 'content-length', 'cookie', 'x-pitwall-staff', 'user-agent', 'accept'];
+const FORWARD_REQUEST = ['content-type', 'content-length', 'cookie', 'x-pitwall-staff', 'user-agent', 'accept', 'authorization'];
 const FORWARD_RESPONSE = ['content-type', 'content-disposition', 'content-length', 'set-cookie', 'cache-control', 'location'];
 
 async function proxy(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }): Promise<Response> {

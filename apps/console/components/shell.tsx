@@ -12,8 +12,9 @@ import { Icon, cn } from './ui';
 export const MeContext = React.createContext<Me | null>(null);
 export function useMe() { return React.useContext(MeContext); }
 
-// The four channels of the pit wall: radio (tickets), telemetry (errors), the bulletin (releases), the cars (systems).
+// The channels of the pit wall: radio (tickets), the board (the team's tasks), telemetry (errors), the bulletin (releases), the cars (systems).
 const IconTickets = () => <Icon size={20} d={<><path d="M4 6h16v9H9l-5 4Z" /><path d="M8 10h8" /></>} />;
+const IconTasks = () => <Icon size={20} d={<><path d="M4 5h4.5v14H4ZM10 5h4.5v9H10ZM16 5h4v6h-4Z" /></>} />;
 const IconErrors = () => <Icon size={20} d={<path d="M3 13h4l2-6 4 12 2.5-8L17 13h4" />} />;
 const IconReleases = () => <Icon size={20} d={<><path d="M5 4h14v16H5Z" /><path d="M9 9h6M9 13h6M9 17h3" /></>} />;
 const IconProducts = () => <Icon size={20} d={<><path d="M4 5h16v4H4ZM4 10.5h11v4H4ZM4 16h7v4H4Z" /></>} />;
@@ -21,6 +22,7 @@ const IconSettings = () => <Icon size={20} d={<><path d="M12 12.5a3.5 3.5 0 1 0 
 
 const NAV = [
   { href: '/', label: 'Chamados', Icon: IconTickets, match: (p: string) => p === '/' || p.startsWith('/tickets') },
+  { href: '/tasks', label: 'Tarefas', Icon: IconTasks, match: (p: string) => p.startsWith('/tasks') },
   { href: '/errors', label: 'Erros', Icon: IconErrors, match: (p: string) => p.startsWith('/errors') },
   { href: '/releases', label: 'Novidades', Icon: IconReleases, match: (p: string) => p.startsWith('/releases') },
   { href: '/products', label: 'Sistemas', Icon: IconProducts, match: (p: string) => p.startsWith('/products') },

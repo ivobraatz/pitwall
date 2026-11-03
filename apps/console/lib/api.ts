@@ -9,14 +9,14 @@ export class ApiError extends Error {
 
 type Params = Record<string, string | number | boolean | null | undefined>;
 
-export async function api<T>(path: string, init: { method?: string; json?: unknown; body?: BodyInit; params?: Params } = {}): Promise<T> {
+export async function api<T>(path: string, init: { method?: string; json?: unknown; body?: BodyInit; params?: Params; signal?: AbortSignal } = {}): Promise<T> {
   const qs = init.params
     ? new URLSearchParams(Object.entries(init.params).filter(([, v]) => v !== undefined && v !== null && v !== '').map(([k, v]) => [k, String(v)])).toString()
     : '';
   const headers: Record<string, string> = { 'X-Pitwall-Staff': '1' };
   let body = init.body;
   if (init.json !== undefined) { headers['Content-Type'] = 'application/json'; body = JSON.stringify(init.json); }
-  const res = await fetch(`/v1${path}${qs ? `?${qs}` : ''}`, { method: init.method ?? 'GET', headers, body, credentials: 'same-origin' });
+  const res = await fetch(`/v1${path}${qs ? `?${qs}` : ''}`, { method: init.method ?? 'GET', headers, body, credentials: 'same-origin', signal: init.signal });
   if (!res.ok) {
     let parsed: unknown;
     let message = `Erro ${res.status}`;
@@ -127,4 +127,43 @@ export interface ReleaseRow {
 export interface ReleaseDetail extends Omit<ReleaseRow, 'commits' | 'notes' | 'tickets'> {
   announce: boolean; commitShas: string[]; ticketCodes: string[];
   notes: Array<{ id: string; locale: string; slug: string; title: string; summary: string; new: string[]; improvements: string[]; bodyMarkdown: string }>;
+}
+
+// ── Team tasks (the internal board, see docs/arquitetura/tarefas-equipe.md) ───────────
+
+export type TaskStatus = 'todo' | 'doing' | 'blocked' | 'done';
+export const TASK_STATUSES: TaskStatus[] = ['todo', 'doing', 'blocked', 'done'];
+export type TaskPriority = 'low' | 'normal' | 'high';
+
+export interface TaskProductRef { id: string; slug: string; name: string; color: string | null }
+export interface TaskChecklistItem { id: string; text: string; done: boolean }
+export interface TaskLink { label: string; url: string }
+
+/** A card as the board and the list carry it: no body, checklist or links, only their counters. */
+export interface TeamTask {
+  id: string; code: string; product: TaskProductRef | null; title: string; status: TaskStatus; position: number;
+  priority: TaskPriority; labels: string[]; dueDate: string | null; assignee: { id: string; name: string } | null;
+  source: 'claude' | 'manual'; createdBy: { ref: string; name: string }; blockedNote: string | null;
+  checklistDone: number; checklistTotal: number; commentCount: number; overdue: boolean;
+  createdAt: string; updatedAt: string; doneAt: string | null; archivedAt: string | null;
+  body?: string; checklist?: TaskChecklistItem[]; links?: TaskLink[];
+}
+export interface TaskComment { id: string; authorRef: string; authorName: string; source: 'claude' | 'manual'; body: string; createdAt: string }
+export interface TaskEvent {
+  id: string; actorRef: string; actorName: string; source: 'claude' | 'manual';
+  kind: 'created' | 'moved' | 'updated' | 'blocked' | 'archived' | 'unarchived' | 'commented';
+  data: { from?: string; to?: string; fields?: string[]; note?: string } | null; createdAt: string;
+}
+export interface TeamTaskDetail extends TeamTask {
+  body: string; checklist: TaskChecklistItem[]; links: TaskLink[]; comments: TaskComment[]; events: TaskEvent[];
+}
+export interface BoardCounts { todo: number; doing: number; blocked: number; done: number; overdue: number }
+export interface Board { columns: Record<TaskStatus, TeamTask[]>; counts: BoardCounts; serverTime: string; removedIds?: string[] }
+export interface TasksMeta {
+  products: TaskProductRef[]; staff: Array<{ id: string; name: string }>; labels: Array<{ name: string; count: number }>;
+}
+
+export interface StaffTokenInfo {
+  id: string; name: string; prefix: string; scopes: string[];
+  createdAt: string; lastUsedAt: string | null; expiresAt: string | null; revokedAt: string | null;
 }
