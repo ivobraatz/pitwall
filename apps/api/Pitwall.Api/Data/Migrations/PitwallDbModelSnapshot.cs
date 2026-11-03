@@ -443,6 +443,69 @@ namespace Pitwall.Data.Migrations
                     b.ToTable("staff_sessions", (string)null);
                 });
 
+            modelBuilder.Entity("Pitwall.Domain.StaffToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("hash");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("prefix");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.PrimitiveCollection<string[]>("Scopes")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("scopes");
+
+                    b.Property<Guid>("StaffUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("staff_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_staff_tokens");
+
+                    b.HasIndex("Hash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_staff_tokens_hash");
+
+                    b.HasIndex("StaffUserId")
+                        .HasDatabaseName("ix_staff_tokens_staff_user_id");
+
+                    b.ToTable("staff_tokens", (string)null);
+                });
+
             modelBuilder.Entity("Pitwall.Domain.StaffUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -505,6 +568,229 @@ namespace Pitwall.Data.Migrations
                         .HasDatabaseName("ix_staff_email");
 
                     b.ToTable("staff", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.TeamTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<Guid?>("AssigneeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("assignee_id");
+
+                    b.Property<string>("BlockedNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("blocked_note");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("body");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedByName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("created_by_name");
+
+                    b.Property<string>("CreatedByRef")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("created_by_ref");
+
+                    b.Property<DateTime?>("DoneAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("done_at");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("due_date");
+
+                    b.PrimitiveCollection<string[]>("Labels")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("labels");
+
+                    b.Property<double>("Position")
+                        .HasColumnType("double precision")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("priority");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_team_tasks");
+
+                    b.HasIndex("ArchivedAt")
+                        .HasDatabaseName("ix_team_tasks_archived_at");
+
+                    b.HasIndex("AssigneeId")
+                        .HasDatabaseName("ix_team_tasks_assignee_id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_team_tasks_code");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_team_tasks_product_id");
+
+                    b.HasIndex("UpdatedAt")
+                        .HasDatabaseName("ix_team_tasks_updated_at");
+
+                    b.HasIndex("Status", "Position")
+                        .HasDatabaseName("ix_team_tasks_status_position")
+                        .HasFilter("archived_at IS NULL");
+
+                    b.ToTable("team_tasks", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.TeamTaskComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("author_name");
+
+                    b.Property<string>("AuthorRef")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("author_ref");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)")
+                        .HasColumnName("body");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_team_task_comments");
+
+                    b.HasIndex("TaskId", "CreatedAt")
+                        .HasDatabaseName("ix_team_task_comments_task_id_created_at");
+
+                    b.ToTable("team_task_comments", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.TeamTaskEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("actor_name");
+
+                    b.Property<string>("ActorRef")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("actor_ref");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Data")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("data");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_team_task_events");
+
+                    b.HasIndex("TaskId", "CreatedAt")
+                        .HasDatabaseName("ix_team_task_events_task_id_created_at");
+
+                    b.ToTable("team_task_events", (string)null);
                 });
 
             modelBuilder.Entity("Pitwall.Domain.Ticket", b =>
@@ -939,6 +1225,118 @@ namespace Pitwall.Data.Migrations
                     b.Navigation("Staff");
                 });
 
+            modelBuilder.Entity("Pitwall.Domain.StaffToken", b =>
+                {
+                    b.HasOne("Pitwall.Domain.StaffUser", "StaffUser")
+                        .WithMany()
+                        .HasForeignKey("StaffUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_staff_tokens_staff_staff_user_id");
+
+                    b.Navigation("StaffUser");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.TeamTask", b =>
+                {
+                    b.HasOne("Pitwall.Domain.StaffUser", "Assignee")
+                        .WithMany()
+                        .HasForeignKey("AssigneeId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_team_tasks_staff_assignee_id");
+
+                    b.HasOne("Pitwall.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_team_tasks_products_product_id");
+
+                    b.OwnsMany("Pitwall.Domain.TeamTaskChecklistItem", "Checklist", b1 =>
+                        {
+                            b1.Property<Guid>("TeamTaskId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<bool>("Done");
+
+                            b1.Property<string>("Id");
+
+                            b1.Property<string>("Text")
+                                .IsRequired();
+
+                            b1.HasKey("TeamTaskId", "__synthesizedOrdinal");
+
+                            b1.ToTable("team_tasks");
+
+                            b1
+                                .ToJson("checklist")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TeamTaskId")
+                                .HasConstraintName("fk_team_tasks_team_tasks_team_task_id");
+                        });
+
+                    b.OwnsMany("Pitwall.Domain.TeamTaskLink", "Links", b1 =>
+                        {
+                            b1.Property<Guid>("TeamTaskId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<string>("Label")
+                                .IsRequired();
+
+                            b1.Property<string>("Url")
+                                .IsRequired();
+
+                            b1.HasKey("TeamTaskId", "__synthesizedOrdinal");
+
+                            b1.ToTable("team_tasks");
+
+                            b1
+                                .ToJson("links")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("TeamTaskId")
+                                .HasConstraintName("fk_team_tasks_team_tasks_team_task_id");
+                        });
+
+                    b.Navigation("Assignee");
+
+                    b.Navigation("Checklist");
+
+                    b.Navigation("Links");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.TeamTaskComment", b =>
+                {
+                    b.HasOne("Pitwall.Domain.TeamTask", "Task")
+                        .WithMany("Comments")
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_task_comments_team_tasks_task_id");
+
+                    b.Navigation("Task");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.TeamTaskEvent", b =>
+                {
+                    b.HasOne("Pitwall.Domain.TeamTask", "Task")
+                        .WithMany("Events")
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_team_task_events_team_tasks_task_id");
+
+                    b.Navigation("Task");
+                });
+
             modelBuilder.Entity("Pitwall.Domain.Ticket", b =>
                 {
                     b.HasOne("Pitwall.Domain.StaffUser", "Assignee")
@@ -991,6 +1389,13 @@ namespace Pitwall.Data.Migrations
             modelBuilder.Entity("Pitwall.Domain.Release", b =>
                 {
                     b.Navigation("Notes");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.TeamTask", b =>
+                {
+                    b.Navigation("Comments");
+
+                    b.Navigation("Events");
                 });
 
             modelBuilder.Entity("Pitwall.Domain.Ticket", b =>

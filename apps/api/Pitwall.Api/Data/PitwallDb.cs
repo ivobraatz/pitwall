@@ -21,6 +21,10 @@ public class PitwallDb(DbContextOptions<PitwallDb> options) : DbContext(options)
     public DbSet<StaffUser> Staff => Set<StaffUser>();
     public DbSet<StaffSession> StaffSessions => Set<StaffSession>();
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+    public DbSet<TeamTask> TeamTasks => Set<TeamTask>();
+    public DbSet<TeamTaskComment> TeamTaskComments => Set<TeamTaskComment>();
+    public DbSet<TeamTaskEvent> TeamTaskEvents => Set<TeamTaskEvent>();
+    public DbSet<StaffToken> StaffTokens => Set<StaffToken>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -152,6 +156,61 @@ public class PitwallDb(DbContextOptions<PitwallDb> options) : DbContext(options)
             e.Property(w => w.Status).HasMaxLength(20);
             e.Property(w => w.PayloadJson).HasColumnType("jsonb");
             e.Property(w => w.LastError).HasMaxLength(1000);
+        });
+
+        b.Entity<TeamTask>(e =>
+        {
+            e.HasIndex(t => t.Code).IsUnique();
+            // The board reads one column at a time, in order, and never the archived.
+            e.HasIndex(t => new { t.Status, t.Position }).HasFilter("archived_at IS NULL");
+            e.HasIndex(t => t.ProductId);
+            e.HasIndex(t => t.UpdatedAt);
+            e.HasIndex(t => t.AssigneeId);
+            e.HasIndex(t => t.ArchivedAt);
+            e.Property(t => t.Code).HasMaxLength(12);
+            e.Property(t => t.Title).HasMaxLength(200);
+            e.Property(t => t.Body).HasMaxLength(20_000);
+            e.Property(t => t.Status).HasMaxLength(16);
+            e.Property(t => t.Priority).HasMaxLength(8);
+            e.Property(t => t.Source).HasMaxLength(8);
+            e.Property(t => t.CreatedByRef).HasMaxLength(64);
+            e.Property(t => t.CreatedByName).HasMaxLength(120);
+            e.Property(t => t.BlockedNote).HasMaxLength(2000);
+            e.OwnsMany(t => t.Checklist, c => c.ToJson());
+            e.OwnsMany(t => t.Links, l => l.ToJson());
+            e.HasOne(t => t.Product).WithMany().HasForeignKey(t => t.ProductId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(t => t.Assignee).WithMany().HasForeignKey(t => t.AssigneeId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<TeamTaskComment>(e =>
+        {
+            e.HasIndex(c => new { c.TaskId, c.CreatedAt });
+            e.Property(c => c.AuthorRef).HasMaxLength(64);
+            e.Property(c => c.AuthorName).HasMaxLength(120);
+            e.Property(c => c.Source).HasMaxLength(8);
+            e.Property(c => c.Body).HasMaxLength(10_000);
+            e.HasOne(c => c.Task).WithMany(t => t.Comments).HasForeignKey(c => c.TaskId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<TeamTaskEvent>(e =>
+        {
+            e.HasIndex(x => new { x.TaskId, x.CreatedAt });
+            e.Property(x => x.ActorRef).HasMaxLength(64);
+            e.Property(x => x.ActorName).HasMaxLength(120);
+            e.Property(x => x.Source).HasMaxLength(8);
+            e.Property(x => x.Kind).HasMaxLength(16);
+            e.Property(x => x.Data).HasColumnType("jsonb");
+            e.HasOne(x => x.Task).WithMany(t => t.Events).HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<StaffToken>(e =>
+        {
+            e.HasIndex(t => t.Hash).IsUnique();
+            e.HasIndex(t => t.StaffUserId);
+            e.Property(t => t.Name).HasMaxLength(80);
+            e.Property(t => t.Prefix).HasMaxLength(12);
+            e.Property(t => t.Hash).HasMaxLength(64);
+            e.HasOne(t => t.StaffUser).WithMany().HasForeignKey(t => t.StaffUserId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

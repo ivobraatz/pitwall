@@ -118,10 +118,16 @@ public static class StaffContext
 
     public static string StaffName(this HttpContext http) =>
         http.User.FindFirst(ClaimTypes.Name)?.Value ?? "Team";
+
+    /// <summary>True when the caller is a tool holding the person's token (the MCP), not the console.</summary>
+    public static bool IsToken(this HttpContext http) =>
+        http.User.HasClaim(c => c.Type == StaffTokenAuthHandler.TokenClaim);
 }
 
 public static class Policies
 {
+    /// <summary>The team's task board: the console session, or a personal token with the tasks scope.</summary>
+    public const string Tasks = "tasks";
     public const string Support = "support";
     public const string IngestErrors = "ingest:errors";
     public const string IngestReleases = "ingest:releases";

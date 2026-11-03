@@ -73,6 +73,12 @@ public static class Tokens
 
     public static string NewWebhookSecret() => $"pwhs_{Random(40)}";
 
+    /// <summary>
+    /// <c>pwt_…</c>: a personal token of someone on the team. Not <c>pw_staff_…</c>: product keys
+    /// are recognised by <c>pw_</c>, and a product with the slug <c>staff</c> would collide.
+    /// </summary>
+    public static string NewStaffToken() => $"pwt_{Random(40)}";
+
     public static string Hash(string token) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
 }

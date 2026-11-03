@@ -69,13 +69,23 @@ if (!builder.Environment.IsEnvironment("Testing"))
 
 builder.Services.AddAuthentication()
     .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ProductKeyAuthHandler>(ProductKeyAuthHandler.Scheme, null)
-    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, StaffSessionAuthHandler>(StaffSessionAuthHandler.Scheme, null);
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, StaffSessionAuthHandler>(StaffSessionAuthHandler.Scheme, null)
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, StaffTokenAuthHandler>(StaffTokenAuthHandler.Scheme, null)
+    // The task routes take either; picking one per request means one handler answers a challenge,
+    // and a request carrying both a cookie and a token is the token's.
+    .AddPolicyScheme(StaffTokenAuthHandler.SessionOrToken, null, o => o.ForwardDefaultSelector = http =>
+        StaffTokenAuthHandler.Carries(http) ? StaffTokenAuthHandler.Scheme : StaffSessionAuthHandler.Scheme);
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(Policies.Support, p => p.AddAuthenticationSchemes(ProductKeyAuthHandler.Scheme).RequireClaim(ProductKeyAuthHandler.ScopeClaim, KeyScopes.Support))
     .AddPolicy(Policies.IngestErrors, p => p.AddAuthenticationSchemes(ProductKeyAuthHandler.Scheme).RequireClaim(ProductKeyAuthHandler.ScopeClaim, KeyScopes.Errors))
     .AddPolicy(Policies.IngestReleases, p => p.AddAuthenticationSchemes(ProductKeyAuthHandler.Scheme).RequireClaim(ProductKeyAuthHandler.ScopeClaim, KeyScopes.Releases))
     .AddPolicy(Policies.Staff, p => p.AddAuthenticationSchemes(StaffSessionAuthHandler.Scheme).RequireClaim(StaffSessionAuthHandler.StaffClaim))
-    .AddPolicy(Policies.StaffAdmin, p => p.AddAuthenticationSchemes(StaffSessionAuthHandler.Scheme).RequireRole(StaffRoles.Admin));
+    .AddPolicy(Policies.StaffAdmin, p => p.AddAuthenticationSchemes(StaffSessionAuthHandler.Scheme).RequireRole(StaffRoles.Admin))
+    // Every other staff policy stays on the session alone: a leaked token reaches the board and nothing else.
+    .AddPolicy(Policies.Tasks, p => p.AddAuthenticationSchemes(StaffTokenAuthHandler.SessionOrToken)
+        .RequireClaim(StaffSessionAuthHandler.StaffClaim)
+        .RequireAssertion(ctx => !ctx.User.HasClaim(c => c.Type == StaffTokenAuthHandler.TokenClaim)
+                                 || ctx.User.HasClaim(ProductKeyAuthHandler.ScopeClaim, StaffTokenScopes.Tasks)));
 
 builder.Services.AddRateLimiter(o =>
 {
@@ -92,6 +102,10 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy("ingest", http => RateLimitPartition.GetFixedWindowLimiter(
         http.User.FindFirst(ProductKeyAuthHandler.ProductClaim)?.Value ?? "anon",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = 600, Window = TimeSpan.FromMinutes(1) }));
+    // Per person, console and tokens together: a runaway agent loop cannot rewrite the board.
+    o.AddPolicy("tasks-writes", http => RateLimitPartition.GetFixedWindowLimiter(
+        http.User.FindFirst(StaffSessionAuthHandler.StaffClaim)?.Value ?? "anon",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 120, Window = TimeSpan.FromMinutes(1) }));
 });
 builder.Services.AddCors(o => o.AddPolicy("public", p => p.AllowAnyOrigin().WithMethods("GET")));
 builder.Services.Configure<ForwardedHeadersOptions>(o =>
@@ -124,6 +138,18 @@ if (staffHosts.Length > 0)
         return next(http);
     });
 }
+// The board takes small JSON bodies only.
+app.UseWhen(http => http.Request.Path.StartsWithSegments("/v1/staff/tasks"), branch => branch.Use((http, next) =>
+{
+    if (http.Request.ContentLength > StaffTaskEndpoints.MaxBodyBytes)
+    {
+        http.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+        return http.Response.WriteAsJsonAsync(new { message = "Corpo da requisição acima de 256 KB." });
+    }
+    if (http.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
+        limit.MaxRequestBodySize = StaffTaskEndpoints.MaxBodyBytes;
+    return next(http);
+}));
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -139,6 +165,8 @@ app.MapStaffTicketEndpoints();
 app.MapStaffErrorEndpoints();
 app.MapStaffProductEndpoints();
 app.MapStaffReleaseEndpoints();
+app.MapStaffTokenEndpoints();
+app.MapStaffTaskEndpoints();
 
 if (!app.Environment.IsEnvironment("Testing"))
 {
