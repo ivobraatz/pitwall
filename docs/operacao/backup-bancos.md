@@ -1,11 +1,11 @@
 # Backup central dos bancos
 
-Um único job na VM Oracle faz o backup dos Postgres de RH Flex, DataRunner, metrifree e Pitwall. Cada
-sistema continua com o backup próprio do host, e este é a cópia fora dele.
+Um único job na VM Oracle faz o backup dos Postgres de RH Flex, DataRunner, metrifree e Pitwall. Enquanto
+o plano da Railway não for o Pro, ele é a **única** cópia dos bancos dos produtos.
 
 | Camada | Onde | Protege contra |
 |---|---|---|
-| Snapshot da Railway | Painel do Postgres, em cada projeto | Erro recente, restauração rápida |
+| Snapshot da Railway | Só no plano Pro, ainda não contratado | Erro recente, restauração rápida |
 | Backup central | Bucket `braatz-backups` no R2 | Perda do projeto ou da conta da Railway, ou da VM |
 
 ## Como funciona
