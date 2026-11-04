@@ -4,4 +4,4 @@
 |---|---|
 | `arquitetura/` | [Visão geral](arquitetura/README.md), [Tarefas da equipe (desenho)](arquitetura/tarefas-equipe.md) |
 | `marca/` | [Marca](marca/README.md): símbolo, cores, tipografia e regras visuais do console |
-| `operacao/` | [Integração](operacao/integracao.md), [Deploy: por onde começar](operacao/deploy.md), [Railway](operacao/deploy-railway.md), [VPS](operacao/deploy-vps.md), [Oracle](operacao/deploy-oracle.md), [Migração](operacao/migracao.md), [Tarefas pelo MCP](operacao/tarefas-mcp.md) |
+| `operacao/` | [Integração](operacao/integracao.md), [Deploy: por onde começar](operacao/deploy.md), [Railway](operacao/deploy-railway.md), [VPS](operacao/deploy-vps.md), [Oracle](operacao/deploy-oracle.md), [Backup central dos bancos](operacao/backup-bancos.md), [Migração](operacao/migracao.md), [Tarefas pelo MCP](operacao/tarefas-mcp.md) |

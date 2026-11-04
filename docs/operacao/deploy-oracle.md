@@ -800,6 +800,9 @@ Uma vez por mês, confira se o dump mais recente é de hoje ou de ontem: `ls -lt
 2. **Backup policies** → **Assign** → **Bronze** (mensal) → **Assign**.
    (O Always Free inclui 5 backups de volume.)
 
+O banco do Pitwall também entra no [backup central](backup-bancos.md), que manda uma cópia cifrada para
+o R2. Os anexos não entram: a cópia deles fora da VM continua sendo a do 15.2.
+
 ### 15.4 Restaurar (quando precisar)
 
 ```bash
