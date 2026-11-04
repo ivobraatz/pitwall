@@ -28,3 +28,10 @@
 	# The console proxies /v1/** to the API by itself, so this site only needs the console.
 	reverse_proxy console:3200
 }
+
+# Vaultwarden (/opt/vaultwarden), reached over the pitwall_default network. DNS record is DNS only.
+# Keep this here: deploy/auto-update.sh runs git reset --hard on rollback, which drops local edits.
+vault.braatz.com.br {
+	encode zstd gzip
+	reverse_proxy vaultwarden:80
+}
