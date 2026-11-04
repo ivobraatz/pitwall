@@ -83,6 +83,24 @@ Precisa da chave privada do age, guardada no gerenciador de senhas, e do segredo
 4. Aponte o sistema para o banco novo e siga o guia de deploy dele.
 5. Apague `chave.txt` e `banco.dump` da máquina.
 
+## Cofre (Vaultwarden)
+
+O Vaultwarden roda na mesma VM e guarda os segredos da tabela acima. Sem ele, os dumps não se
+recuperam. O `/opt/vaultwarden/backup.sh` gera às 03:15 uma cópia consistente do SQLite e da chave RSA
+em `/opt/vaultwarden/backups`. Às 03:40, `deploy/bancos/backup-cofre.sh` roda como root, pelo
+`/etc/cron.d/backup-cofre`, pega a cópia mais recente, cifra e envia para `diario/vaultwarden/`. O log
+fica em `/opt/backups/logs/cofre.log`, e o aviso vai para `PUSH_COFRE`.
+
+**A chave privada do age precisa ficar fora do cofre.** Ela abre o backup do cofre, então uma cópia só
+dentro dele não serve em um desastre. A ordem de recuperação é:
+
+1. Pegar a chave do age na cópia física.
+2. Decifrar o backup do cofre e subir o Vaultwarden.
+3. Com os segredos de volta, restaurar os bancos.
+
+Para restaurar o cofre, decifre com `age -d -i chave.txt -o cofre.tar.gz <arquivo>.tar.gz.age`, extraia
+na pasta de dados com o Vaultwarden parado e suba o container.
+
 ## Quando falha
 
 | Sintoma | O que olhar |
