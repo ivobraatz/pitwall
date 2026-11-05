@@ -830,11 +830,12 @@ $COMPOSE --profile backup run --rm --no-deps rclone copy /backups/anexos bucket:
 
 ## Parte 16 — Monitoramento
 
-Se o Pitwall cair, os sistemas não conseguem abrir chamados. Crie um monitor externo gratuito:
+Se o Pitwall cair, os sistemas não conseguem abrir chamados. O monitoramento usa o Uptime Kuma, que
+roda na VM, e um Worker da Cloudflare que avisa se a VM ou o próprio Kuma caírem:
 
-1. https://uptimerobot.com → crie a conta → **New monitor**.
-2. *Monitor type*: **HTTP(s)**; *URL*: `https://pitwall-api.braatz.com.br/health`; *Interval*: 5 minutos;
-   alerta pelo seu e-mail → **Create monitor**.
+1. No Uptime Kuma → **Add New Monitor**.
+2. *Monitor Type*: **HTTP(s)**; *URL*: `https://pitwall-api.braatz.com.br/health`; alerta pelo seu
+   e-mail → **Save**.
 
 (Não monitore o console: o Access bloqueia o robô, e a API já cobre o servidor.)
 
@@ -1065,7 +1066,7 @@ fazer); aparece apenas `Finished pitwall-update.service`.
 
 ### 19.6 Ser avisado quando der errado
 
-O monitor do UptimeRobot (parte 16) avisa se o Pitwall sair do ar. Para saber também de uma
+O monitor do Uptime Kuma (parte 16) avisa se o Pitwall sair do ar. Para saber também de uma
 atualização que voltou sozinha para a versão anterior, olhe o `journalctl` do 19.5 de vez em quando,
 ou procure por `não subiu` e `ATENÇÃO`:
 
@@ -1115,7 +1116,7 @@ journalctl -u pitwall-update.service --since "7 days ago" --no-pager | grep -E "
 - [ ] Variáveis em cada sistema e `PITWALL_RELEASE_KEY` / `PITWALL_URL` no GitHub de cada um.
 - [ ] SeaweedFS no ar, bucket `pitwall-anexos` criado (`$COMPOSE logs api | grep -i "attachments bucket"`) e o print de teste abrindo no console.
 - [ ] Backups: cron do `deploy/backup.sh`, cópia em outra máquina (15.2), política do boot volume.
-- [ ] Monitor do UptimeRobot no `/health`.
+- [ ] Monitor do Uptime Kuma no `/health`.
 - [ ] Timer `pitwall-update.timer` ativo (`systemctl list-timers pitwall-update.timer`).
 - [ ] Importação do DataRunner feita e `import.env` apagado.
 

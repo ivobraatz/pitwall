@@ -331,7 +331,7 @@ podem ser abertos. Guarde-a no gerenciador de senhas, nunca só no `.env` do ser
 ## 10. Monitoramento e teste de fumaça
 
 **Monitoramento externo.** Se o Pitwall cai, os sistemas não conseguem abrir chamados, e ninguém vê
-isso sozinho. No UptimeRobot ou no BetterStack, crie dois monitores HTTP(S) com alerta por e-mail:
+isso sozinho. Num monitor externo, como o Uptime Kuma em outra máquina, crie dois monitores HTTP(S) com alerta por e-mail:
 
 - `https://api.<domínio>/health` (esperado: 200);
 - `https://pitwall.<domínio>/login` (esperado: 200 com o Access; se o Access barrar o monitor, use

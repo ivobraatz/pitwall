@@ -326,7 +326,7 @@ entende, reverter o código pode quebrar o banco; nesse caso, restaure o backup 
 ## 11. Monitoramento e teste de fumaça
 
 **Monitoramento externo.** Se o Pitwall cai, os sistemas não conseguem abrir chamados, e ninguém vê
-isso sozinho. Crie no UptimeRobot ou no BetterStack dois monitores HTTP(S), com alerta por e-mail:
+isso sozinho. Crie num monitor externo, como o Uptime Kuma em outra máquina, dois monitores HTTP(S), com alerta por e-mail:
 
 - `https://api.<domínio>/health` (esperado: 200);
 - `https://pitwall.<domínio>/login` (esperado: 200; o monitor será barrado pelo Cloudflare Access.
