@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <PackageId>Pitwall.AspNetCore</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Description>Connects an ASP.NET Core product to Pitwall: the support bridge, server error reporting and signed webhooks.</Description>
     <Authors>Ivo Braatz</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
