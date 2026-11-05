@@ -12,7 +12,7 @@ inputs:
     description: A product key with the `releases` scope (store it as a secret).
     required: true
   version:
-    description: Version to announce. Default: major.minor of version-from + commit count.
+    description: 'Version to announce. Default: major.minor of version-from + commit count.'
     required: false
     default: ''
   version-from:
