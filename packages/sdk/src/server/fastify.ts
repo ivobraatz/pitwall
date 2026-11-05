@@ -13,7 +13,7 @@
 
 import type { IncomingMessage } from 'node:http';
 import { Readable } from 'node:stream';
-import { bridgeTarget, encodeActor, type PitwallActor } from './index.js';
+import { bridgeFetch, bridgeTarget, encodeActor, type PitwallActor } from './index.js';
 
 // Typed loosely on purpose: the SDK does not depend on Fastify; these are the parts it uses.
 interface FastifyRequestLike { method: string; url: string; raw: IncomingMessage; headers: Record<string, string | string[] | undefined>; params: unknown }
@@ -33,6 +33,8 @@ export interface FastifyBridgeOptions {
   apiKey: string;
   resolveActor: (request: never) => PitwallActor | null | undefined | Promise<PitwallActor | null | undefined>;
   fetch?: typeof fetch;
+  /** How long a read waits for Pitwall to answer before the bridge gives up. Default 10 seconds. */
+  readTimeoutMs?: number;
 }
 
 export async function pitwallSupport(app: FastifyInstanceLike, opts: FastifyBridgeOptions): Promise<void> {
@@ -57,11 +59,11 @@ export async function pitwallSupport(app: FastifyInstanceLike, opts: FastifyBrid
       if (typeof ct === 'string') headers['Content-Type'] = ct;
       let res: Response;
       try {
-        res = await doFetch(target, {
+        res = await bridgeFetch(doFetch, target, {
           method: request.method, headers,
           body: request.method === 'POST' ? (Readable.toWeb(request.raw) as ReadableStream) : undefined,
           ...(request.method === 'POST' ? { duplex: 'half' } : {}),
-        } as RequestInit);
+        } as RequestInit, opts.readTimeoutMs);
       } catch {
         return reply.code(502).send({ message: 'Support is unreachable right now.' });
       }

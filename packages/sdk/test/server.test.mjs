@@ -32,6 +32,31 @@ test('bridge forwards with the key and the actor, and refuses without a session'
   assert.equal(traversal.status, 400);
 });
 
+test('a read gives up when Pitwall does not answer, and an upload is left alone', async () => {
+  const hang = (_url, init) => new Promise((_resolve, reject) => {
+    init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+  });
+  const bridge = createSupportBridge({
+    baseUrl: 'https://pw.test', apiKey: 'pw_x_key', fetch: hang, readTimeoutMs: 50,
+    resolveActor: () => ({ customerId: 'ws-1' }),
+  });
+  const started = Date.now();
+  const res = await bridge.handle(new Request('https://app.test/api/support/tickets'), ['tickets']);
+  assert.equal(res.status, 502);
+  assert.equal((await res.json()).message, 'Support is unreachable right now.');
+  assert.ok(Date.now() - started < 2000);
+
+  let signal = 'not called';
+  const upload = createSupportBridge({
+    baseUrl: 'https://pw.test', apiKey: 'pw_x_key', readTimeoutMs: 50,
+    resolveActor: () => ({ customerId: 'ws-1' }),
+    fetch: async (_url, init) => { signal = init.signal; return new Response('{}', { status: 201 }); },
+  });
+  const posted = await upload.handle(new Request('https://app.test/x', { method: 'POST', body: 'a' }), ['tickets']);
+  assert.equal(posted.status, 201);
+  assert.equal(signal, undefined);
+});
+
 test('actor encoding is base64url JSON', () => {
   assert.equal(Buffer.from(encodeActor({ customerId: 'a' }), 'base64url').toString(), '{"customerId":"a"}');
 });

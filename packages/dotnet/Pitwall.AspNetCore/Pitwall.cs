@@ -29,6 +29,8 @@ public sealed class PitwallOptions
     /// <summary>The running version, stamped on every error report.</summary>
     public string? Release { get; set; }
     public string? Environment { get; set; }
+    /// <summary>How long a support read waits for Pitwall to answer before the bridge gives up.</summary>
+    public TimeSpan SupportReadTimeout { get; set; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// False when no Pitwall is configured (a self-hosted install, a developer machine): the bridge
@@ -78,7 +80,9 @@ public static class PitwallServiceCollectionExtensions
             c.BaseAddress = new Uri(o.BaseUrl.TrimEnd('/') + "/");
             c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", o.ApiKey);
             c.Timeout = TimeSpan.FromSeconds(120);
-        });
+        })
+        // The 120 seconds above are for a 90 MB upload. A host that is down must not get them.
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { ConnectTimeout = TimeSpan.FromSeconds(5) });
         services.AddSingleton<PitwallErrorReporter>();
         services.AddSingleton<IPitwallErrorReporter>(sp => sp.GetRequiredService<PitwallErrorReporter>());
         services.AddHostedService(sp => sp.GetRequiredService<PitwallErrorReporter>());
@@ -118,7 +122,8 @@ public static class PitwallBridge
 
     public static async Task ForwardAsync(HttpContext http, string path, Func<HttpContext, ValueTask<PitwallActor?>> resolveActor)
     {
-        if (!http.RequestServices.GetRequiredService<IOptions<PitwallOptions>>().Value.IsConfigured)
+        var options = http.RequestServices.GetRequiredService<IOptions<PitwallOptions>>().Value;
+        if (!options.IsConfigured)
         {
             http.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
             await http.Response.WriteAsJsonAsync(new { message = "Support is not configured on this installation." });
@@ -153,12 +158,21 @@ public static class PitwallBridge
             if (http.Request.ContentLength is { } len) request.Content.Headers.ContentLength = len;
         }
 
+        // A person is looking at a spinner, so a read gets a short deadline for Pitwall's answer.
+        // An upload keeps the client's own timeout: it may legitimately take a while. The deadline
+        // covers the headers only, so a large attachment still streams down at its own pace.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(http.RequestAborted);
+        if (!HttpMethods.IsPost(http.Request.Method)) deadline.CancelAfter(options.SupportReadTimeout);
+
         HttpResponseMessage response;
         try
         {
-            response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, http.RequestAborted);
+            response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
         }
-        catch (HttpRequestException)
+        // HttpClient reports a timeout as a cancellation, not as HttpRequestException. Only the
+        // browser hanging up is a real cancellation: the rest means Pitwall did not answer.
+        catch (Exception ex) when (ex is HttpRequestException
+            || (ex is OperationCanceledException && !http.RequestAborted.IsCancellationRequested))
         {
             http.Response.StatusCode = StatusCodes.Status502BadGateway;
             await http.Response.WriteAsJsonAsync(new { message = "Support is unreachable right now." });

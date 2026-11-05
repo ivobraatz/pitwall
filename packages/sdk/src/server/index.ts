@@ -30,6 +30,28 @@ export interface BridgeOptions<Req = Request> {
   /** Who is asking, from the product's own session. Null refuses the request (401). */
   resolveActor: (req: Req) => PitwallActor | null | Promise<PitwallActor | null>;
   fetch?: typeof fetch;
+  /** How long a read waits for Pitwall to answer before the bridge gives up. Default 10 seconds. */
+  readTimeoutMs?: number;
+}
+
+export const DEFAULT_READ_TIMEOUT_MS = 10_000;
+
+/**
+ * Fetch for the bridge. A person is looking at a spinner, so a read gets a short deadline for
+ * Pitwall's answer; an upload does not, because it may legitimately take a while. The deadline
+ * covers the headers only: a large attachment still streams down at its own pace.
+ */
+export async function bridgeFetch(
+  doFetch: typeof fetch, target: string, init: RequestInit, readTimeoutMs = DEFAULT_READ_TIMEOUT_MS,
+): Promise<Response> {
+  if (init.method === 'POST') return doFetch(target, init);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), readTimeoutMs);
+  try {
+    return await doFetch(target, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function encodeActor(actor: PitwallActor): string {
@@ -65,12 +87,12 @@ export function createSupportBridge(options: BridgeOptions<Request>) {
       if (contentType) headers.set('Content-Type', contentType);
       let res: Response;
       try {
-        res = await doFetch(target, {
+        res = await bridgeFetch(doFetch, target, {
           method: req.method, headers,
           body: req.method === 'POST' ? req.body : undefined,
           // Required by Node's fetch to stream a request body.
           ...(req.method === 'POST' ? { duplex: 'half' } : {}),
-        } as RequestInit);
+        } as RequestInit, options.readTimeoutMs);
       } catch {
         return Response.json({ message: 'Support is unreachable right now.' }, { status: 502 });
       }

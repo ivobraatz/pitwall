@@ -19,6 +19,41 @@ public class BridgeContractTests
     }
 
     [Fact]
+    public async Task Bridge_answers_502_quickly_when_Pitwall_connects_and_stays_silent()
+    {
+        var silent = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        silent.Start();
+        try
+        {
+            var port = ((System.Net.IPEndPoint)silent.LocalEndpoint).Port;
+            var services = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
+            Microsoft.Extensions.DependencyInjection.LoggingServiceCollectionExtensions.AddLogging(services);
+            services.AddPitwall(o =>
+            {
+                o.BaseUrl = $"http://127.0.0.1:{port}";
+                o.ApiKey = "pw_x_key";
+                o.SupportReadTimeout = TimeSpan.FromMilliseconds(200);
+            });
+            await using var provider = Microsoft.Extensions.DependencyInjection.ServiceCollectionContainerBuilderExtensions.BuildServiceProvider(services);
+
+            var http = new Microsoft.AspNetCore.Http.DefaultHttpContext { RequestServices = provider };
+            http.Request.Method = "GET";
+            http.Response.Body = new MemoryStream();
+
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            await PitwallBridge.ForwardAsync(http, "tickets",
+                _ => ValueTask.FromResult<PitwallActor?>(new PitwallActor("ws-7", "Ótica Visão", "u-3", "José", "jose@x.test")));
+
+            Assert.Equal(502, http.Response.StatusCode);
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(5), $"took {clock.Elapsed}");
+        }
+        finally
+        {
+            silent.Stop();
+        }
+    }
+
+    [Fact]
     public void Api_reads_the_actor_the_package_writes()
     {
         var http = new Microsoft.AspNetCore.Http.DefaultHttpContext();
