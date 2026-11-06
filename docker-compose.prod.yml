@@ -1,6 +1,6 @@
 # The whole Pitwall on one box: Postgres, SeaweedFS (attachments), the API and the console.
 #
-# Public traffic goes through Caddy (profile "caddy"; see deploy/Caddyfile and docs/operacao/deploy-vps.md):
+# Public traffic goes through Caddy (profile "caddy"; see deploy/Caddyfile and docs/operacao/deploy-oracle.md):
 #   api.<domínio>      the API, called by the products' backends (public by design)
 #   pitwall.<domínio>  the console, for the team: MUST sit behind Cloudflare Access or Tailscale
 # The console proxies /v1 to the API, so the console hostname must never be the products' path.

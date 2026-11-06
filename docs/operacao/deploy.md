@@ -6,7 +6,6 @@ cada um.
 | Ambiente | Guia | Anexos ficam em | Atualização depois do CI verde | Custo |
 |---|---|---|---|---|
 | **Oracle Always Free** (VM ARM) | [deploy-oracle.md](deploy-oracle.md) | SeaweedFS na VM | timer na VM | gratuito, dentro dos limites da Oracle |
-| **VPS ou servidor próprio** (Hetzner, DigitalOcean, máquina física com IP público) | [deploy-vps.md](deploy-vps.md) | SeaweedFS no servidor | timer no servidor | o do servidor |
 | **Outra plataforma de contêineres** | [abaixo](#outras-plataformas) | volume ou bucket | depende da plataforma | depende da plataforma |
 
 **Qual escolher:** sem preferência e com tempo para administrar um servidor, use a Oracle. Se a Oracle
@@ -57,7 +56,6 @@ escolha antes do primeiro anexo.
 | Ambiente | Mecanismo | Como ligar | Se a versão nova não subir |
 |---|---|---|---|
 | Oracle | timer pergunta ao GitHub a cada 5 minutos, roda o `deploy/auto-update.sh` | [parte 19](deploy-oracle.md#parte-19--atualização-automática-cicd) | volta o código sozinho; o dump feito antes fica em `backups/` |
-| VPS | o mesmo timer | [seção 11](deploy-vps.md#11-atualizar-e-reverter) | o mesmo |
 
 **O dia a dia é igual em todos:** faça merge ou push na `main`. Com CI vermelho, nada é publicado.
 
