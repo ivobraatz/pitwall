@@ -5,7 +5,6 @@ externo, testar num aparelho, obter uma credencial. Ele fica separado dos chamad
 Claude Code registra e confere essas tarefas pelo servidor MCP do Pitwall (`pitwall-mcp`), usando
 um token pessoal de quem está na sessão.
 
-O desenho e as decisões estão em [`arquitetura/tarefas-equipe.md`](../arquitetura/tarefas-equipe.md).
 
 ## 1. Criar o token
 

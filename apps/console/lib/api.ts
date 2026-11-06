@@ -129,7 +129,7 @@ export interface ReleaseDetail extends Omit<ReleaseRow, 'commits' | 'notes' | 't
   notes: Array<{ id: string; locale: string; slug: string; title: string; summary: string; new: string[]; improvements: string[]; bodyMarkdown: string }>;
 }
 
-// ── Team tasks (the internal board, see docs/arquitetura/tarefas-equipe.md) ───────────
+// ── Team tasks (the internal board, see docs/operacao/tarefas-mcp.md) ───────────
 
 export type TaskStatus = 'todo' | 'doing' | 'blocked' | 'done';
 export const TASK_STATUSES: TaskStatus[] = ['todo', 'doing', 'blocked', 'done'];

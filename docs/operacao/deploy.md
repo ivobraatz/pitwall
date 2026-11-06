@@ -7,7 +7,6 @@ cada um.
 |---|---|---|---|---|
 | **Oracle Always Free** (VM ARM) | [deploy-oracle.md](deploy-oracle.md) | SeaweedFS na VM | timer na VM | gratuito, dentro dos limites da Oracle |
 | **VPS ou servidor próprio** (Hetzner, DigitalOcean, máquina física com IP público) | [deploy-vps.md](deploy-vps.md) | SeaweedFS no servidor | timer no servidor | o do servidor |
-| **Railway** | [deploy-railway.md](deploy-railway.md) | volume da API (ou SeaweedFS, como um terceiro serviço) | *Wait for CI* do Railway | por uso; volumes e vídeos pesam na conta |
 | **Outra plataforma de contêineres** | [abaixo](#outras-plataformas) | volume ou bucket | depende da plataforma | depende da plataforma |
 
 **Qual escolher:** sem preferência e com tempo para administrar um servidor, use a Oracle. Se a Oracle
@@ -59,7 +58,6 @@ escolha antes do primeiro anexo.
 |---|---|---|---|
 | Oracle | timer pergunta ao GitHub a cada 5 minutos, roda o `deploy/auto-update.sh` | [parte 19](deploy-oracle.md#parte-19--atualização-automática-cicd) | volta o código sozinho; o dump feito antes fica em `backups/` |
 | VPS | o mesmo timer | [seção 11](deploy-vps.md#11-atualizar-e-reverter) | o mesmo |
-| Railway | o Railway espera o CI e faz o deploy | [seção 9](deploy-railway.md#9-atualizar-e-reverter) | o deploy com healthcheck ruim não recebe tráfego; rollback pelo painel |
 
 **O dia a dia é igual em todos:** faça merge ou push na `main`. Com CI vermelho, nada é publicado.
 
@@ -85,8 +83,7 @@ Este caminho **não foi testado**, e os guias acima não o cobrem. Qualquer plat
 - Postgres 17 e rede privada entre o console e a API.
 - Volume persistente em `/data` da API, gravável pelo usuário `app`, que não é root. Se o volume nascer
   como root, rode a API como root ou corrija o dono; caso contrário, todo anexo falha com 502.
-- Variáveis: as da [seção 3 do guia do Railway](deploy-railway.md#3-variáveis-do-api) valem para qualquer
-  plataforma. No console, `PITWALL_API_URL` aponta para o endereço privado da API, e
+- Variáveis: as do `.env.example`, em qualquer plataforma. No console, `PITWALL_API_URL` aponta para o endereço privado da API, e
   `Pitwall__StaffHosts` da API recebe o host desse endereço.
 - Portão de acesso no console, e nunca na API.
 

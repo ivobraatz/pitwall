@@ -105,7 +105,6 @@ funciona em cada um.
 
 - Oracle Cloud Always Free (VM ARM gratuita): [docs/operacao/deploy-oracle.md](docs/operacao/deploy-oracle.md)
 - VPS ou servidor próprio: [docs/operacao/deploy-vps.md](docs/operacao/deploy-vps.md)
-- Railway: [docs/operacao/deploy-railway.md](docs/operacao/deploy-railway.md)
 
 `docker-compose.prod.yml` sobe Postgres, SeaweedFS (anexos), API e console (`deploy/gerar-env.sh` cria o `.env`).
 
