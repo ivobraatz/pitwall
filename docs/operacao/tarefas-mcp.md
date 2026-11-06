@@ -95,7 +95,39 @@ Sistema neste repositório: product = "<slug>".
 | "Token inválido, expirado ou revogado." | Token revogado, vencido ou de pessoa desativada. Gere outro. |
 | "Não consegui falar com …" | `PITWALL_URL` errada, sem `https://`, ou console fora do ar. |
 | "Tarefa ou produto não encontrado." em toda tool | `PITWALL_URL` aponta para o hostname público da **API**. Com `Pitwall:StaffHosts`, ele devolve 404 para `/v1/staff`. Use o endereço do console. |
-| "A resposta de … não é do Pitwall." | A URL abre outro site, ou há uma tela de login na frente do console (Cloudflare Access, Tailscale Funnel com autenticação, proxy com senha). O MCP não passa por login de navegador. No Cloudflare Access, crie uma aplicação para o caminho `/v1/staff/tasks` com uma política **Bypass** (a rota continua exigindo o token) ou use um *service token* do Access. |
+| "A resposta de … não é do Pitwall." | A URL abre outro site, ou há uma tela de login na frente do console (Cloudflare Access, Tailscale Funnel com autenticação, proxy com senha). O MCP não passa por login de navegador. Com Cloudflare Access, veja a seção abaixo. |
 | "O token não tem o escopo tasks." | Token criado direto no banco sem escopo. Crie pelo console. |
 | "Limite de requisições." | 120 escritas por minuto por pessoa (console e tokens somados). Espere um minuto. |
 | `/mcp` mostra `pitwall` com erro | Rode o comando do `claude mcp add` à mão para ver o erro no stderr. O token nunca aparece nesse log. |
+
+## Console atrás do Cloudflare Access
+
+O Access pede login de navegador (e-mail e código), e o MCP não tem navegador. A saída é uma
+**segunda aplicação** do Access, só para o caminho das tarefas, com a ação **Bypass**. O Access
+sempre aplica a aplicação de caminho mais específico, então o resto do console continua atrás do
+login. As rotas liberadas continuam exigindo o token `pwt_…` (ou a sessão do console); sem ele, a
+API responde 401.
+
+O MCP não envia cabeçalhos de *service token* do Access (`CF-Access-Client-Id`), então a política
+**Service Auth** não serve aqui.
+
+1. Abra https://one.dash.cloudflare.com → **Access** → **Applications** → **Add an application** →
+   **Self-hosted**.
+2. *Application name*: `Pitwall MCP (tarefas)`.
+3. **Add public hostname** duas vezes, no mesmo subdomínio e domínio do console:
+   - *Subdomain* `pitwall`, *Domain* `<seu-dominio>`, *Path* `v1/staff/tasks`;
+   - *Subdomain* `pitwall`, *Domain* `<seu-dominio>`, *Path* `v1/staff/tasks/*`.
+4. Em **Policies** → **Add a policy**: *Policy name* `MCP com token`; *Action* **Bypass**;
+   *Include* → *Selector* **Everyone**.
+5. Salve (**Save application**). Não mexa na aplicação `Pitwall console`.
+
+Confira num terminal (sem cookie, sem token):
+
+```sh
+curl -i https://pitwall.<seu-dominio>/v1/staff/tasks/board   # esperado: 401 com {"message":"Sign in to the console."}
+curl -i https://pitwall.<seu-dominio>/v1/staff/tickets       # esperado: 302 para a tela de login do Access
+```
+
+O primeiro mostra que o Access deixou passar e o Pitwall barrou. O segundo mostra que o resto
+continua protegido. Também numa janela anônima, `https://pitwall.<seu-dominio>` ainda deve pedir o
+e-mail do Access.
