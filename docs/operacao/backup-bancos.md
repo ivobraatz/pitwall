@@ -1,6 +1,6 @@
 # Backup central dos bancos
 
-Um único job na VM Oracle faz o backup dos Postgres de RH Flex, DataRunner, metrifree e Pitwall. Enquanto
+Um único job na VM Oracle faz o backup dos Postgres de RH Flex, DataRunner, metrifree, Fiscal e Pitwall. Enquanto
 o plano da Railway não for o Pro, ele é a **única** cópia dos bancos dos produtos.
 
 | Camada | Onde | Protege contra |

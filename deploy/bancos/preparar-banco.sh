@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Liga um sistema ao backup central (docs/operacao/backup-bancos.md). Rode uma vez por sistema, na VM:
 #
-#   preparar-banco.sh rhflex | datarunner | metrifree     pede a URL pública de admin do Postgres
+#   preparar-banco.sh rhflex | datarunner | metrifree | fiscal   pede a URL pública de admin do Postgres
 #   preparar-banco.sh pitwall                             usa o Postgres local do Pitwall
 #
 # Nos sistemas da Railway, cria o usuário backup_ro, que só lê. A URL de admin fica só na memória deste
@@ -17,8 +17,9 @@ case "$sistema" in
   rhflex) tabelas="Tenants Funcionarios RegistrosPonto" ;;
   datarunner) tabelas="tenants users connections" ;;
   metrifree) tabelas="users posts" ;;
+  fiscal) tabelas="nfse evento_stripe" ;;
   pitwall) tabelas="tickets products team_tasks" ;;
-  *) echo "uso: preparar-banco.sh rhflex|datarunner|metrifree|pitwall" >&2; exit 2 ;;
+  *) echo "uso: preparar-banco.sh rhflex|datarunner|metrifree|fiscal|pitwall" >&2; exit 2 ;;
 esac
 
 mkdir -p -m 700 "$bancos"
