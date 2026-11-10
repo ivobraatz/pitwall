@@ -1,0 +1,55 @@
+name: Release MCP
+
+# Publica o pitwall-mcp no npm quando sai uma tag mcp-v<versão>.
+#
+# Como lançar uma versão (exemplo: 0.3.0):
+#   1. Suba "version" em packages/mcp/package.json e commite.
+#   2. Crie e envie a tag:  git tag mcp-v0.3.0 && git push origin mcp-v0.3.0
+#
+# O workflow falha antes de publicar se a tag e a versão do pacote não baterem.
+# Usa o mesmo secret NPM_TOKEN do release.yml; o token precisa poder publicar o pitwall-mcp.
+
+on:
+  push:
+    tags: ['mcp-v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: A tag confere com a versão do pacote
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#mcp-v}"
+          version=$(node -p "require('./packages/mcp/package.json').version")
+          echo "tag=$tag pacote=$version"
+          if [ "$version" != "$tag" ]; then
+            echo "::error::a tag é $GITHUB_REF_NAME, mas packages/mcp/package.json está em $version"
+            exit 1
+          fi
+
+      - run: pnpm install --frozen-lockfile
+
+      # O test do pacote já compila (tsc) antes de rodar.
+      - run: pnpm --filter pitwall-mcp test
+
+      - name: Publica o pitwall-mcp no npm
+        working-directory: packages/mcp
+        # O build já rodou acima; --ignore-scripts pula o prepublishOnly.
+        run: npm publish --provenance --access public --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
