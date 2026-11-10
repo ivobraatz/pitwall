@@ -50,6 +50,7 @@ escolha antes do primeiro anexo.
 | `ci.yml`, jobs `api` e `web` | push na `main` e PRs | testes da API, testes do SDK, typecheck e build do console |
 | `ci.yml`, job `prod-stack` | push na `main` e PRs | sobe o `docker-compose.prod.yml` de verdade, confere as fotos do login, o login e um vídeo de 30 MB, verifica que ele chegou ao bucket e roda o `deploy/backup.sh` |
 | `release.yml` | tag `v<versão>` | publica `pitwall-sdk` no npm e `Pitwall.AspNetCore` no NuGet. Não faz deploy |
+| `mcp-release.yml` | tag `mcp-v<versão>` | publica `pitwall-mcp` no npm, com a versão de `packages/mcp/package.json`. Não faz deploy |
 
 ### Como a versão chega a cada ambiente
 

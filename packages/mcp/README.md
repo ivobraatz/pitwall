@@ -100,4 +100,7 @@ corepack pnpm --filter pitwall-mcp build
 corepack pnpm --filter pitwall-mcp test
 ```
 
+Publicar: suba `version` no `package.json`, commite e envie a tag `mcp-v<versão>`. O workflow
+`mcp-release.yml` testa e publica no npm.
+
 Licença MIT.
