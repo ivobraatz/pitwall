@@ -1,6 +1,6 @@
 {
   "name": "pitwall-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "MCP server for Pitwall: Claude Code works the team's task board and reports to the Atlas (systems, services, routines, activity).",
   "repository": {
     "type": "git",

@@ -72,7 +72,9 @@ Atlas (escopo `atlas`):
 | Tool | Para quê |
 |---|---|
 | `atlas_overview` | Saúde e pendências de cada sistema, o que roda agora e o que foi achado sem cadastro. |
-| `register_system`, `register_service`, `register_repo`, `link_services` | Cadastram ou atualizam o mapa. Repetir não duplica. |
+| `register_system`, `register_service`, `register_repo`, `link_services` | Cadastram ou atualizam o mapa, com detalhes, lacunas e o tipo de cada ligação. Repetir não duplica. |
+| `register_process`, `update_process_step`, `atlas_processes` | Processos etapa por etapa: como é hoje, como deveria ser, o próximo passo. |
+| `atlas_attention` | O que foi declarado como lacuna ou aviso, do maior impacto para o menor. |
 | `register_routine`, `list_routines` | Rotinas: o que roda sozinho, com a instrução do agente. |
 | `start_activity`, `finish_activity` | Avisam o que a sessão está fazendo, para a faixa "Agora". |
 | `start_routine_run`, `finish_routine_run` | Registram a execução de uma rotina e o que ela gerou. |

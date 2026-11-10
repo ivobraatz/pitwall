@@ -33,6 +33,8 @@ public class PitwallDb(DbContextOptions<PitwallDb> options) : DbContext(options)
     public DbSet<AtlasRoutineRun> AtlasRoutineRuns => Set<AtlasRoutineRun>();
     public DbSet<AtlasActivity> AtlasActivities => Set<AtlasActivity>();
     public DbSet<AtlasDiscovery> AtlasDiscoveries => Set<AtlasDiscovery>();
+    public DbSet<AtlasProcess> AtlasProcesses => Set<AtlasProcess>();
+    public DbSet<AtlasStep> AtlasSteps => Set<AtlasStep>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -57,6 +59,12 @@ public class PitwallDb(DbContextOptions<PitwallDb> options) : DbContext(options)
             e.Property(x => x.MonitorStatus).HasMaxLength(16);
             e.Property(x => x.DeployStatus).HasMaxLength(16);
             e.Property(x => x.CommitSha).HasMaxLength(64);
+            e.Property(x => x.Group).HasMaxLength(60);
+            e.Property(x => x.Condition).HasMaxLength(16).HasDefaultValue(AtlasConditions.Ok);
+            e.Property(x => x.Impact).HasMaxLength(8);
+            e.Property(x => x.Owner).HasMaxLength(16);
+            e.Property(x => x.TaskCode).HasMaxLength(20);
+            e.OwnsMany(x => x.Facts, f => f.ToJson());
             e.Ignore(x => x.State);
             e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Environment).WithMany().HasForeignKey(x => x.EnvironmentId).OnDelete(DeleteBehavior.SetNull);
@@ -66,6 +74,7 @@ public class PitwallDb(DbContextOptions<PitwallDb> options) : DbContext(options)
         {
             e.HasIndex(x => new { x.FromServiceId, x.ToServiceId }).IsUnique();
             e.Property(x => x.Label).HasMaxLength(80);
+            e.Property(x => x.Kind).HasMaxLength(16);
             e.HasOne(x => x.From).WithMany().HasForeignKey(x => x.FromServiceId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.To).WithMany().HasForeignKey(x => x.ToServiceId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -114,6 +123,34 @@ public class PitwallDb(DbContextOptions<PitwallDb> options) : DbContext(options)
             e.Property(x => x.Source).HasMaxLength(8);
             e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(x => x.Service).WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<AtlasProcess>(e =>
+        {
+            e.HasIndex(x => x.Slug).IsUnique();
+            e.Property(x => x.Slug).HasMaxLength(60);
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.OwnsMany(x => x.Stages, s => s.ToJson());
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<AtlasStep>(e =>
+        {
+            e.HasIndex(x => new { x.ProcessId, x.Slug }).IsUnique();
+            e.HasIndex(x => x.Status);
+            e.Property(x => x.Slug).HasMaxLength(60);
+            e.Property(x => x.Stage).HasMaxLength(40);
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.Status).HasMaxLength(8);
+            e.Property(x => x.Owner).HasMaxLength(16);
+            e.Property(x => x.Today).HasMaxLength(2000);
+            e.Property(x => x.Ideal).HasMaxLength(2000);
+            e.Property(x => x.Next).HasMaxLength(1000);
+            e.Property(x => x.TaskCode).HasMaxLength(20);
+            e.Property(x => x.Impact).HasMaxLength(8);
+            e.HasOne(x => x.Process).WithMany(p => p.Steps).HasForeignKey(x => x.ProcessId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.SetNull);
         });
 
         b.Entity<AtlasDiscovery>(e =>

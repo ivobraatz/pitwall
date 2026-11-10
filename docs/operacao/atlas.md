@@ -32,6 +32,26 @@ novo atualiza, não duplica.
 | Ligação "este usa aquele" | origem + destino | `link_services` |
 | Repositório | `dono/nome` | `register_repo` |
 | Rotina | slug | `register_routine` |
+| Processo (venda, suporte, funil de um produto) | slug | `register_process` |
+| Etapa de um processo | processo + slug da etapa | `update_process_step` |
+
+Para ler: `atlas_overview`, `atlas_processes` e `atlas_attention` (tudo que foi declarado como lacuna ou
+aviso, do maior impacto para o menor).
+
+### O que os coletores não veem
+
+Os coletores dizem se um serviço está no ar. O resto é declarado no cadastro:
+
+- **Serviço:** `group` (bloco em que aparece no sistema), `facts` (detalhes chave → valor), `items` (lista:
+  redes, bancos, canais), `condition` (`ok`, `warn` funciona mal, `gap` falta, `planned`, `local` só numa
+  máquina) e, para o que não está ok, `impact` (`high`, `medium`, `low`), `owner` (`auto`, `agent`,
+  `person`, `together`) e `task` (código da tarefa que resolve).
+- **Ligação:** `kind` (`host`, `dns`, `storage`, `payment`, `email`, `ai`, `login`, `measure`, `monitor`,
+  `support`, `deploy`, `integration`, `business`) e `planned` para a que ainda não existe.
+- **Processo:** etapas em ordem, cada uma com situação (`ok`, `warn`, `gap`, `next`, `idea`), como é hoje,
+  como deveria ser, o próximo passo, responsável, impacto, tarefa e os serviços envolvidos. Com `stages`
+  (colunas, como oferta, atração, conversão), cada etapa cai num estágio e num sistema, e o processo vira
+  uma matriz sistema × estágio. Mandar `steps` substitui todas as etapas; `update_process_step` muda uma.
 
 O ambiente é criado junto com o primeiro serviço que o cita. As tools do Atlas pedem um token pessoal
 com o escopo `atlas`; o console cria tokens com `tasks` e `atlas`. Tokens antigos têm só `tasks`: gere
@@ -59,11 +79,24 @@ Uma linha inválida recusa o arquivo inteiro e nada é gravado. Exemplo (dados f
       "repos": ["acme-inc/rockets"],
       "services": [
         { "name": "API", "kind": "api", "environment": "production", "provider": "railway", "externalRef": "acme/api",
-          "url": "https://api.acme.example", "monitor": "Acme API", "uses": ["CDN", "acme/production/Banco"] },
+          "url": "https://api.acme.example", "monitor": "Acme API", "uses": ["CDN", "acme/production/Banco"],
+          "group": "Núcleo", "facts": { "Health": "/health", "Memória": "1 GB" },
+          "links": [{ "to": "acme/App", "kind": "deploy", "planned": true }] },
         { "name": "Banco", "kind": "database", "environment": "production", "provider": "railway", "externalRef": "acme/postgres" },
-        { "name": "Site", "kind": "site", "environment": "production", "provider": "vercel", "externalRef": "acme-site" }
+        { "name": "Site", "kind": "site", "environment": "production", "provider": "vercel", "externalRef": "acme-site" },
+        { "name": "App", "kind": "app", "group": "Na loja", "condition": "gap", "impact": "high", "owner": "person",
+          "task": "T-7K2QM", "notes": "Ainda não publicado." }
       ]
     }
+  ],
+  "processes": [
+    { "slug": "funil", "name": "Funil", "stages": [{ "key": "oferta", "name": "Oferta" }, { "key": "receita", "name": "Receita" }],
+      "steps": [
+        { "slug": "acme-oferta", "name": "Planos", "system": "acme", "stage": "oferta", "status": "ok", "owner": "auto",
+          "services": ["acme/production/API"] },
+        { "slug": "acme-receita", "name": "Cobrança", "system": "acme", "stage": "receita", "status": "gap", "impact": "high",
+          "today": "Manual.", "ideal": "Automática.", "next": "Ligar a cobrança recorrente." }
+      ] }
   ],
   "routines": [
     { "slug": "saude", "name": "Saúde", "frequency": "daily", "system": null,
@@ -72,8 +105,10 @@ Uma linha inválida recusa o arquivo inteiro e nada é gravado. Exemplo (dados f
 }
 ```
 
-`kind`: `api`, `web`, `worker`, `database`, `site`, `external` ou `other`. `uses` aceita o nome de um
-serviço compartilhado, `sistema/Nome` ou `sistema/ambiente/Nome`. `frequency`: `daily`, `weekly` ou `monthly`.
+`kind` do serviço: `site`, `web`, `app`, `api`, `worker`, `database`, `storage`, `domain`, `email`, `monitor`,
+`backup`, `package`, `integration`, `analytics`, `external` ou `other`. `uses` e `links[].to` aceitam o nome
+de um serviço compartilhado, `sistema/Nome` ou `sistema/ambiente/Nome`; `links` diz também o tipo da
+ligação. `frequency`: `daily`, `weekly` ou `monthly`.
 
 ## Coletores
 

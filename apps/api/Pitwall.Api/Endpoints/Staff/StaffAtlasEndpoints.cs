@@ -21,7 +21,7 @@ public static class StaffAtlasEndpoints
     public static readonly TimeSpan RunStaleAfter = TimeSpan.FromHours(6);
     private const int RunHistory = 30;
 
-    public sealed record LinkRequest(string? From, string? To, string? Label);
+    public sealed record LinkRequest(string? From, string? To, string? Label, string? Kind = null, bool? Planned = null);
     public sealed record RepoRequest(string? FullName, string? System);
     public sealed record EnvironmentRequest(string? Slug, string? Name);
     public sealed record ActivityRequest(string? System, string? Component, string? Description);
@@ -34,6 +34,8 @@ public static class StaffAtlasEndpoints
         var group = app.MapGroup("/v1/staff/atlas").RequireAuthorization(Policies.Atlas).WithTags("Staff");
         group.MapGet("", Overview);
         group.MapGet("/flows", Flows);
+        group.MapGet("/processes", Processes);
+        group.MapGet("/attention", Attention);
         group.MapGet("/routines", Routines);
         group.MapGet("/routines/{routine}/runs", RoutineRuns);
 
@@ -72,10 +74,10 @@ public static class StaffAtlasEndpoints
         });
         writes.MapPost("/links", async (LinkRequest req, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
         {
-            var (link, error) = await writer.LinkAsync(req.From, req.To, req.Label, ct);
+            var (link, error) = await writer.LinkAsync(req.From, req.To, req.Label, ct, req.Kind, req.Planned);
             if (link is null) return Bad(error!);
             await db.SaveChangesAsync(ct);
-            return Results.Ok(new { link.Id, from = link.FromServiceId, to = link.ToServiceId, link.Label });
+            return Results.Ok(new { link.Id, from = link.FromServiceId, to = link.ToServiceId, link.Label, link.Kind, link.Planned });
         });
         writes.MapDelete("/links/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
         {
@@ -92,6 +94,33 @@ public static class StaffAtlasEndpoints
         writes.MapDelete("/repos/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
         {
             await db.AtlasRepos.Where(r => r.Id == id).ExecuteDeleteAsync(ct);
+            return Results.NoContent();
+        });
+
+        writes.MapPost("/processes", async (AtlasWriter.ProcessInput req, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
+        {
+            var (process, created, error) = await writer.UpsertProcessAsync(req, ct);
+            if (process is null) return Bad(error!);
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new { process.Id, process.Slug, process.Name, steps = process.Steps.Count, created });
+        });
+        writes.MapDelete("/processes/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
+        {
+            await db.AtlasProcesses.Where(p => p.Id == id).ExecuteDeleteAsync(ct);
+            return Results.NoContent();
+        });
+        writes.MapPost("/processes/{process}/steps", async (string process, AtlasWriter.StepInput req, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
+        {
+            if (await writer.FindProcessAsync(process, ct) is not { } p) return NotFound("Processo não encontrado. Use atlas_processes para ver os identificadores.");
+            var (step, error) = await writer.UpsertStepAsync(p, req, ct);
+            if (step is null) return Bad(error!);
+            p.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(StepDto(step));
+        });
+        writes.MapDelete("/steps/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
+        {
+            await db.AtlasSteps.Where(s => s.Id == id).ExecuteDeleteAsync(ct);
             return Results.NoContent();
         });
 
@@ -155,13 +184,23 @@ public static class StaffAtlasEndpoints
         var errors = await db.ServerErrors.AsNoTracking().Where(e => e.OccurredAt >= dayAgo)
             .GroupBy(e => e.ProductId).Select(g => new { g.Key, Count = g.Select(e => e.Signature).Distinct().Count() })
             .ToDictionaryAsync(g => g.Key, g => g.Count, ct);
+        string[] attention = [AtlasStepStatuses.Gap, AtlasStepStatuses.Warn];
+        var openSteps = await db.AtlasSteps.AsNoTracking().Where(s => attention.Contains(s.Status))
+            .Select(s => new { s.Status, ProductId = s.ProductId ?? s.Process.ProductId }).ToListAsync(ct);
 
         var systems = products.Select(p =>
         {
             var own = services.Where(s => s.ProductId == p.Id).ToList();
+            var steps = openSteps.Where(s => s.ProductId == p.Id).ToList();
             return new
             {
                 p.Id, p.Slug, p.Name, p.Color, p.Description, p.WebsiteUrl,
+                // What the team declared as missing (gap) or pending (warn), on services and process steps.
+                attention = new
+                {
+                    gaps = own.Count(s => s.Condition == AtlasConditions.Gap) + steps.Count(s => s.Status == AtlasStepStatuses.Gap),
+                    warnings = own.Count(s => s.Condition == AtlasConditions.Warn) + steps.Count(s => s.Status == AtlasStepStatuses.Warn),
+                },
                 health = new
                 {
                     total = own.Count,
@@ -190,9 +229,10 @@ public static class StaffAtlasEndpoints
             services = services.Select(s => new
             {
                 s.Id, s.ProductId, s.EnvironmentId, s.Name, s.Kind, s.Provider, s.ExternalRef, s.Url, monitor = s.MonitorRef, s.Notes,
+                s.Group, s.Condition, facts = s.Facts.Select(f => new { f.Key, f.Value }), s.Items, s.Impact, s.Owner, task = s.TaskCode,
                 s.State, s.MonitorStatus, s.DeployStatus, s.LastDeployAt, s.CommitSha, s.CheckedAt,
             }),
-            links = links.Select(l => new { l.Id, from = l.FromServiceId, to = l.ToServiceId, l.Label }),
+            links = links.Select(l => new { l.Id, from = l.FromServiceId, to = l.ToServiceId, l.Label, l.Kind, l.Planned }),
             repos = repos.Select(r => new
             {
                 r.Id, r.ProductId, r.FullName, r.LastRunName, r.LastRunStatus, r.LastRunAt, r.LastRunUrl, r.LastRunSha,
@@ -305,6 +345,69 @@ public static class StaffAtlasEndpoints
             };
         }));
     }
+
+    /// <summary>Every process with its steps in order. <c>?system=</c> keeps the processes and steps of one system.</summary>
+    private static async Task<IResult> Processes(PitwallDb db, CancellationToken ct, [FromQuery] string? system = null)
+    {
+        var processes = await db.AtlasProcesses.AsNoTracking().Include(p => p.Product).Include(p => p.Steps).ThenInclude(s => s.Product)
+            .OrderBy(p => p.Position).ThenBy(p => p.Name).ToListAsync(ct);
+        Guid? only = null;
+        if (!string.IsNullOrWhiteSpace(system))
+        {
+            var s = system.Trim().ToLowerInvariant();
+            only = (await db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Slug == s || p.Id.ToString() == s, ct))?.Id;
+            if (only is null) return NotFound("Sistema não encontrado.");
+        }
+        return Results.Ok(processes
+            .Where(p => only is null || p.ProductId == only || p.Steps.Any(s => s.ProductId == only))
+            .Select(p => new
+            {
+                p.Id, p.Slug, p.Name, p.Description, p.UpdatedAt,
+                system = SystemRef(p.Product),
+                stages = p.Stages.Select(s => new { s.Key, s.Name, s.Description }),
+                steps = p.Steps.Where(s => only is null || p.ProductId == only || s.ProductId == only)
+                    .OrderBy(s => s.Position).Select(StepDto),
+            }));
+    }
+
+    public sealed record AttentionItem(
+        string Source, Guid Id, string Status, string Title, string? Detail, string? Next, string? Impact, string? Owner, string? Task,
+        SystemRefDto? System, string? Where, Guid? ProcessId, Guid? ServiceId);
+
+    /// <summary>
+    /// What needs a person: every gap and every warning the team declared, on services and on process
+    /// steps, most impact first. The complement of the collectors' "down": this is what is known to be missing.
+    /// </summary>
+    private static async Task<IResult> Attention(PitwallDb db, CancellationToken ct, [FromQuery] string? system = null)
+    {
+        var services = await db.AtlasServices.AsNoTracking().Include(s => s.Product)
+            .Where(s => s.Condition == AtlasConditions.Gap || s.Condition == AtlasConditions.Warn).ToListAsync(ct);
+        var steps = await db.AtlasSteps.AsNoTracking().Include(s => s.Product).Include(s => s.Process).ThenInclude(p => p.Product)
+            .Where(s => s.Status == AtlasStepStatuses.Gap || s.Status == AtlasStepStatuses.Warn).ToListAsync(ct);
+        var items = services.Select(s => new AttentionItem(
+                "service", s.Id, s.Condition, s.Name, s.Notes, null, s.Impact, s.Owner, s.TaskCode, SystemRef(s.Product), s.Group, null, s.Id))
+            .Concat(steps.Select(s => new AttentionItem(
+                "step", s.Id, s.Status, s.Name, s.Today, s.Next, s.Impact, s.Owner, s.TaskCode, SystemRef(s.Product ?? s.Process.Product),
+                s.Process.Name, s.ProcessId, null)));
+        if (!string.IsNullOrWhiteSpace(system))
+        {
+            var slug = system.Trim().ToLowerInvariant();
+            items = items.Where(i => i.System?.Slug == slug);
+        }
+        return Results.Ok(items
+            .OrderBy(i => AtlasImpacts.Rank(i.Impact)).ThenBy(i => i.Status == AtlasStepStatuses.Gap ? 0 : 1).ThenBy(i => i.Title)
+            .ToList());
+    }
+
+    private static SystemRefDto? SystemRef(Product? p) => p is null ? null : new SystemRefDto(p.Id, p.Slug, p.Name, p.Color);
+    public sealed record SystemRefDto(Guid Id, string Slug, string Name, string? Color);
+
+    private static object StepDto(AtlasStep s) => new
+    {
+        s.Id, s.Slug, s.Name, s.Status, s.Stage, s.Owner, s.Today, s.Ideal, s.Next, task = s.TaskCode, s.Impact,
+        services = s.ServiceIds, s.Position, s.UpdatedAt,
+        system = SystemRef(s.Product),
+    };
 
     private static async Task<IResult> Routines(PitwallDb db, CancellationToken ct, [FromQuery] string? frequency = null, [FromQuery] bool? enabled = null)
     {

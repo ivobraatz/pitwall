@@ -3,7 +3,7 @@ import { createClient, type ClientOptions } from './client.js';
 import { registerAtlasTools } from './atlas.js';
 import { registerTools } from './tools.js';
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 
 /** The MCP server with its tools (the task board and the Atlas), before any transport is attached (the tests use an in-memory one). */
 export function createServer(options: ClientOptions): { server: McpServer; configured: boolean } {

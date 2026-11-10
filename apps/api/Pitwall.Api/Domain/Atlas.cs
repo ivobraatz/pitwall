@@ -40,6 +40,25 @@ public class AtlasService
     public string? MonitorRef { get; set; }
     public string? Notes { get; set; }
 
+    // What the team declares about it, by hand or through the MCP.
+    /// <summary>The block it sits in inside its system: "On the web", "Core", "At the customer".</summary>
+    public string? Group { get; set; }
+    /// <summary>
+    /// ok | warn (exists, with something pending) | gap (needed, does not exist yet) | planned |
+    /// local (runs only on a machine). Independent of what the collectors see.
+    /// </summary>
+    public string Condition { get; set; } = AtlasConditions.Ok;
+    /// <summary>Details read as a list: "Health" → "/health", "Memory" → "2 GB". Order kept.</summary>
+    public List<AtlasFact> Facts { get; set; } = [];
+    /// <summary>What it carries inside: the networks a connector reaches, the databases a driver reads.</summary>
+    public List<string> Items { get; set; } = [];
+    /// <summary>For a gap or a warning: high | medium | low.</summary>
+    public string? Impact { get; set; }
+    /// <summary>Who resolves or runs it: auto | agent | person | together.</summary>
+    public string? Owner { get; set; }
+    /// <summary>The task that tracks it, by code.</summary>
+    public string? TaskCode { get; set; }
+
     // What the collectors last saw. Never written by hand.
     /// <summary>up | down | pending | maintenance, from the monitor.</summary>
     public string? MonitorStatus { get; set; }
@@ -69,6 +88,12 @@ public class AtlasService
     };
 }
 
+public class AtlasFact
+{
+    public string Key { get; set; } = null!;
+    public string Value { get; set; } = null!;
+}
+
 /// <summary>"This service uses that one": drawn as an edge of the map.</summary>
 public class AtlasLink
 {
@@ -76,6 +101,10 @@ public class AtlasLink
     public Guid FromServiceId { get; set; }
     public Guid ToServiceId { get; set; }
     public string? Label { get; set; }
+    /// <summary>What the dependency is: host, dns, storage, payment… (<see cref="AtlasLinkKinds"/>).</summary>
+    public string? Kind { get; set; }
+    /// <summary>Drawn dashed: the link exists only once something planned is done.</summary>
+    public bool Planned { get; set; }
     public DateTime CreatedAt { get; set; }
 
     public AtlasService From { get; set; } = null!;
@@ -192,6 +221,66 @@ public class AtlasDiscovery
     public DateTime? DismissedAt { get; set; }
 }
 
+/// <summary>
+/// How the team does something, step by step: keeping the systems up, selling a project, a
+/// product's funnel. The only part of the Atlas written by hand besides systems and routines.
+/// With stages, the steps form a grid (one row per system, one column per stage); without, a line.
+/// </summary>
+public class AtlasProcess
+{
+    public Guid Id { get; set; }
+    public string Slug { get; set; } = null!;
+    public string Name { get; set; } = null!;
+    public string? Description { get; set; }
+    /// <summary>Null = the whole operation's.</summary>
+    public Guid? ProductId { get; set; }
+    public List<AtlasStage> Stages { get; set; } = [];
+    public int Position { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+
+    public Product? Product { get; set; }
+    public ICollection<AtlasStep> Steps { get; set; } = [];
+}
+
+public class AtlasStage
+{
+    public string Key { get; set; } = null!;
+    public string Name { get; set; } = null!;
+    public string? Description { get; set; }
+}
+
+/// <summary>One step of a process: how it is done today, how it should be, and what comes next.</summary>
+public class AtlasStep
+{
+    public Guid Id { get; set; }
+    public Guid ProcessId { get; set; }
+    /// <summary>Unique inside its process.</summary>
+    public string Slug { get; set; } = null!;
+    /// <summary>The row of the grid, when the process covers several systems.</summary>
+    public Guid? ProductId { get; set; }
+    /// <summary>The column of the grid: one of the process's stage keys.</summary>
+    public string? Stage { get; set; }
+    public string Name { get; set; } = null!;
+    /// <summary>ok | warn | gap | next | idea.</summary>
+    public string Status { get; set; } = AtlasStepStatuses.Ok;
+    /// <summary>auto | agent | person | together.</summary>
+    public string? Owner { get; set; }
+    public string? Today { get; set; }
+    public string? Ideal { get; set; }
+    public string? Next { get; set; }
+    public string? TaskCode { get; set; }
+    /// <summary>high | medium | low.</summary>
+    public string? Impact { get; set; }
+    /// <summary>The services that make the step happen.</summary>
+    public List<Guid> ServiceIds { get; set; } = [];
+    public int Position { get; set; }
+    public DateTime UpdatedAt { get; set; }
+
+    public AtlasProcess Process { get; set; } = null!;
+    public Product? Product { get; set; }
+}
+
 public static class AtlasStates
 {
     public const string Up = "up";
@@ -205,7 +294,53 @@ public static class AtlasServiceKinds
 {
     public const string External = "external";
     public const string Other = "other";
-    public static readonly string[] All = ["api", "web", "worker", "database", "site", External, Other];
+    public static readonly string[] All =
+    [
+        "site", "web", "app", "api", "worker", "database", "storage", "domain", "email", "monitor", "backup",
+        "package", "integration", "analytics", External, Other,
+    ];
+    public static bool IsValid(string? s) => s is not null && All.Contains(s);
+}
+
+public static class AtlasConditions
+{
+    public const string Ok = "ok";
+    public const string Warn = "warn";
+    public const string Gap = "gap";
+    public static readonly string[] All = [Ok, Warn, Gap, "planned", "local"];
+    public static bool IsValid(string? s) => s is not null && All.Contains(s);
+}
+
+public static class AtlasStepStatuses
+{
+    public const string Ok = "ok";
+    public const string Warn = "warn";
+    public const string Gap = "gap";
+    public static readonly string[] All = [Ok, Warn, Gap, "next", "idea"];
+    public static bool IsValid(string? s) => s is not null && All.Contains(s);
+}
+
+public static class AtlasOwners
+{
+    public static readonly string[] All = ["auto", "agent", "person", "together"];
+    public static bool IsValid(string? s) => s is not null && All.Contains(s);
+}
+
+public static class AtlasImpacts
+{
+    public static readonly string[] All = ["high", "medium", "low"];
+    public static bool IsValid(string? s) => s is not null && All.Contains(s);
+    /// <summary>For sorting: high first, no impact last.</summary>
+    public static int Rank(string? s) => s switch { "high" => 0, "medium" => 1, "low" => 2, _ => 3 };
+}
+
+public static class AtlasLinkKinds
+{
+    public static readonly string[] All =
+    [
+        "host", "dns", "storage", "payment", "email", "ai", "login", "measure", "monitor", "support", "deploy",
+        "integration", "business",
+    ];
     public static bool IsValid(string? s) => s is not null && All.Contains(s);
 }
 

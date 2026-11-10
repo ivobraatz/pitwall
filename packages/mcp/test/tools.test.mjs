@@ -42,9 +42,10 @@ test('lists the board and the atlas tools with schemas', async () => {
   const { client } = await connect();
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map((t) => t.name).sort(), [
-    'atlas_overview', 'board_summary', 'comment_task', 'create_task', 'finish_activity', 'finish_routine_run', 'get_task',
-    'link_services', 'list_products', 'list_routines', 'list_tasks', 'move_task', 'register_repo', 'register_routine',
-    'register_service', 'register_system', 'start_activity', 'start_routine_run', 'update_task',
+    'atlas_attention', 'atlas_overview', 'atlas_processes', 'board_summary', 'comment_task', 'create_task', 'finish_activity',
+    'finish_routine_run', 'get_task', 'link_services', 'list_products', 'list_routines', 'list_tasks', 'move_task',
+    'register_process', 'register_repo', 'register_routine', 'register_service', 'register_system', 'start_activity',
+    'start_routine_run', 'update_process_step', 'update_task',
   ]);
   for (const t of tools) {
     assert.ok(t.description && t.description.length > 20, `${t.name} has a description`);
@@ -214,4 +215,62 @@ test('atlas_overview summarises health, now and what was found', async () => {
   assert.match(out, /\[activity\] Corrigindo o frete \(Ana \(Claude\)\)/);
   assert.match(out, /railway: acme\/worker @production/);
   assert.match(out, /Coletores não conectados: vercel\./);
+});
+
+test('a service carries what the collectors do not see, and a link its kind', async () => {
+  const { client, calls } = await connect({ respond: () => json(200, { id: 's1', name: 'App da loja', created: true }) });
+  await client.callTool({
+    name: 'register_service',
+    arguments: { system: 'acme', name: 'App da loja', kind: 'app', condition: 'gap', impact: 'high', owner: 'person', task: 'T-ABC12', facts: { Loja: 'Play' }, items: ['Mastodon'] },
+  });
+  assert.deepEqual(calls[0].body, { system: 'acme', name: 'App da loja', kind: 'app', condition: 'gap', impact: 'high', owner: 'person', task: 'T-ABC12', facts: { Loja: 'Play' }, items: ['Mastodon'] });
+  const linked = await client.callTool({ name: 'link_services', arguments: { from: 'acme/API', to: 'acme/App da loja', kind: 'deploy', planned: true } });
+  assert.equal(calls[1].url, `${URL_}/v1/staff/atlas/links`);
+  assert.equal(calls[1].body.kind, 'deploy');
+  assert.match(text(linked), /\(planejado\)/);
+  const wrong = await client.callTool({ name: 'link_services', arguments: { from: 'a', to: 'b', kind: 'magic' } });
+  assert.equal(wrong.isError, true);
+});
+
+test('a process is written whole, a step alone, and both read back in order', async () => {
+  const process = {
+    slug: 'acme-venda', name: 'Venda', description: null, system: { slug: 'acme' },
+    stages: [{ key: 'oferta', name: 'Oferta' }],
+    steps: [
+      { slug: 'contato', name: 'Contato', status: 'ok', stage: 'oferta', owner: 'auto', today: null, ideal: null, next: null, task: null, impact: null, system: null },
+      { slug: 'contrato', name: 'Contrato', status: 'gap', stage: null, owner: null, today: null, ideal: null, next: 'Escolher a plataforma.', task: 'T-ABC12', impact: 'high', system: { slug: 'acme' } },
+    ],
+  };
+  const { client, calls } = await connect({
+    respond: (call) => {
+      if (call.url.endsWith('/steps')) return json(200, { ...process.steps[1], status: 'next' });
+      if (call.method === 'POST') return json(200, { slug: 'acme-venda', name: 'Venda', steps: 2, created: true });
+      return json(200, [process]);
+    },
+  });
+  const written = await client.callTool({ name: 'register_process', arguments: { slug: 'acme-venda', name: 'Venda', steps: [{ slug: 'contato', name: 'Contato' }, { slug: 'contrato', name: 'Contrato' }] } });
+  assert.match(text(written), /Cadastrado: acme-venda — Venda \(2 etapas\)/);
+  assert.equal(calls[0].body.steps.length, 2);
+
+  await client.callTool({ name: 'update_process_step', arguments: { process: 'acme-venda', slug: 'contrato', status: 'next' } });
+  assert.equal(calls[1].url, `${URL_}/v1/staff/atlas/processes/acme-venda/steps`);
+  assert.deepEqual(calls[1].body, { slug: 'contrato', status: 'next' });
+
+  const out = text(await client.callTool({ name: 'atlas_processes', arguments: { system: 'acme' } }));
+  assert.equal(calls[2].url, `${URL_}/v1/staff/atlas/processes?system=acme`);
+  assert.match(out, /\[ok\] contato: Contato — Oferta/);
+  assert.match(out, /\[gap\] contrato: Contrato — acme \(T-ABC12, impacto alto\)\n {6}próximo: Escolher a plataforma\./);
+});
+
+test('atlas_attention lists gaps with impact and what to do next', async () => {
+  const items = [
+    { source: 'service', status: 'gap', title: 'App da loja', detail: 'Sai como pacote avulso.', next: null, impact: 'high', owner: 'person', task: 'T-ABC12', system: { slug: 'acme' }, where: 'Na web' },
+    { source: 'step', status: 'warn', title: 'Nota fiscal', detail: null, next: 'Ligar a emissão.', impact: null, owner: null, task: null, system: null, where: 'Venda' },
+  ];
+  const { client } = await connect({ respond: () => json(200, items) });
+  const out = text(await client.callTool({ name: 'atlas_attention', arguments: {} }));
+  assert.match(out, /\[gap\] App da loja — acme · Na web \(impacto alto, T-ABC12\)\n {4}Sai como pacote avulso\./);
+  assert.match(out, /\[warn\] Nota fiscal — Venda\n {4}Ligar a emissão\./);
+  const { client: empty } = await connect({ respond: () => json(200, []) });
+  assert.match(text(await empty.callTool({ name: 'atlas_attention', arguments: {} })), /Nada declarado/);
 });
