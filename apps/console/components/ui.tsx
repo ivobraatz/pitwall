@@ -128,7 +128,7 @@ const STATUS_BLOCK: Record<string, string> = {
 export const SEVERITY_LABEL: Record<string, string> = { low: 'Baixa', normal: 'Normal', high: 'Alta', critical: 'Crítica' };
 export const SEVERITY_TONE: Record<string, string> = { low: 'idle', normal: 'info', high: 'warn', critical: 'error' };
 const SEVERITY_DOT: Record<string, string> = { low: 'bg-fg-subtle', normal: 'bg-info', high: 'bg-warning', critical: 'bg-danger' };
-export const CATEGORY_LABEL: Record<string, string> = { bug: 'Problema', question: 'Dúvida', feature: 'Sugestão', billing: 'Cobrança', other: 'Outro' };
+export const CATEGORY_LABEL: Record<string, string> = { bug: 'Problema', question: 'Dúvida', feature: 'Sugestão', billing: 'Cobrança', other: 'Outro', contact: 'Contato' };
 
 export function StatusPill({ status, wide }: { status: string; wide?: boolean }) {
   return <span className={cn('inline-flex h-7 items-center px-2.5 text-[13px] font-semibold whitespace-nowrap', wide && 'w-40', STATUS_BLOCK[status] ?? STATUS_BLOCK.closed)}>{STATUS_LABEL[status] ?? status}</span>;

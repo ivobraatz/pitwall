@@ -41,7 +41,7 @@ export async function fetchBlob(path: string): Promise<{ blob: Blob; contentType
 export type TicketStatus = 'open' | 'in_progress' | 'waiting_customer' | 'fixed_pending_deploy' | 'resolved' | 'closed';
 export const STATUSES: TicketStatus[] = ['open', 'in_progress', 'waiting_customer', 'fixed_pending_deploy', 'resolved', 'closed'];
 export const SEVERITIES = ['low', 'normal', 'high', 'critical'] as const;
-export const CATEGORIES = ['bug', 'question', 'feature', 'billing', 'other'] as const;
+export const CATEGORIES = ['bug', 'question', 'feature', 'billing', 'other', 'contact'] as const;
 
 export interface Me { id: string; name: string; email: string; role: 'admin' | 'agent'; totpEnabled: boolean; mustChangePassword: boolean; totpRequired: boolean }
 export interface ProductRef { id: string; slug: string; name: string }

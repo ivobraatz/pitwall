@@ -116,12 +116,19 @@ function DiagnosticsPanel({ d }: { d: Diagnostics }) {
 function Thread({ d, onSent }: { d: Dossier; onSent: () => void }) {
   const toast = useToast();
   const [body, setBody] = React.useState('');
-  const [internal, setInternal] = React.useState(false);
+  const t = d.ticket;
+  // A contact from a public form has no screen to read answers on: the answer goes by e-mail,
+  // and the thread holds only the team's notes.
+  const contact = t.category === 'contact';
+  const [internal, setInternal] = React.useState(contact);
+  React.useEffect(() => { if (contact) setInternal(true); }, [contact]);
   const [status, setStatus] = React.useState('');
   const [files, setFiles] = React.useState<File[]>([]);
   const [sending, setSending] = React.useState(false);
   const listRef = React.useRef<HTMLDivElement>(null);
-  const t = d.ticket;
+  const replyByMail = d.opener.email
+    ? `mailto:${d.opener.email}?subject=${encodeURIComponent(`Re: ${t.title} (${t.code})`)}`
+    : null;
 
   React.useEffect(() => { const el = listRef.current; if (el) el.scrollTop = el.scrollHeight; }, [t.messages.length]);
 
@@ -172,6 +179,12 @@ function Thread({ d, onSent }: { d: Dossier; onSent: () => void }) {
       </div>
       <div className={cn('transition-colors duration-200', internal ? 'bg-warning/10' : 'bg-well')}>
         <div className="flex flex-wrap items-center gap-2 px-3 pt-3 text-[13px]">
+          {contact ? (
+            <>
+              {replyByMail && <a href={replyByMail} className="inline-flex h-8 items-center bg-fg px-3 font-semibold text-bg transition-opacity hover:opacity-90">Responder por e-mail</a>}
+              <span className="text-fg-muted">Veio de um formulário: quem escreveu não vê esta conversa. Aqui ficam as notas da equipe.</span>
+            </>
+          ) : (<>
           <div className="flex gap-1">
             <button onClick={() => setInternal(false)} className={cn('h-8 px-3 font-semibold transition-colors', !internal ? 'bg-fg text-bg' : 'text-fg-muted hover:bg-hover hover:text-fg')}>Responder ao cliente</button>
             <button onClick={() => setInternal(true)} className={cn('h-8 px-3 font-semibold transition-colors', internal ? 'bg-warning text-on-status' : 'text-fg-muted hover:bg-hover hover:text-fg')}>Nota interna</button>
@@ -184,6 +197,7 @@ function Thread({ d, onSent }: { d: Dossier; onSent: () => void }) {
             </>
           )}
           {internal && <span className="font-semibold text-warning">O cliente não vê notas internas.</span>}
+          </>)}
         </div>
         {files.length > 0 && (
           <div className="flex flex-wrap gap-1 px-3 pt-2">{files.map((f, i) => (

@@ -546,6 +546,19 @@ O contrato é HTTP e está em [Contrato HTTP](#contrato-http). Você precisa de 
 [`examples/demo-product/server.mjs`](../../examples/demo-product/server.mjs) faz os três com `node:http` puro, sem
 framework, em cerca de 90 linhas.
 
+### Formulário de contato de um site, sem login
+
+Um site sem conta de cliente também abre chamado: o backend do formulário chama `POST /v1/support/tickets`
+com uma chave `support` do sistema do site e `category: "contact"`. No `Pitwall-Actor`, o e-mail de quem
+escreveu é o `customerId`, o `userId` e o `userEmail`; a empresa (ou o nome) é o `customerName`.
+
+- O e-mail da equipe sai com **Reply-To** para quem escreveu: responder o e-mail é responder o contato.
+- No console, o chamado mostra **Responder por e-mail** no lugar da resposta ao cliente: a pessoa não vê
+  a conversa, que guarda só notas da equipe.
+- `contact` não aparece em `/config`, então o botão de suporte dos produtos não oferece esse tipo.
+- Se o Pitwall não responder, o formulário precisa de um caminho de reserva (um e-mail direto) para não
+  perder o contato.
+
 ---
 
 ## Contrato HTTP
@@ -611,7 +624,7 @@ e pelo `customerId` do actor. Um id de chamado de outro cliente responde **404**
 | `GET` | `/config` | — | `{ product: {slug, name}, teamName, categories, severities, statuses, retroactiveRecording, maxAttachmentBytes }` |
 | `GET` | `/tickets` | `status`: `open` (ativos), `done` (resolvido ou fechado), `all` ou um status; `search` (título ou código); `page` (padrão 1); `pageSize` (1 a 100, padrão 25) | `{ items, total, page, pageSize }`. Cada item: `id, code, title, category, severity, status, openedBy, createdAt, updatedAt, lastTeamMessageAt, lastCustomerMessageAt, messageCount, hasRecording, fixedIn` |
 | `GET` | `/tickets/{id}` | — | Detalhe: `id, code, title, body, category, severity, status, route, fixedIn`, datas, `openedBy {id,name}`, `traceIds`, `diagnostics`, `messages[]`, `attachments[]`. Notas internas não aparecem. Resposta da equipe vem com `author: {id: "team", name: teamName}` |
-| `POST` | `/tickets` | JSON: `title` (obrigatório, até 200); `body` (obrigatório, até 20.000); `category` (`bug`, `question`, `feature`, `billing`, `other`; padrão `bug`); `severity` (`low`, `normal`, `high`, `critical`; padrão `normal`); `route` (começa com `/`, até 512); `diagnostics` (objeto JSON; acima de 512 KB é descartado sem erro); `traceIds` (até 20, até 64 caracteres cada) | **201** `{ id, code }`. `code` tem a forma `20261016-7K3Q` |
+| `POST` | `/tickets` | JSON: `title` (obrigatório, até 200); `body` (obrigatório, até 20.000); `category` (`bug`, `question`, `feature`, `billing`, `other`, `contact`; padrão `bug`); `severity` (`low`, `normal`, `high`, `critical`; padrão `normal`); `route` (começa com `/`, até 512); `diagnostics` (objeto JSON; acima de 512 KB é descartado sem erro); `traceIds` (até 20, até 64 caracteres cada) | **201** `{ id, code }`. `code` tem a forma `20261016-7K3Q` |
 | `POST` | `/tickets/{id}/messages` | JSON: `body` (obrigatório, até 20.000) | **201** `{ id }`. Se o chamado estava `waiting_customer` ou `resolved`, volta para `in_progress`; se estava `closed`, volta para `open` |
 | `POST` | `/tickets/{id}/attachments` | multipart: `file` (obrigatório, até 25 MB); `kind` (`image`, `file` ou `recording`; padrão pelo tipo); `messageId` (opcional, de uma mensagem deste chamado); `meta` (JSON, até 512 KB) | **201** anexo. Tipos aceitos: `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `application/gzip`, `application/json`, `text/plain`, `text/csv`, `application/pdf`. Gravação (`recording`) só em `application/json` ou `application/gzip`. Acima do limite: **413**; tipo recusado: **400** |
 | `GET` | `/tickets/{id}/attachments/{attachmentId}` | `download=true` força download | Bytes. Imagens e PDF abrem na página; o resto baixa |

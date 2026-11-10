@@ -55,7 +55,7 @@ public static class SupportEndpoints
         {
             product = new { product.Slug, product.Name },
             teamName = product.Settings.TeamName ?? product.Name,
-            categories = TicketCategories.All,
+            categories = TicketCategories.CustomerChoices,
             severities = TicketSeverities.All,
             statuses = TicketStatuses.All,
             retroactiveRecording = product.Settings.RetroactiveRecording,

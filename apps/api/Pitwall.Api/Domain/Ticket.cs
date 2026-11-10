@@ -144,7 +144,14 @@ public static class TicketStatuses
 public static class TicketCategories
 {
     public const string Bug = "bug";
-    public static readonly string[] All = [Bug, "question", "feature", "billing", "other"];
+    /// <summary>
+    /// A message from a public form (a site's contact page): the person has no account and no
+    /// screen to read answers on, so the team answers by e-mail, not in the thread.
+    /// </summary>
+    public const string Contact = "contact";
+    public static readonly string[] All = [Bug, "question", "feature", "billing", "other", Contact];
+    /// <summary>What a signed-in customer picks from inside a product.</summary>
+    public static readonly string[] CustomerChoices = [Bug, "question", "feature", "billing", "other"];
     public static bool IsValid(string? s) => s is not null && All.Contains(s);
 }
 
