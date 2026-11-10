@@ -14,7 +14,11 @@
 	@staff path /v1/staff /v1/staff/*
 	respond @staff 404
 
-	reverse_proxy api:8080
+	reverse_proxy api:8080 {
+		# While a deploy swaps the container, wait for it instead of answering 502.
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
 }
 
 {$PITWALL_CONSOLE_DOMAIN} {
@@ -26,12 +30,12 @@
 	respond @outside 403
 
 	# The console proxies /v1/** to the API by itself, so this site only needs the console.
-	reverse_proxy console:3200
+	reverse_proxy console:3200 {
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
 }
 
-# Vaultwarden (/opt/vaultwarden), reached over the pitwall_default network. DNS record is DNS only.
-# Keep this here: deploy/auto-update.sh runs git reset --hard on rollback, which drops local edits.
-vault.braatz.com.br {
-	encode zstd gzip
-	reverse_proxy vaultwarden:80
-}
+# Other sites this installation serves from the same server (another app on the compose network,
+# for example) live in deploy/caddy.d/*.caddy: outside Git, so a deploy's reset never drops them.
+import /etc/caddy/sites/*.caddy
