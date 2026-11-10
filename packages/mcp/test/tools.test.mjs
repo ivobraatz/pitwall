@@ -38,11 +38,13 @@ async function connect({ url = URL_, token = TOKEN, respond = () => json(200, {}
 
 const text = (result) => result.content.map((c) => c.text).join('\n');
 
-test('lists the eight tools with schemas', async () => {
+test('lists the board and the atlas tools with schemas', async () => {
   const { client } = await connect();
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map((t) => t.name).sort(), [
-    'board_summary', 'comment_task', 'create_task', 'get_task', 'list_products', 'list_tasks', 'move_task', 'update_task',
+    'atlas_overview', 'board_summary', 'comment_task', 'create_task', 'finish_activity', 'finish_routine_run', 'get_task',
+    'link_services', 'list_products', 'list_routines', 'list_tasks', 'move_task', 'register_repo', 'register_routine',
+    'register_service', 'register_system', 'start_activity', 'start_routine_run', 'update_task',
   ]);
   for (const t of tools) {
     assert.ok(t.description && t.description.length > 20, `${t.name} has a description`);
@@ -156,4 +158,60 @@ test('a page that is not Pitwall is reported as a wrong url', async () => {
   const res = await client.callTool({ name: 'list_products', arguments: {} });
   assert.equal(res.isError, true);
   assert.match(text(res), /não é do Pitwall/);
+});
+
+test('start_activity posts and tells how to finish; finish posts the result', async () => {
+  const { client, calls } = await connect({ respond: (call) => (call.url.endsWith('/finish') ? json(200, { id: 'a1', status: 'ok' }) : json(201, { id: 'a1', status: 'running' })) });
+  const started = await client.callTool({ name: 'start_activity', arguments: { system: 'acme', component: 'api', description: 'Corrigindo o frete' } });
+  assert.equal(started.isError, undefined);
+  assert.equal(calls[0].url, `${URL_}/v1/staff/atlas/activities`);
+  assert.deepEqual(calls[0].body, { system: 'acme', component: 'api', description: 'Corrigindo o frete' });
+  assert.match(text(started), /finish_activity\(id="a1"\)/);
+
+  await client.callTool({ name: 'finish_activity', arguments: { id: 'a1', result: 'PR aberto' } });
+  assert.equal(calls[1].url, `${URL_}/v1/staff/atlas/activities/a1/finish`);
+  assert.equal(calls[1].body.result, 'PR aberto');
+});
+
+test('routine run reports what it produced', async () => {
+  const { client, calls } = await connect({ respond: () => json(200, { id: 'r1' }) });
+  await client.callTool({ name: 'start_routine_run', arguments: { routine: 'triagem' } });
+  assert.equal(calls[0].url, `${URL_}/v1/staff/atlas/routines/triagem/runs`);
+  await client.callTool({
+    name: 'finish_routine_run',
+    arguments: { id: 'r1', status: 'ok', result: '1 PR', links: [{ kind: 'pr', label: 'Corrige o frete', url: 'https://git.example.com/acme/acme/pull/7' }] },
+  });
+  assert.equal(calls[1].url, `${URL_}/v1/staff/atlas/runs/r1/finish`);
+  assert.equal(calls[1].body.links[0].kind, 'pr');
+});
+
+test('an empty atlas says so, and a token without the scope gets the api message', async () => {
+  const empty = { systems: [], now: [], discoveries: [], collectors: [] };
+  const { client } = await connect({ respond: () => json(200, empty) });
+  assert.match(text(await client.callTool({ name: 'atlas_overview', arguments: {} })), /Atlas está vazio/);
+
+  const message = 'O token não tem o escopo atlas. Gere outro em Configurações → Tokens pessoais.';
+  const denied = await connect({ respond: () => json(403, { message }) });
+  const res = await denied.client.callTool({ name: 'register_system', arguments: { slug: 'acme', name: 'Acme' } });
+  assert.equal(res.isError, true);
+  assert.equal(text(res), message);
+});
+
+test('atlas_overview summarises health, now and what was found', async () => {
+  const overview = {
+    systems: [
+      { slug: 'acme', name: 'Acme', health: { total: 3, up: 2, down: 1, degraded: 0, deploying: 0, unknown: 0 }, pending: { tasks: 2, tickets: 1, errors: 4, alerts: null } },
+      { slug: 'globex', name: 'Globex', health: { total: 0, up: 0, down: 0, degraded: 0, deploying: 0, unknown: 0 }, pending: { tasks: 0, tickets: 0, errors: 0, alerts: 0 } },
+    ],
+    now: [{ kind: 'activity', title: 'Corrigindo o frete', detail: 'api', actor: 'Ana (Claude)' }],
+    discoveries: [{ source: 'railway', kind: 'service', name: 'acme/worker', environment: 'production' }],
+    collectors: [{ name: 'railway', connected: true, error: null }, { name: 'vercel', connected: false, error: null }],
+  };
+  const { client } = await connect({ respond: () => json(200, overview) });
+  const out = text(await client.callTool({ name: 'atlas_overview', arguments: {} }));
+  assert.match(out, /acme — 1 fora do ar · 2 tarefas · 1 chamados · 4 erros \(24h\) · \? alertas/);
+  assert.match(out, /globex — sem serviços/);
+  assert.match(out, /\[activity\] Corrigindo o frete \(Ana \(Claude\)\)/);
+  assert.match(out, /railway: acme\/worker @production/);
+  assert.match(out, /Coletores não conectados: vercel\./);
 });

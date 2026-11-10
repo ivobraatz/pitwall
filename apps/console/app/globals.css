@@ -170,6 +170,27 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ds-accent); wi
 .bar { transform-origin: bottom; animation: grow-y .7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); }
 .grow-x { transform-origin: left; animation: grow-x .8s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 60ms); }
 
+/* Atlas. A node something is happening to pulses; a cell that does not exist is hatched, so it
+   reads as "missing" and not as "empty". The map takes the board's tokens. */
+@keyframes atlas-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.atlas-pulse { animation: atlas-pulse 1.4s var(--ease) infinite; }
+.atlas-live { position: relative; }
+.atlas-live::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 2px var(--ds-running); animation: atlas-pulse 1.4s var(--ease) infinite; }
+.atlas-live-down::after { box-shadow: inset 0 0 0 2px var(--ds-danger); }
+.atlas-hatch { background-image: repeating-linear-gradient(135deg, var(--ds-border-subtle) 0 1px, transparent 1px 9px); box-shadow: inset 0 0 0 1px var(--ds-border-subtle); }
+.atlas-flow .react-flow {
+  --xy-background-color: var(--ds-bg-alt);
+  --xy-edge-stroke: var(--ds-border-loud);
+  --xy-controls-button-background-color: var(--ds-bg-chip);
+  --xy-controls-button-background-color-hover: var(--ds-bg-active);
+  --xy-controls-button-color: var(--ds-fg-primary);
+  --xy-controls-button-color-hover: var(--ds-fg-primary);
+  --xy-controls-button-border-color: var(--ds-bg-alt);
+  --xy-controls-box-shadow: none;
+}
+.atlas-flow .react-flow__node { cursor: pointer; }
+.atlas-flow .react-flow__controls-button { width: 36px; height: 36px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

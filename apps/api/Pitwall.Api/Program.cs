@@ -10,6 +10,7 @@ using Pitwall.Domain;
 using Pitwall.Endpoints;
 using Pitwall.Endpoints.Staff;
 using Pitwall.Services;
+using Pitwall.Services.Atlas;
 using Pitwall.Services.Mail;
 using Pitwall.Services.Releases;
 using Pitwall.Services.Storage;
@@ -61,9 +62,23 @@ builder.Services.AddSingleton<IReleaseNoteModel, AnthropicReleaseNoteModel>();
 builder.Services.AddScoped<ReleaseWriter>();
 builder.Services.AddScoped<ReleasePublisher>();
 builder.Services.AddSingleton<WebhookDispatcher>();
+
+// The Atlas. Each collector reads its provider with a read-only token from the environment;
+// one without a token is "not connected" and does nothing.
+builder.Services.AddScoped<AtlasWriter>();
+builder.Services.AddScoped<AtlasImporter>();
+builder.Services.AddHttpClient("atlas", c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddSingleton<AtlasCollectorStatus>();
+static HttpClient AtlasHttp(IServiceProvider sp) => sp.GetRequiredService<IHttpClientFactory>().CreateClient("atlas");
+builder.Services.AddSingleton<IAtlasCollector>(sp => new RailwayCollector(AtlasHttp(sp), config["Atlas:Railway:Token"], config["Atlas:Railway:WorkspaceId"]));
+builder.Services.AddSingleton<IAtlasCollector>(sp => new GitHubCollector(AtlasHttp(sp), config["Atlas:GitHub:Token"]));
+builder.Services.AddSingleton<IAtlasCollector>(sp => new KumaCollector(AtlasHttp(sp), config["Atlas:Kuma:Url"], config["Atlas:Kuma:ApiKey"]));
+builder.Services.AddSingleton<IAtlasCollector>(sp => new VercelCollector(AtlasHttp(sp), config["Atlas:Vercel:Token"], config["Atlas:Vercel:TeamId"]));
+builder.Services.AddSingleton<AtlasCollectorRunner>();
 if (!builder.Environment.IsEnvironment("Testing"))
 {
     builder.Services.AddHostedService(sp => sp.GetRequiredService<WebhookDispatcher>());
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<AtlasCollectorRunner>());
     builder.Services.AddHostedService<RetentionService>();
 }
 
@@ -85,7 +100,11 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy(Policies.Tasks, p => p.AddAuthenticationSchemes(StaffTokenAuthHandler.SessionOrToken)
         .RequireClaim(StaffSessionAuthHandler.StaffClaim)
         .RequireAssertion(ctx => !ctx.User.HasClaim(c => c.Type == StaffTokenAuthHandler.TokenClaim)
-                                 || ctx.User.HasClaim(ProductKeyAuthHandler.ScopeClaim, StaffTokenScopes.Tasks)));
+                                 || ctx.User.HasClaim(ProductKeyAuthHandler.ScopeClaim, StaffTokenScopes.Tasks)))
+    .AddPolicy(Policies.Atlas, p => p.AddAuthenticationSchemes(StaffTokenAuthHandler.SessionOrToken)
+        .RequireClaim(StaffSessionAuthHandler.StaffClaim)
+        .RequireAssertion(ctx => !ctx.User.HasClaim(c => c.Type == StaffTokenAuthHandler.TokenClaim)
+                                 || ctx.User.HasClaim(ProductKeyAuthHandler.ScopeClaim, StaffTokenScopes.Atlas)));
 
 builder.Services.AddRateLimiter(o =>
 {
@@ -167,6 +186,7 @@ app.MapStaffProductEndpoints();
 app.MapStaffReleaseEndpoints();
 app.MapStaffTokenEndpoints();
 app.MapStaffTaskEndpoints();
+app.MapStaffAtlasEndpoints();
 
 if (!app.Environment.IsEnvironment("Testing"))
 {
@@ -186,6 +206,22 @@ if (args.Length > 0 && args[0] == "import-datarunner")
     var result = await importer.RunAsync(args.Contains("--dry-run"), CancellationToken.None);
     Console.WriteLine($"tickets {result.Tickets}, messages {result.Messages}, attachments {result.Attachments} " +
                       $"(missing bytes {result.MissingBlobs}), server errors {result.ServerErrors}, skipped {result.Skipped}");
+    return;
+}
+
+// `dotnet Pitwall.Api.dll import-atlas <file.json> [--dry-run]`: loads an installation's own map
+// from a file outside the repository (format in docs/operacao/atlas.md).
+if (args.Length > 0 && args[0] == "import-atlas")
+{
+    if (args.Length < 2 || !File.Exists(args[1])) { Console.Error.WriteLine("Uso: import-atlas <arquivo.json> [--dry-run]"); Environment.ExitCode = 2; return; }
+    using var scope = app.Services.CreateScope();
+    var file = System.Text.Json.JsonSerializer.Deserialize<AtlasImporter.AtlasFile>(
+        await File.ReadAllTextAsync(args[1]), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+    if (file is null) { Console.Error.WriteLine("O arquivo está vazio."); Environment.ExitCode = 2; return; }
+    var result = await scope.ServiceProvider.GetRequiredService<AtlasImporter>().RunAsync(file, args.Contains("--dry-run"), CancellationToken.None);
+    foreach (var error in result.Errors) Console.Error.WriteLine(error);
+    Console.WriteLine($"systems {result.Systems}, services {result.Services}, links {result.Links}, repos {result.Repos}, routines {result.Routines}, errors {result.Errors.Count}");
+    if (result.Errors.Count > 0) Environment.ExitCode = 1;
     return;
 }
 

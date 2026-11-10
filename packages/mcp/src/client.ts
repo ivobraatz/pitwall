@@ -1,6 +1,6 @@
 /**
  * The one way this server talks to Pitwall: JSON over HTTPS to the installation's console, which
- * proxies `/v1/staff/tasks/*` to its API. The token goes in the Authorization header and nowhere
+ * proxies `/v1/staff/tasks/*` and `/v1/staff/atlas/*` to its API. The token goes in the Authorization header and nowhere
  * else — never into a log line, an error message or a tool result.
  */
 
@@ -83,8 +83,8 @@ function apiMessage(data: unknown): string | undefined {
 export function errorMessage(status: number, data: unknown): string {
   switch (status) {
     case 401: return 'Token inválido, expirado ou revogado. Gere outro em Configurações → Tokens pessoais.';
-    case 403: return 'O token não tem o escopo tasks.';
-    case 404: return 'Tarefa ou produto não encontrado. Use list_tasks ou list_products.';
+    case 403: return apiMessage(data) ?? 'O token não tem o escopo necessário (tasks ou atlas).';
+    case 404: return apiMessage(data) ?? 'Não encontrado. Use list_tasks ou list_products.';
     case 413: return apiMessage(data) ?? 'Conteúdo grande demais (limite de 256 KB).';
     case 429: return 'Limite de requisições. Espere um minuto.';
   }

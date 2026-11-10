@@ -22,6 +22,504 @@ namespace Pitwall.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Pitwall.Domain.AtlasActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("actor_name");
+
+                    b.Property<string>("Component")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("component");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("result");
+
+                    b.Property<Guid?>("ServiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_atlas_activities");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_atlas_activities_product_id");
+
+                    b.HasIndex("ServiceId")
+                        .HasDatabaseName("ix_atlas_activities_service_id");
+
+                    b.HasIndex("Status", "StartedAt")
+                        .HasDatabaseName("ix_atlas_activities_status_started_at");
+
+                    b.ToTable("atlas_activities", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasDiscovery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("DismissedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dismissed_at");
+
+                    b.Property<string>("Environment")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("environment");
+
+                    b.Property<string>("ExternalRef")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("external_ref");
+
+                    b.Property<DateTime>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTime>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("url");
+
+                    b.HasKey("Id")
+                        .HasName("pk_atlas_discoveries");
+
+                    b.HasIndex("Source", "Kind", "ExternalRef")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atlas_discoveries_source_kind_external_ref");
+
+                    b.ToTable("atlas_discoveries", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasEnvironment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("slug");
+
+                    b.HasKey("Id")
+                        .HasName("pk_atlas_environments");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atlas_environments_slug");
+
+                    b.ToTable("atlas_environments", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("FromServiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_service_id");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("label");
+
+                    b.Property<Guid>("ToServiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("to_service_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_atlas_links");
+
+                    b.HasIndex("ToServiceId")
+                        .HasDatabaseName("ix_atlas_links_to_service_id");
+
+                    b.HasIndex("FromServiceId", "ToServiceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atlas_links_from_service_id_to_service_id");
+
+                    b.ToTable("atlas_links", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasRepo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checked_at");
+
+                    b.Property<int?>("Commits7d")
+                        .HasColumnType("integer")
+                        .HasColumnName("commits7d");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("FailedRuns7d")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_runs7d");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("full_name");
+
+                    b.Property<DateTime?>("LastRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_run_at");
+
+                    b.Property<string>("LastRunName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("last_run_name");
+
+                    b.Property<string>("LastRunSha")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("last_run_sha");
+
+                    b.Property<string>("LastRunStatus")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("last_run_status");
+
+                    b.Property<string>("LastRunUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("last_run_url");
+
+                    b.Property<int?>("OpenAlerts")
+                        .HasColumnType("integer")
+                        .HasColumnName("open_alerts");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<int?>("Runs7d")
+                        .HasColumnType("integer")
+                        .HasColumnName("runs7d");
+
+                    b.HasKey("Id")
+                        .HasName("pk_atlas_repos");
+
+                    b.HasIndex("FullName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atlas_repos_full_name");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_atlas_repos_product_id");
+
+                    b.ToTable("atlas_repos", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasRoutine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Frequency")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("frequency");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
+                        .HasColumnName("prompt");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("slug");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_atlas_routines");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_atlas_routines_product_id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_atlas_routines_slug");
+
+                    b.ToTable("atlas_routines", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasRoutineRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("actor_name");
+
+                    b.Property<DateTime?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<Guid>("RoutineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("routine_id");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("summary");
+
+                    b.HasKey("Id")
+                        .HasName("pk_atlas_routine_runs");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_atlas_routine_runs_status");
+
+                    b.HasIndex("RoutineId", "StartedAt")
+                        .HasDatabaseName("ix_atlas_routine_runs_routine_id_started_at");
+
+                    b.ToTable("atlas_routine_runs", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasService", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CheckedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checked_at");
+
+                    b.Property<string>("CommitSha")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("commit_sha");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DeployStatus")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("deploy_status");
+
+                    b.Property<Guid?>("EnvironmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("environment_id");
+
+                    b.Property<string>("ExternalRef")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("external_ref");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTime?>("LastDeployAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_deploy_at");
+
+                    b.Property<string>("MonitorRef")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("monitor_ref");
+
+                    b.Property<string>("MonitorStatus")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("monitor_status");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Url")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("url");
+
+                    b.HasKey("Id")
+                        .HasName("pk_atlas_services");
+
+                    b.HasIndex("EnvironmentId")
+                        .HasDatabaseName("ix_atlas_services_environment_id");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_atlas_services_product_id");
+
+                    b.HasIndex("Provider", "ExternalRef")
+                        .HasDatabaseName("ix_atlas_services_provider_external_ref");
+
+                    b.ToTable("atlas_services", (string)null);
+                });
+
             modelBuilder.Entity("Pitwall.Domain.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1132,6 +1630,129 @@ namespace Pitwall.Data.Migrations
                     b.ToTable("webhook_deliveries", (string)null);
                 });
 
+            modelBuilder.Entity("Pitwall.Domain.AtlasActivity", b =>
+                {
+                    b.HasOne("Pitwall.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_atlas_activities_products_product_id");
+
+                    b.HasOne("Pitwall.Domain.AtlasService", "Service")
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_atlas_activities_atlas_services_service_id");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasLink", b =>
+                {
+                    b.HasOne("Pitwall.Domain.AtlasService", "From")
+                        .WithMany()
+                        .HasForeignKey("FromServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_atlas_links_atlas_services_from_service_id");
+
+                    b.HasOne("Pitwall.Domain.AtlasService", "To")
+                        .WithMany()
+                        .HasForeignKey("ToServiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_atlas_links_atlas_services_to_service_id");
+
+                    b.Navigation("From");
+
+                    b.Navigation("To");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasRepo", b =>
+                {
+                    b.HasOne("Pitwall.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_atlas_repos_products_product_id");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasRoutine", b =>
+                {
+                    b.HasOne("Pitwall.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_atlas_routines_products_product_id");
+
+                    b.Navigation("Product");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasRoutineRun", b =>
+                {
+                    b.HasOne("Pitwall.Domain.AtlasRoutine", "Routine")
+                        .WithMany("Runs")
+                        .HasForeignKey("RoutineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_atlas_routine_runs_atlas_routines_routine_id");
+
+                    b.OwnsMany("Pitwall.Domain.AtlasRunLink", "Links", b1 =>
+                        {
+                            b1.Property<Guid>("AtlasRoutineRunId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAdd();
+
+                            b1.Property<string>("Kind")
+                                .IsRequired();
+
+                            b1.Property<string>("Label")
+                                .IsRequired();
+
+                            b1.Property<string>("Url");
+
+                            b1.HasKey("AtlasRoutineRunId", "__synthesizedOrdinal");
+
+                            b1.ToTable("atlas_routine_runs");
+
+                            b1
+                                .ToJson("links")
+                                .HasColumnType("jsonb");
+
+                            b1.WithOwner()
+                                .HasForeignKey("AtlasRoutineRunId")
+                                .HasConstraintName("fk_atlas_routine_runs_atlas_routine_runs_atlas_routine_run_id");
+                        });
+
+                    b.Navigation("Links");
+
+                    b.Navigation("Routine");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasService", b =>
+                {
+                    b.HasOne("Pitwall.Domain.AtlasEnvironment", "Environment")
+                        .WithMany()
+                        .HasForeignKey("EnvironmentId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_atlas_services_atlas_environments_environment_id");
+
+                    b.HasOne("Pitwall.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_atlas_services_products_product_id");
+
+                    b.Navigation("Environment");
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Pitwall.Domain.Product", b =>
                 {
                     b.HasOne("Pitwall.Domain.StaffUser", "Owner")
@@ -1379,6 +2000,11 @@ namespace Pitwall.Data.Migrations
                         .HasConstraintName("fk_ticket_messages_tickets_ticket_id");
 
                     b.Navigation("Ticket");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.AtlasRoutine", b =>
+                {
+                    b.Navigation("Runs");
                 });
 
             modelBuilder.Entity("Pitwall.Domain.Product", b =>

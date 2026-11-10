@@ -1,13 +1,13 @@
 # pitwall-mcp
 
-Servidor MCP do quadro de tarefas da equipe no [Pitwall](https://github.com/ivobraatz/pitwall).
+Servidor MCP do [Pitwall](https://github.com/ivobraatz/pitwall): o quadro de tarefas da equipe e o Atlas.
 Numa sessão do Claude Code, o Claude registra as tarefas manuais que sobraram, como "configurar o
 webhook no painel" ou "testar o login no celular". Na sessão seguinte, ele lê o que a equipe
 moveu ou bloqueou, confere e comenta.
 
 O servidor fala com o **console** da sua instalação, a mesma URL que você abre no navegador,
-usando um token pessoal. O token só alcança `/v1/staff/tasks/*`: não lê chamados, produtos nem a
-equipe.
+usando um token pessoal. O token só alcança `/v1/staff/tasks/*` (escopo `tasks`) e `/v1/staff/atlas/*`
+(escopo `atlas`): não lê chamados nem a equipe.
 
 ## Instalar
 
@@ -32,7 +32,7 @@ equipe.
      -- node <caminho-do-repo>/packages/mcp/dist/index.js
    ```
 
-3. Teste: dentro do Claude Code, `/mcp` mostra `pitwall` conectado com 8 tools. Peça "mostre o
+3. Teste: dentro do Claude Code, `/mcp` mostra `pitwall` conectado. Peça "mostre o
    board_summary". Sem o Claude, use o inspetor:
 
    ```sh
@@ -67,6 +67,16 @@ log, em mensagem de erro nem em resultado de tool.
 | `comment_task` | Registra o que foi verificado, o resultado e o próximo passo. |
 | `board_summary` | Contagem por coluna, atrasadas, e as tarefas em `blocked` e `doing`. Para o começo da sessão. |
 
+Atlas (escopo `atlas`):
+
+| Tool | Para quê |
+|---|---|
+| `atlas_overview` | Saúde e pendências de cada sistema, o que roda agora e o que foi achado sem cadastro. |
+| `register_system`, `register_service`, `register_repo`, `link_services` | Cadastram ou atualizam o mapa. Repetir não duplica. |
+| `register_routine`, `list_routines` | Rotinas: o que roda sozinho, com a instrução do agente. |
+| `start_activity`, `finish_activity` | Avisam o que a sessão está fazendo, para a faixa "Agora". |
+| `start_routine_run`, `finish_routine_run` | Registram a execução de uma rotina e o que ela gerou. |
+
 Cada tool devolve primeiro um texto curto, como
 `T-7K2QM [blocked] Configurar callback (demo) — nota: …`, e depois o JSON completo num segundo bloco.
 
@@ -79,7 +89,7 @@ Cada tool devolve primeiro um texto curto, como
 | "Tarefa ou produto não encontrado." em tudo | `PITWALL_URL` aponta para o host público da API, que esconde as rotas da equipe. Use a URL do console. |
 | "A resposta de … não é do Pitwall." | A URL abre outro site, ou uma tela de login de um proxy na frente do console. |
 
-Guia completo: [`docs/operacao/tarefas-mcp.md`](https://github.com/ivobraatz/pitwall/blob/main/docs/operacao/tarefas-mcp.md).
+Guias: [`tarefas-mcp.md`](https://github.com/ivobraatz/pitwall/blob/main/docs/operacao/tarefas-mcp.md) e [`atlas.md`](https://github.com/ivobraatz/pitwall/blob/main/docs/operacao/atlas.md).
 
 ## Desenvolvimento
 

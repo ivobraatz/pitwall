@@ -86,6 +86,7 @@ public sealed class StaffTokenAuthHandler(
     protected override Task HandleForbiddenAsync(AuthenticationProperties properties)
     {
         Response.StatusCode = StatusCodes.Status403Forbidden;
-        return Response.WriteAsJsonAsync(new { message = "O token não tem o escopo tasks." });
+        var scope = Request.Path.StartsWithSegments("/v1/staff/atlas") ? "atlas" : "tasks";
+        return Response.WriteAsJsonAsync(new { message = $"O token não tem o escopo {scope}. Gere outro em Configurações → Tokens pessoais." });
     }
 }

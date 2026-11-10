@@ -25,9 +25,108 @@ public class PitwallDb(DbContextOptions<PitwallDb> options) : DbContext(options)
     public DbSet<TeamTaskComment> TeamTaskComments => Set<TeamTaskComment>();
     public DbSet<TeamTaskEvent> TeamTaskEvents => Set<TeamTaskEvent>();
     public DbSet<StaffToken> StaffTokens => Set<StaffToken>();
+    public DbSet<AtlasEnvironment> AtlasEnvironments => Set<AtlasEnvironment>();
+    public DbSet<AtlasService> AtlasServices => Set<AtlasService>();
+    public DbSet<AtlasLink> AtlasLinks => Set<AtlasLink>();
+    public DbSet<AtlasRepo> AtlasRepos => Set<AtlasRepo>();
+    public DbSet<AtlasRoutine> AtlasRoutines => Set<AtlasRoutine>();
+    public DbSet<AtlasRoutineRun> AtlasRoutineRuns => Set<AtlasRoutineRun>();
+    public DbSet<AtlasActivity> AtlasActivities => Set<AtlasActivity>();
+    public DbSet<AtlasDiscovery> AtlasDiscoveries => Set<AtlasDiscovery>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.Entity<AtlasEnvironment>(e =>
+        {
+            e.HasIndex(x => x.Slug).IsUnique();
+            e.Property(x => x.Slug).HasMaxLength(40);
+            e.Property(x => x.Name).HasMaxLength(80);
+        });
+
+        b.Entity<AtlasService>(e =>
+        {
+            e.HasIndex(x => x.ProductId);
+            e.HasIndex(x => new { x.Provider, x.ExternalRef });
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.Kind).HasMaxLength(16);
+            e.Property(x => x.Provider).HasMaxLength(40);
+            e.Property(x => x.ExternalRef).HasMaxLength(300);
+            e.Property(x => x.Url).HasMaxLength(500);
+            e.Property(x => x.MonitorRef).HasMaxLength(200);
+            e.Property(x => x.Notes).HasMaxLength(2000);
+            e.Property(x => x.MonitorStatus).HasMaxLength(16);
+            e.Property(x => x.DeployStatus).HasMaxLength(16);
+            e.Property(x => x.CommitSha).HasMaxLength(64);
+            e.Ignore(x => x.State);
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Environment).WithMany().HasForeignKey(x => x.EnvironmentId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<AtlasLink>(e =>
+        {
+            e.HasIndex(x => new { x.FromServiceId, x.ToServiceId }).IsUnique();
+            e.Property(x => x.Label).HasMaxLength(80);
+            e.HasOne(x => x.From).WithMany().HasForeignKey(x => x.FromServiceId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.To).WithMany().HasForeignKey(x => x.ToServiceId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<AtlasRepo>(e =>
+        {
+            e.HasIndex(x => x.FullName).IsUnique();
+            e.Property(x => x.FullName).HasMaxLength(200);
+            e.Property(x => x.LastRunName).HasMaxLength(200);
+            e.Property(x => x.LastRunStatus).HasMaxLength(16);
+            e.Property(x => x.LastRunUrl).HasMaxLength(500);
+            e.Property(x => x.LastRunSha).HasMaxLength(64);
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<AtlasRoutine>(e =>
+        {
+            e.HasIndex(x => x.Slug).IsUnique();
+            e.Property(x => x.Slug).HasMaxLength(60);
+            e.Property(x => x.Name).HasMaxLength(120);
+            e.Property(x => x.Frequency).HasMaxLength(16);
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.Prompt).HasMaxLength(20_000);
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<AtlasRoutineRun>(e =>
+        {
+            e.HasIndex(x => new { x.RoutineId, x.StartedAt });
+            e.HasIndex(x => x.Status);
+            e.Property(x => x.Status).HasMaxLength(16);
+            e.Property(x => x.Summary).HasMaxLength(4000);
+            e.Property(x => x.ActorName).HasMaxLength(120);
+            e.OwnsMany(x => x.Links, l => l.ToJson());
+            e.HasOne(x => x.Routine).WithMany(r => r.Runs).HasForeignKey(x => x.RoutineId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<AtlasActivity>(e =>
+        {
+            e.HasIndex(x => new { x.Status, x.StartedAt });
+            e.Property(x => x.Component).HasMaxLength(120);
+            e.Property(x => x.Description).HasMaxLength(500);
+            e.Property(x => x.Status).HasMaxLength(16);
+            e.Property(x => x.Result).HasMaxLength(2000);
+            e.Property(x => x.ActorName).HasMaxLength(120);
+            e.Property(x => x.Source).HasMaxLength(8);
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.Service).WithMany().HasForeignKey(x => x.ServiceId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<AtlasDiscovery>(e =>
+        {
+            e.HasIndex(x => new { x.Source, x.Kind, x.ExternalRef }).IsUnique();
+            e.Property(x => x.Source).HasMaxLength(20);
+            e.Property(x => x.Kind).HasMaxLength(16);
+            e.Property(x => x.ExternalRef).HasMaxLength(300);
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.Property(x => x.Environment).HasMaxLength(80);
+            e.Property(x => x.Url).HasMaxLength(500);
+        });
+
         b.Entity<Product>(e =>
         {
             e.HasIndex(p => p.Slug).IsUnique();

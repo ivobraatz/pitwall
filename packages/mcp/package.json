@@ -1,7 +1,7 @@
 {
   "name": "pitwall-mcp",
-  "version": "0.1.0",
-  "description": "MCP server for the Pitwall team task board: Claude Code reads, creates, moves and comments on the team's manual tasks.",
+  "version": "0.2.0",
+  "description": "MCP server for Pitwall: Claude Code works the team's task board and reports to the Atlas (systems, services, routines, activity).",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ivobraatz/pitwall.git",

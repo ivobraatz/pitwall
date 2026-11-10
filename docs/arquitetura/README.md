@@ -22,11 +22,11 @@ pessoa.
 
 | Peça | Responsabilidade |
 |---|---|
-| API (`apps/api`) | Superfície do cliente (`/v1/support`, só via ponte), ingestão (`/v1/ingest/errors`, `/v1/ingest/releases`), changelog público (`/v1/public/{slug}/releases`), superfície da equipe (`/v1/staff`). Serviços de fundo: despacho de webhooks e retenção. |
+| API (`apps/api`) | Superfície do cliente (`/v1/support`, só via ponte), ingestão (`/v1/ingest/errors`, `/v1/ingest/releases`), changelog público (`/v1/public/{slug}/releases`), superfície da equipe (`/v1/staff`). Serviços de fundo: despacho de webhooks, retenção e os coletores do Atlas (de hora em hora). |
 | Console (`apps/console`) | Next.js; faz proxy de `/v1` para a API, então a sessão é cookie de primeira parte. |
 | SDK navegador | Buffers de diagnóstico (log, requisições, erros, eventos), gravação rrweb (retroativa ~2 min + procedimento até 10 min), instrumentação de `fetch`, e os Web Components (`<pitwall-tickets>`, `<pitwall-ticket>`, `<pitwall-player>`, o diálogo, a barra de gravação, os avisos). Funciona em React, Vue ou HTML puro. |
 | SDK servidor / Pitwall.AspNetCore | Ponte, reporter de erros em lote, verificação de webhook. |
-| MCP (`packages/mcp`) | Servidor MCP `pitwall-mcp` (stdio) para o Claude Code: 8 tools sobre o quadro de tarefas da equipe (`/v1/staff/tasks`), autenticado por token pessoal `pwt_…`. Fala com o console, não com a API. |
+| MCP (`packages/mcp`) | Servidor MCP `pitwall-mcp` (stdio) para o Claude Code: tools sobre o quadro de tarefas (`/v1/staff/tasks`) e sobre o Atlas (`/v1/staff/atlas`), autenticado por token pessoal `pwt_…`. Fala com o console, não com a API. |
 
 Os pacotes são públicos: npm `pitwall-sdk` (o produto importa `@pitwall/sdk` por alias, sem token), npm `pitwall-mcp` e NuGet `Pitwall.AspNetCore`. Como integrar, em [integracao.md](../operacao/integracao.md).
 
@@ -58,6 +58,12 @@ autor "Nome (Claude)") → o cartão aparece no quadro do console em até 12 s (
 Claude comenta o que verificou. Tarefa nunca vira chamado, não dispara webhook e não aparece para
 produto nem cliente. Guia: [tarefas-mcp.md](../operacao/tarefas-mcp.md).
 
+**Atlas.** Os coletores leem Railway, GitHub, Uptime Kuma e Vercel com tokens só de leitura e gravam o que viram nos
+serviços e repositórios cadastrados; o que não está cadastrado vira descoberta. Sessões do Claude Code avisam o que estão
+fazendo (`start_activity` / `finish_activity`) e o executor de rotinas registra cada execução; o console lê tudo de
+`GET /v1/staff/atlas` a cada 5 s. Os fluxos são calculados do que já existe (repositórios, erros, chamados, tarefas,
+novidades), sem tabela própria. Guia: [atlas.md](../operacao/atlas.md).
+
 ## Modelo de dados
 
 ```
@@ -77,7 +83,16 @@ team_tasks      product_id?, code (T-XXXXX), title, body, status (todo|doing|blo
                 priority, labels[], due_date, assignee_id, source (claude|manual), created_by_ref/name,
                 blocked_note, checklist jsonb, links jsonb, done_at, archived_at, timestamps…
 team_task_comments / team_task_events (created|moved|updated|blocked|archived|unarchived|commented, data jsonb)
-staff_tokens    staff_user_id, name, prefix, hash, scopes[] (tasks), last_used_at, expires_at, revoked_at
+staff_tokens    staff_user_id, name, prefix, hash, scopes[] (tasks | atlas), last_used_at, expires_at, revoked_at
+atlas_environments  slug, name, position
+atlas_services  product_id?, environment_id?, name, kind, provider, external_ref, url, monitor_ref, notes,
+                monitor_status, deploy_status, last_deploy_at, commit_sha, checked_at (os cinco últimos vêm dos coletores)
+atlas_links     from_service_id, to_service_id, label
+atlas_repos     product_id?, full_name, last_run_*, commits7d, runs7d, failed_runs7d, open_alerts, checked_at
+atlas_routines  product_id?, slug, name, frequency (daily|weekly|monthly), description, prompt, enabled
+atlas_routine_runs  routine_id, status (running|ok|failed), started_at, finished_at, summary, links jsonb, actor_name
+atlas_activities    product_id?, service_id?, component, description, status, result, actor_name, source, started_at, finished_at
+atlas_discoveries   source, kind (service|repo|monitor), external_ref, name, environment, url, first/last_seen_at, dismissed_at
 ```
 
 ## Segurança e dados
@@ -96,8 +111,9 @@ staff_tokens    staff_user_id, name, prefix, hash, scopes[] (tasks), last_used_a
   rate limit no login. Recomendado: console atrás de Cloudflare Access ou Tailscale. Com
   `Pitwall:StaffHosts`, `/v1/staff` só responde pelo endereço privado que o console usa; o hostname
   público, o dos sistemas, devolve 404.
-- **Tokens pessoais.** `pwt_…`, só o hash é guardado e o texto aparece uma vez. O único escopo é `tasks`:
-  o token alcança `/v1/staff/tasks/*` e nada mais (as outras rotas da equipe só aceitam a sessão, e só a
+- **Tokens pessoais.** `pwt_…`, só o hash é guardado e o texto aparece uma vez. Os escopos são `tasks`
+  (`/v1/staff/tasks/*`) e `atlas` (`/v1/staff/atlas/*`, menos a importação de arquivo, que é só de admin no console):
+  o token alcança essas rotas e nada mais (as outras rotas da equipe só aceitam a sessão, e só a
   sessão cria ou revoga tokens). Revogar vale na hora; desativar a pessoa, em até 1 minuto. Escritas
   com token não precisam do cabeçalho CSRF, porque o navegador não anexa um Bearer sozinho.
 - **Gravações.** rrweb grava DOM, não pixels; com "ocultar dados" (padrão) textos de tabela,
@@ -105,6 +121,8 @@ staff_tokens    staff_user_id, name, prefix, hash, scopes[] (tasks), last_used_a
   pessoa anexar e revisar. Os anexos ficam num bucket privado, servidos só por endpoints autenticados.
 - **Minimização.** Mande ao Pitwall o mínimo: ids e nomes. E-mail é opcional. No RH Flex,
   marque com `data-pw-mask` tudo que for dado de funcionário (LGPD).
+- **Coletores.** Cada token de provedor é só de leitura, fica em variável de ambiente e viaja só no cabeçalho da
+  requisição; a mensagem de erro de um coletor traz o status HTTP, nunca o token.
 - **Retenção.** Erros do servidor: 30 dias (o chamado guarda a assinatura). Gravações: 90 dias após o
   chamado fechar. Registro de webhooks (entregues ou falhos, não os pendentes): 30 dias. Sessões expiradas:
   removidas de hora em hora.

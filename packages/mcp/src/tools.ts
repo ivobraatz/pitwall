@@ -14,7 +14,7 @@ const LABELS = z.array(z.string().max(32)).max(10).describe('Etiquetas em minús
 const TASKS = '/v1/staff/tasks';
 const path = (task: string, rest = '') => `${TASKS}/${encodeURIComponent(task.trim())}${rest}`;
 
-function query(params: Record<string, string | number | boolean | undefined>): string {
+export function query(params: Record<string, string | number | boolean | undefined>): string {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') q.set(k, String(v));
   const s = q.toString();
@@ -22,7 +22,7 @@ function query(params: Record<string, string | number | boolean | undefined>): s
 }
 
 /** The short text first; the JSON after it, for when the model needs a field the text left out. */
-function ok(text: string, data?: unknown): CallToolResult {
+export function ok(text: string, data?: unknown): CallToolResult {
   const content: CallToolResult['content'] = [{ type: 'text', text }];
   if (data !== undefined && data !== null) content.push({ type: 'text', text: JSON.stringify(data) });
   return { content };
@@ -33,7 +33,7 @@ function fail(message: string): CallToolResult {
 }
 
 /** Runs a tool body; any failure becomes a message the model can act on, never a stack trace or a secret. */
-function guarded<A>(client: PitwallClient, run: (args: A) => Promise<CallToolResult>) {
+export function guarded<A>(client: PitwallClient, run: (args: A) => Promise<CallToolResult>) {
   return async (args: A): Promise<CallToolResult> => {
     if (!client.configured) return fail(CONFIG_MESSAGE);
     try {

@@ -1,0 +1,163 @@
+import type { Words } from '@/lib/i18n';
+
+/** Every word of the Atlas screens, in the console's two languages. */
+const pt = {
+  title: 'Atlas',
+  subtitle: 'O que está no ar, o que está rodando agora e o que pede atenção.',
+  'view.overview': 'Geral', 'view.engine': 'Motor', 'view.map': 'Mapa', 'view.flows': 'Fluxos',
+  'view.routines': 'Rotinas', 'view.discovery': 'Descoberta',
+  'action.register': 'Cadastrar', 'action.system': 'Sistema', 'action.service': 'Serviço', 'action.repo': 'Repositório',
+  'action.link': 'Ligação', 'action.routine': 'Rotina', 'action.import': 'Importar arquivo', 'action.refresh': 'Coletar agora',
+  'action.save': 'Salvar', 'action.cancel': 'Cancelar', 'action.remove': 'Remover', 'action.back': 'Todos os sistemas',
+  'action.dismiss': 'Ignorar', 'action.history': 'Histórico', 'action.edit': 'Editar', 'action.close': 'Fechar',
+  'lang.label': 'Idioma',
+
+  'empty.title': 'O Atlas está vazio.',
+  'empty.body': 'Cadastre o primeiro sistema para ver aqui o que está no ar, o que roda sozinho e o que está sendo feito agora. Quem já tem um mapa pronto pode importar um arquivo.',
+  'empty.first': 'Cadastrar o primeiro sistema',
+
+  'now.title': 'Agora',
+  'now.idle': 'Nada rodando agora.',
+  'now.activity': 'Sessão', 'now.routine': 'Rotina', 'now.deploy': 'Deploy', 'now.down': 'Fora do ar',
+
+  'col.system': 'Sistema', 'col.health': 'Saúde', 'col.pending': 'Pendências', 'col.now': 'Agora',
+  'health.none': 'Sem serviços', 'health.up': '{up} de {total} no ar', 'health.down': '{n} fora do ar',
+  'pending.tasks': 'tarefas', 'pending.tickets': 'chamados', 'pending.errors': 'erros 24h', 'pending.alerts': 'alertas',
+  'pending.unknown': 'Alertas de segurança: sem leitura',
+  'verdict.down': 'Fora do ar', 'verdict.attention': 'Pede atenção', 'verdict.ok': 'Em ordem', 'verdict.empty': 'Sem serviços',
+  'idle': 'Parado',
+
+  'state.up': 'No ar', 'state.down': 'Fora do ar', 'state.deploying': 'Em deploy', 'state.degraded': 'Com problema', 'state.unknown': 'Sem leitura',
+  'legend': 'Legenda',
+
+  'engine.none': 'Não existe',
+  'engine.noenv': 'Nenhum ambiente cadastrado. Ele é criado junto com o primeiro serviço.',
+  'engine.deploy': 'deploy', 'engine.never': 'sem deploy lido',
+  'engine.pipeline': 'Esteira', 'engine.pipelineHint': 'A última execução de cada repositório.',
+  'engine.external': 'Serviços externos', 'engine.usedBy': 'Usado por', 'engine.unused': 'Nenhuma ligação',
+  'engine.collectors': 'Coletores', 'collector.off': 'não conectado', 'collector.never': 'ainda não rodou', 'collector.ok': 'leu',
+  'collector.error': 'falhou',
+  'repo.none': 'Nenhum repositório cadastrado.', 'repo.norun': 'sem execução lida',
+  'repo.week': '{commits} commits · {runs} execuções em 7 dias', 'repo.failed': '{n} com falha', 'repo.alerts': '{n} alertas',
+  'run.success': 'Passou', 'run.failure': 'Falhou', 'run.running': 'Rodando', 'run.cancelled': 'Cancelada', 'run.other': 'Encerrada',
+
+  'map.hint': 'Aproxime para ver os serviços de cada sistema. De longe, um nó por sistema.',
+  'map.services': '{n} serviços',
+
+  'flows.code': 'Código', 'flows.errors': 'Erros', 'flows.content': 'Conteúdo',
+  'flows.window7': 'últimos 7 dias', 'flows.window30': 'últimos 30 dias',
+  'flows.gap': 'Lacuna', 'flows.gapHint': 'Sem dado ou sem processo',
+  'step.commit': 'Commit', 'step.ci': 'CI', 'step.deploy': 'Deploy', 'step.production': 'Produção',
+  'step.error': 'Erro', 'step.ticket': 'Chamado', 'step.task': 'Tarefa', 'step.fix': 'Correção',
+  'step.release': 'Novidade', 'step.draft': 'Rascunho', 'step.published': 'Aprovação', 'step.social': 'Rede social',
+  'detail.failed': '{n} com falha', 'detail.of': 'de {n}',
+
+  'routines.none': 'Nenhuma rotina cadastrada.',
+  'routines.noneHint': 'Uma rotina é algo que roda sozinho: o executor busca a lista aqui e entrega cada instrução a um agente.',
+  'freq.daily': 'Diárias', 'freq.weekly': 'Semanais', 'freq.monthly': 'Mensais',
+  'freq1.daily': 'Diária', 'freq1.weekly': 'Semanal', 'freq1.monthly': 'Mensal',
+  'routine.never': 'Nunca rodou', 'routine.off': 'Desligada', 'routine.all': 'Toda a operação',
+  'runstatus.ok': 'Concluída', 'runstatus.failed': 'Falhou', 'runstatus.running': 'Rodando', 'runstatus.stale': 'Não terminou',
+  'routine.produced': 'Gerou', 'routine.nothing': 'Nada gerado', 'routine.noruns': 'Sem execuções ainda.',
+
+  'discovery.none': 'Nada novo: tudo o que os coletores acharam está cadastrado.',
+  'discovery.title': 'Encontrado, não cadastrado',
+  'discovery.hint': 'O que os coletores viram nos provedores e ainda não está no mapa.',
+  'discovery.service': 'serviço', 'discovery.repo': 'repositório', 'discovery.monitor': 'monitor',
+
+  'field.slug': 'Identificador', 'field.slugHint': 'Minúsculas, números e hífen.', 'field.name': 'Nome', 'field.description': 'Descrição',
+  'field.site': 'Site', 'field.system': 'Sistema', 'field.shared': 'Externo, compartilhado', 'field.environment': 'Ambiente',
+  'field.kind': 'Tipo', 'field.provider': 'Onde roda', 'field.providerHint': 'railway, vercel, vm…',
+  'field.ref': 'Referência no provedor', 'field.refHint': 'Railway: projeto/serviço. Vercel: nome do projeto.',
+  'field.url': 'Endereço', 'field.monitor': 'Monitor', 'field.monitorHint': 'O nome do monitor no Uptime Kuma.',
+  'field.repo': 'Repositório', 'field.repoHint': 'dono/nome', 'field.from': 'Quem usa', 'field.to': 'O que é usado', 'field.label': 'Rótulo',
+  'field.frequency': 'Frequência', 'field.what': 'O que faz', 'field.prompt': 'Instrução para o agente', 'field.enabled': 'Ligada',
+  'field.file': 'Arquivo JSON',
+  'import.hint': 'Carrega sistemas, serviços, ligações, repositórios e rotinas de um arquivo. Rodar de novo atualiza, não duplica.',
+  'import.check': 'Conferir', 'import.apply': 'Importar', 'import.invalid': 'O arquivo não é um JSON válido.',
+  'import.summary': '{systems} sistemas, {services} serviços, {links} ligações, {repos} repositórios, {routines} rotinas.',
+  'saved': 'Salvo.', 'removed': 'Removido.', 'collected': 'Coleta concluída.', 'error': 'Algo deu errado.',
+  'confirm.remove': 'Remover?',
+};
+
+const en: typeof pt = {
+  title: 'Atlas',
+  subtitle: 'What is up, what is running right now and what needs attention.',
+  'view.overview': 'Overview', 'view.engine': 'Engine', 'view.map': 'Map', 'view.flows': 'Flows',
+  'view.routines': 'Routines', 'view.discovery': 'Discovery',
+  'action.register': 'Register', 'action.system': 'System', 'action.service': 'Service', 'action.repo': 'Repository',
+  'action.link': 'Link', 'action.routine': 'Routine', 'action.import': 'Import a file', 'action.refresh': 'Collect now',
+  'action.save': 'Save', 'action.cancel': 'Cancel', 'action.remove': 'Remove', 'action.back': 'All systems',
+  'action.dismiss': 'Dismiss', 'action.history': 'History', 'action.edit': 'Edit', 'action.close': 'Close',
+  'lang.label': 'Language',
+
+  'empty.title': 'The Atlas is empty.',
+  'empty.body': 'Register the first system to see here what is up, what runs by itself and what is being worked on right now. If you already have a map, import a file.',
+  'empty.first': 'Register the first system',
+
+  'now.title': 'Now',
+  'now.idle': 'Nothing running right now.',
+  'now.activity': 'Session', 'now.routine': 'Routine', 'now.deploy': 'Deploy', 'now.down': 'Down',
+
+  'col.system': 'System', 'col.health': 'Health', 'col.pending': 'Pending', 'col.now': 'Now',
+  'health.none': 'No services', 'health.up': '{up} of {total} up', 'health.down': '{n} down',
+  'pending.tasks': 'tasks', 'pending.tickets': 'tickets', 'pending.errors': 'errors 24h', 'pending.alerts': 'alerts',
+  'pending.unknown': 'Security alerts: not read',
+  'verdict.down': 'Down', 'verdict.attention': 'Needs attention', 'verdict.ok': 'All good', 'verdict.empty': 'No services',
+  'idle': 'Idle',
+
+  'state.up': 'Up', 'state.down': 'Down', 'state.deploying': 'Deploying', 'state.degraded': 'Degraded', 'state.unknown': 'Not read',
+  'legend': 'Legend',
+
+  'engine.none': 'Does not exist',
+  'engine.noenv': 'No environment yet. One is created with the first service.',
+  'engine.deploy': 'deploy', 'engine.never': 'no deploy read',
+  'engine.pipeline': 'Pipeline', 'engine.pipelineHint': 'The last run of each repository.',
+  'engine.external': 'Outside services', 'engine.usedBy': 'Used by', 'engine.unused': 'No links',
+  'engine.collectors': 'Collectors', 'collector.off': 'not connected', 'collector.never': 'has not run yet', 'collector.ok': 'read',
+  'collector.error': 'failed',
+  'repo.none': 'No repository registered.', 'repo.norun': 'no run read',
+  'repo.week': '{commits} commits · {runs} runs in 7 days', 'repo.failed': '{n} failed', 'repo.alerts': '{n} alerts',
+  'run.success': 'Passed', 'run.failure': 'Failed', 'run.running': 'Running', 'run.cancelled': 'Cancelled', 'run.other': 'Ended',
+
+  'map.hint': 'Zoom in to see each system\'s services. From afar, one node per system.',
+  'map.services': '{n} services',
+
+  'flows.code': 'Code', 'flows.errors': 'Errors', 'flows.content': 'Content',
+  'flows.window7': 'last 7 days', 'flows.window30': 'last 30 days',
+  'flows.gap': 'Gap', 'flows.gapHint': 'No data or no process',
+  'step.commit': 'Commit', 'step.ci': 'CI', 'step.deploy': 'Deploy', 'step.production': 'Production',
+  'step.error': 'Error', 'step.ticket': 'Ticket', 'step.task': 'Task', 'step.fix': 'Fix',
+  'step.release': 'Release', 'step.draft': 'Draft', 'step.published': 'Approval', 'step.social': 'Social network',
+  'detail.failed': '{n} failed', 'detail.of': 'of {n}',
+
+  'routines.none': 'No routine registered.',
+  'routines.noneHint': 'A routine is something that runs by itself: the runner fetches the list here and hands each instruction to an agent.',
+  'freq.daily': 'Daily', 'freq.weekly': 'Weekly', 'freq.monthly': 'Monthly',
+  'freq1.daily': 'Daily', 'freq1.weekly': 'Weekly', 'freq1.monthly': 'Monthly',
+  'routine.never': 'Never ran', 'routine.off': 'Off', 'routine.all': 'The whole operation',
+  'runstatus.ok': 'Done', 'runstatus.failed': 'Failed', 'runstatus.running': 'Running', 'runstatus.stale': 'Did not finish',
+  'routine.produced': 'Produced', 'routine.nothing': 'Nothing produced', 'routine.noruns': 'No runs yet.',
+
+  'discovery.none': 'Nothing new: everything the collectors found is registered.',
+  'discovery.title': 'Found, not registered',
+  'discovery.hint': 'What the collectors saw at the providers and is not on the map yet.',
+  'discovery.service': 'service', 'discovery.repo': 'repository', 'discovery.monitor': 'monitor',
+
+  'field.slug': 'Identifier', 'field.slugHint': 'Lower case, digits and hyphen.', 'field.name': 'Name', 'field.description': 'Description',
+  'field.site': 'Website', 'field.system': 'System', 'field.shared': 'Outside, shared', 'field.environment': 'Environment',
+  'field.kind': 'Kind', 'field.provider': 'Where it runs', 'field.providerHint': 'railway, vercel, vm…',
+  'field.ref': 'Reference at the provider', 'field.refHint': 'Railway: project/service. Vercel: project name.',
+  'field.url': 'Address', 'field.monitor': 'Monitor', 'field.monitorHint': 'The monitor\'s name in Uptime Kuma.',
+  'field.repo': 'Repository', 'field.repoHint': 'owner/name', 'field.from': 'Who uses', 'field.to': 'What is used', 'field.label': 'Label',
+  'field.frequency': 'Frequency', 'field.what': 'What it does', 'field.prompt': 'Instruction for the agent', 'field.enabled': 'On',
+  'field.file': 'JSON file',
+  'import.hint': 'Loads systems, services, links, repositories and routines from a file. Running it again updates, never duplicates.',
+  'import.check': 'Check', 'import.apply': 'Import', 'import.invalid': 'The file is not valid JSON.',
+  'import.summary': '{systems} systems, {services} services, {links} links, {repos} repositories, {routines} routines.',
+  'saved': 'Saved.', 'removed': 'Removed.', 'collected': 'Collection finished.', 'error': 'Something went wrong.',
+  'confirm.remove': 'Remove?',
+};
+
+export type AtlasWord = keyof typeof pt;
+export const WORDS: Words<AtlasWord> = { pt, en };

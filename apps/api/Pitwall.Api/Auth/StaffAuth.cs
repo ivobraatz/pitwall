@@ -128,6 +128,8 @@ public static class Policies
 {
     /// <summary>The team's task board: the console session, or a personal token with the tasks scope.</summary>
     public const string Tasks = "tasks";
+    /// <summary>The Atlas: the console session, or a personal token with the atlas scope.</summary>
+    public const string Atlas = "atlas";
     public const string Support = "support";
     public const string IngestErrors = "ingest:errors";
     public const string IngestReleases = "ingest:releases";

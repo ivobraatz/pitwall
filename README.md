@@ -21,6 +21,8 @@ num único console.
 - **Novidades escritas sozinhas.** O CI de cada sistema manda os commits; o Claude Haiku 5.5
   escreve a nota em pt e en; ela vai para o changelog público e para o sino do produto. Commits que
   citam um código de chamado (`fix: … (20261016-7K3Q)`) resolvem o chamado e avisam o cliente.
+- **Atlas.** A operação viva: o que está no ar, o que roda agora, a esteira de cada repositório, as rotinas que rodam
+  sozinhas e o que apareceu nos provedores sem cadastro. Começa vazio; cada instalação cadastra o seu.
 - **Um console para a equipe.** Fila única de todos os sistemas, dossiê com gravação + stack trace,
   erros agrupados, revisão das novidades, cadastro de sistemas, chaves e webhooks.
 
@@ -96,6 +98,8 @@ resposta chegar no demo e o webhook em **Webhooks**.
 ```bash
 dotnet test Pitwall.slnx                       # unitários + integração (Postgres via Testcontainers)
 corepack pnpm --filter @pitwall/sdk test       # ponte, assinatura de webhook
+corepack pnpm --filter pitwall-mcp test        # tools do MCP
+corepack pnpm --filter @pitwall/console test:e2e   # telas no navegador, desktop e celular
 ```
 
 ## Deploy
@@ -111,6 +115,7 @@ funciona em cada um.
 
 - [docs/arquitetura/README.md](docs/arquitetura/README.md): segurança, dados e como as partes conversam.
 - [docs/operacao/integracao.md](docs/operacao/integracao.md): ligar um sistema ao Pitwall.
+- [docs/operacao/atlas.md](docs/operacao/atlas.md): o Atlas, os coletores e as rotinas.
 - [CONTRIBUTING.md](CONTRIBUTING.md): como contribuir.
 - [SECURITY.md](SECURITY.md): como reportar vulnerabilidades.
 

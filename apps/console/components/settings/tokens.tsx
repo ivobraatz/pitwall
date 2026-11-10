@@ -31,8 +31,8 @@ function mcpCommand(token: string): string {
 }
 
 /**
- * Personal tokens: what the Pitwall MCP uses to work the task board as you. Shown once; listed
- * by prefix; good for the board only (not tickets, products or the team).
+ * Personal tokens: what the Pitwall MCP uses to work the task board and report to the Atlas as
+ * you. Shown once; listed by prefix; good for those two only (not tickets or the team).
  */
 export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
   const toast = useToast();
@@ -46,7 +46,7 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
   const create = async () => {
     setBusy(true);
     try {
-      const res = await api<Created>('/staff/me/tokens', { method: 'POST', json: { name, expiresInDays: days === 'never' ? null : Number(days) } });
+      const res = await api<Created>('/staff/me/tokens', { method: 'POST', json: { name, expiresInDays: days === 'never' ? null : Number(days), scopes: ['tasks', 'atlas'] } });
       setCreated(res); setName('');
       void tokens.refetch();
     } catch (e) { toast('error', e instanceof Error ? e.message : 'Erro.'); } finally { setBusy(false); }
@@ -62,7 +62,8 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
       <div className="flex flex-col gap-4 px-5 pt-2 pb-6 text-[14px]">
         <p className="max-w-xl leading-[1.5] text-fg-secondary">
           Para o Claude Code ler e atualizar o quadro de <strong className="font-semibold text-fg">Tarefas</strong> em seu nome, pelo MCP do Pitwall.
-          O token só alcança as tarefas: não lê chamados, sistemas nem a equipe.
+          Ele também registra sistemas, rotinas e atividade no <strong className="font-semibold text-fg">Atlas</strong>.
+          O token só alcança as tarefas e o Atlas: não lê chamados nem a equipe.
         </p>
 
         {created ? (
@@ -73,7 +74,7 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
             <pre className="overflow-x-auto bg-well p-3 leading-[1.6] text-fg">{mcpCommand(created.token)}</pre>
             <div className="flex flex-wrap items-center gap-2">
               <CopyButton text={mcpCommand(created.token)} label="Copiar comando" />
-              <span className="text-[13px] text-fg-muted">Depois, no Claude Code, <code>/mcp</code> mostra o pitwall com 8 tools.</span>
+              <span className="text-[13px] text-fg-muted">Depois, no Claude Code, <code>/mcp</code> mostra o pitwall conectado.</span>
               <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setCreated(null)}>Pronto</Button>
             </div>
           </div>

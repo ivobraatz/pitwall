@@ -1,0 +1,15 @@
+# gitleaks runs in CI over the whole history (see .github/workflows/ci.yml): a secret or a token fails the build.
+[extend]
+useDefault = true
+
+# Values that look like secrets and are not: fixed keys of the CI stack and of the tests, never used anywhere real.
+[allowlist]
+description = "throwaway values of the CI stack, the dev settings and the tests"
+paths = [
+  '''^\.github/workflows/ci\.yml$''',
+  '''^apps/api/Pitwall\.Api/appsettings\.Development\.json$''',
+  '''^apps/api/Pitwall\.Tests/''',
+  '''^packages/mcp/test/''',
+  '''^packages/sdk/test/''',
+  '''^apps/console/e2e/''',
+]

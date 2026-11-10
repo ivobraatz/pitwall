@@ -3,3 +3,7 @@ node_modules
 next-env.d.ts
 *.tsbuildinfo
 .taste-skill
+
+# playwright
+/test-results
+/playwright-report

@@ -71,6 +71,14 @@ services:
       Pitwall__Bootstrap__Email: ${PITWALL_ADMIN_EMAIL:-}
       Pitwall__Bootstrap__Password: ${PITWALL_ADMIN_PASSWORD:-}
       Anthropic__ApiKey: ${ANTHROPIC_API_KEY:-}
+      # Atlas collectors: read-only tokens. One left empty shows as "not connected" (docs/operacao/atlas.md).
+      Atlas__Railway__Token: ${ATLAS_RAILWAY_TOKEN:-}
+      Atlas__Railway__WorkspaceId: ${ATLAS_RAILWAY_WORKSPACE_ID:-}
+      Atlas__GitHub__Token: ${ATLAS_GITHUB_TOKEN:-}
+      Atlas__Kuma__Url: ${ATLAS_KUMA_URL:-}
+      Atlas__Kuma__ApiKey: ${ATLAS_KUMA_API_KEY:-}
+      Atlas__Vercel__Token: ${ATLAS_VERCEL_TOKEN:-}
+      Atlas__Vercel__TeamId: ${ATLAS_VERCEL_TEAM_ID:-}
       # By default, the SeaweedFS above. To use another bucket, set the STORAGE_* in .env and
       # STORAGE_CREATE_BUCKET=false.
       Storage__Provider: ${STORAGE_PROVIDER:-s3}

@@ -28,7 +28,9 @@ public static class StaffTokenScopes
 {
     /// <summary>The team's task board: <c>/v1/staff/tasks/*</c>.</summary>
     public const string Tasks = "tasks";
+    /// <summary>The Atlas: <c>/v1/staff/atlas/*</c> (register systems and services, report activity and routine runs).</summary>
+    public const string Atlas = "atlas";
 
-    public static readonly string[] All = [Tasks];
+    public static readonly string[] All = [Tasks, Atlas];
     public static bool IsValid(string? s) => s is not null && All.Contains(s);
 }
