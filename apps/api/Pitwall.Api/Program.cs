@@ -104,7 +104,11 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy(Policies.Atlas, p => p.AddAuthenticationSchemes(StaffTokenAuthHandler.SessionOrToken)
         .RequireClaim(StaffSessionAuthHandler.StaffClaim)
         .RequireAssertion(ctx => !ctx.User.HasClaim(c => c.Type == StaffTokenAuthHandler.TokenClaim)
-                                 || ctx.User.HasClaim(ProductKeyAuthHandler.ScopeClaim, StaffTokenScopes.Atlas)));
+                                 || ctx.User.HasClaim(ProductKeyAuthHandler.ScopeClaim, StaffTokenScopes.Atlas)))
+    .AddPolicy(Policies.Errors, p => p.AddAuthenticationSchemes(StaffTokenAuthHandler.SessionOrToken)
+        .RequireClaim(StaffSessionAuthHandler.StaffClaim)
+        .RequireAssertion(ctx => !ctx.User.HasClaim(c => c.Type == StaffTokenAuthHandler.TokenClaim)
+                                 || ctx.User.HasClaim(ProductKeyAuthHandler.ScopeClaim, StaffTokenScopes.Errors)));
 
 builder.Services.AddRateLimiter(o =>
 {

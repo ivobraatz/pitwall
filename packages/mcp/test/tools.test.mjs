@@ -43,7 +43,7 @@ test('lists the board and the atlas tools with schemas', async () => {
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map((t) => t.name).sort(), [
     'atlas_attention', 'atlas_overview', 'atlas_processes', 'board_summary', 'comment_task', 'create_task', 'finish_activity',
-    'finish_routine_run', 'get_task', 'link_services', 'list_products', 'list_routines', 'list_tasks', 'move_task',
+    'finish_routine_run', 'get_task', 'link_services', 'list_errors', 'list_products', 'list_routines', 'list_tasks', 'move_task',
     'register_process', 'register_repo', 'register_routine', 'register_service', 'register_system', 'start_activity',
     'start_routine_run', 'update_process_step', 'update_task',
   ]);
@@ -273,4 +273,45 @@ test('atlas_attention lists gaps with impact and what to do next', async () => {
   assert.match(out, /\[warn\] Nota fiscal — Venda\n {4}Ligar a emissão\./);
   const { client: empty } = await connect({ respond: () => json(200, []) });
   assert.match(text(await empty.callTool({ name: 'atlas_attention', arguments: {} })), /Nada declarado/);
+});
+
+test('list_errors sends the period, product and limit and summarises each group', async () => {
+  const report = {
+    since: '2026-11-09T10:00:00Z',
+    items: [
+      {
+        product: { slug: 'acme', name: 'Acme' }, signature: 'abc123', route: '/api/orders/{id}', method: 'POST', exceptionType: 'NullReferenceException',
+        message: 'Object reference not set', statusCode: 500, count: 12, customers: 3, firstSeen: '2026-11-09T11:00:00Z', lastSeen: '2026-11-10T08:00:00Z',
+        traceId: 'trace-1', tickets: { total: 1, open: 1 }, tasks: { total: 1, open: 1, codes: ['T-7K2QM'] }, tracked: true,
+      },
+      {
+        product: { slug: 'globex', name: 'Globex' }, signature: 'def456', route: null, method: 'GET', exceptionType: 'TimeoutException',
+        message: 'Timed out', statusCode: 500, count: 1, customers: 1, firstSeen: '2026-11-10T07:00:00Z', lastSeen: '2026-11-10T07:00:00Z',
+        traceId: 'trace-2', tickets: { total: 0, open: 0 }, tasks: { total: 0, open: 0, codes: [] }, tracked: false,
+      },
+    ],
+  };
+  const { client, calls } = await connect({ respond: () => json(200, report) });
+  const res = await client.callTool({ name: 'list_errors', arguments: { since: '48', product: 'acme', limit: 10 } });
+  assert.equal(calls[0].method, 'GET');
+  assert.equal(calls[0].url, `${URL_}/v1/staff/errors/recent?since=48&product=acme&limit=10`);
+  const out = text(res);
+  assert.match(out, /acme POST \/api\/orders\/\{id\} — NullReferenceException: Object reference not set/);
+  assert.match(out, /12x \(3 cliente\(s\)\).* trace trace-1 · assinatura abc123/);
+  assert.match(out, /já registrado: 1 chamado\(s\) \+ tarefa T-7K2QM/);
+  assert.match(out, /sem chamado nem tarefa/);
+
+  await client.callTool({ name: 'list_errors', arguments: {} });
+  assert.equal(calls[1].url, `${URL_}/v1/staff/errors/recent`);
+});
+
+test('list_errors says so when there is nothing, and relays a missing scope', async () => {
+  const empty = await connect({ respond: () => json(200, { since: '2026-11-09T10:00:00Z', items: [] }) });
+  assert.match(text(await empty.client.callTool({ name: 'list_errors', arguments: {} })), /Nenhum erro no período/);
+
+  const message = 'O token não tem o escopo errors. Gere outro em Configurações → Tokens pessoais.';
+  const denied = await connect({ respond: () => json(403, { message }) });
+  const res = await denied.client.callTool({ name: 'list_errors', arguments: {} });
+  assert.equal(res.isError, true);
+  assert.equal(text(res), message);
 });

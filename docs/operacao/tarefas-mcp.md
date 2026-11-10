@@ -15,7 +15,7 @@ um token pessoal de quem está na sessão.
    já preenchido com o endereço do console. Copie.
 
 Qualquer pessoa da equipe (atendente ou admin) cria os próprios tokens, até 10 ativos. O token vale só para `/v1/staff/tasks/*`: não lê chamados,
-nem a equipe, e não cria outros tokens. Com o escopo `atlas` (o console já inclui), alcança também `/v1/staff/atlas/*`: veja [atlas.md](atlas.md).
+nem a equipe, e não cria outros tokens. Com o escopo `atlas` (o console já inclui), alcança também `/v1/staff/atlas/*`: veja [atlas.md](atlas.md). Com o escopo `errors` (opcional, marcado ao criar o token), lê os erros do servidor agrupados em `/v1/staff/errors/recent` (tool `list_errors`) e nada além disso.
 
 ## 2. Conectar o Claude Code
 
@@ -118,7 +118,7 @@ O MCP não envia cabeçalhos de *service token* do Access (`CF-Access-Client-Id`
    - *Subdomain* `pitwall`, *Domain* `<seu-dominio>`, *Path* `v1/staff/tasks/*`.
 4. Em **Policies** → **Add a policy**: *Policy name* `MCP com token`; *Action* **Bypass**;
    *Include* → *Selector* **Everyone**.
-   Para as tools do Atlas, acrescente do mesmo jeito os caminhos `v1/staff/atlas` e `v1/staff/atlas/*`.
+   Para as tools do Atlas, acrescente do mesmo jeito os caminhos `v1/staff/atlas` e `v1/staff/atlas/*`; para `list_errors`, `v1/staff/errors/recent`.
 5. Salve (**Save application**). Não mexa na aplicação `Pitwall console`.
 
 Confira num terminal (sem cookie, sem token):

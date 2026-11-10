@@ -6,10 +6,11 @@ import { guarded, ok, query } from './tools.js';
 /*
  * The Atlas: what the team runs and what is happening to it. These tools register systems,
  * services and routines, and report work in progress, so the console shows it while it happens.
- * They need a personal token with the `atlas` scope.
+ * They need a personal token with the `atlas` scope (`list_errors`: the `errors` scope).
  */
 
 const ATLAS = '/v1/staff/atlas';
+const ERRORS = '/v1/staff/errors';
 const SYSTEM = z.string().min(1).describe('Slug do sistema (veja list_products).');
 const RESULT = z.enum(['ok', 'failed']);
 const SERVICE_KINDS = ['site', 'web', 'app', 'api', 'worker', 'database', 'storage', 'domain', 'email', 'monitor', 'backup', 'package', 'integration', 'analytics', 'external', 'other'] as const;
@@ -105,6 +106,25 @@ function overviewText(o: Overview): string {
   return lines.join('\n');
 }
 
+interface ErrorGroup {
+  product: { slug: string; name: string } | null; signature: string; route: string | null; method: string; exceptionType: string;
+  message: string; statusCode: number; count: number; customers: number; firstSeen: string; lastSeen: string; traceId: string;
+  tickets: { total: number; open: number }; tasks: { total: number; open: number; codes: string[] }; tracked: boolean;
+}
+
+function errorsText(r: { items: ErrorGroup[] }): string {
+  if (r.items.length === 0) return 'Nenhum erro no período.';
+  return r.items.map((e) => {
+    const refs = [
+      e.tickets.total > 0 ? `${e.tickets.total} chamado(s)` : null,
+      e.tasks.total > 0 ? `tarefa ${e.tasks.codes.join(', ')}` : null,
+    ].filter(Boolean).join(' + ');
+    return `${e.product?.slug ?? '?'} ${e.method} ${e.route ?? '?'} — ${e.exceptionType}: ${e.message}\n` +
+      `  ${e.count}x (${e.customers} cliente(s)), de ${e.firstSeen} a ${e.lastSeen} · trace ${e.traceId} · assinatura ${e.signature}\n` +
+      `  ${e.tracked ? `já registrado: ${refs}` : 'sem chamado nem tarefa'}`;
+  }).join('\n');
+}
+
 export function registerAtlasTools(server: McpServer, client: PitwallClient): void {
   server.registerTool('atlas_overview', {
     title: 'Ver o Atlas',
@@ -113,6 +133,20 @@ export function registerAtlasTools(server: McpServer, client: PitwallClient): vo
   }, guarded(client, async () => {
     const o = await client.request<Overview>('GET', ATLAS);
     return ok(overviewText(o), o);
+  }));
+
+  server.registerTool('list_errors', {
+    title: 'Listar erros do servidor',
+    description: 'Erros do servidor agrupados por assinatura (mesmo bug, vários clientes): sistema, rota, exceção, mensagem, contagem, primeira e última ocorrência, um trace de exemplo e se já existe chamado ou tarefa. Os mais frequentes primeiro. Pede o escopo errors.',
+    inputSchema: {
+      since: z.string().max(40).optional().describe('Horas atrás (ex.: 24, o padrão; até 720) ou uma data ISO.'),
+      product: z.string().optional().describe('Slug do sistema (veja list_products).'),
+      limit: z.number().int().min(1).max(200).optional().describe('Máximo de grupos (padrão 50).'),
+    },
+    annotations: { readOnlyHint: true },
+  }, guarded(client, async (a: { since?: string; product?: string; limit?: number }) => {
+    const r = await client.request<{ since: string; items: ErrorGroup[] }>('GET', `${ERRORS}/recent${query({ since: a.since, product: a.product, limit: a.limit })}`);
+    return ok(errorsText(r), r);
   }));
 
   server.registerTool('register_system', {

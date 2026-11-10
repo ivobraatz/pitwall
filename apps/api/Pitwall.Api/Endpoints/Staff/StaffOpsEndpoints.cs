@@ -23,29 +23,10 @@ public static class StaffErrorEndpoints
         group.MapGet("/groups", async (PitwallDb db, CancellationToken ct, [FromQuery] Guid? productId = null, [FromQuery] int days = 7) =>
         {
             var since = DateTime.UtcNow.AddDays(-Math.Clamp(days, 1, 30));
-            var q = db.ServerErrors.AsNoTracking().Where(e => e.OccurredAt > since);
-            if (productId is not null) q = q.Where(e => e.ProductId == productId);
-            var groups = await q.GroupBy(e => new { e.ProductId, e.Signature })
-                .Select(g => new
-                {
-                    g.Key.ProductId, g.Key.Signature,
-                    count = g.Count(),
-                    customers = g.Select(e => e.CustomerRef).Distinct().Count(),
-                    firstSeen = g.Min(e => e.OccurredAt),
-                    lastSeen = g.Max(e => e.OccurredAt),
-                })
-                .OrderByDescending(g => g.lastSeen).Take(200).ToListAsync(ct);
+            var groups = await GroupsAsync(db, since, productId, 200, byCount: false, ct);
 
-            // The newest occurrence of each group names it; tickets with the signature say whether
-            // someone already reported it.
+            // Tickets with the signature say whether someone already reported it.
             var signatures = groups.Select(g => g.Signature).ToList();
-            var samples = await db.ServerErrors.AsNoTracking()
-                .Where(e => signatures.Contains(e.Signature) && e.OccurredAt > since)
-                .GroupBy(e => e.Signature)
-                .Select(g => g.OrderByDescending(e => e.OccurredAt)
-                    .Select(e => new { e.Signature, e.ExceptionType, e.Message, e.Method, Route = e.RouteTemplate ?? e.Path, e.Release, e.StatusCode })
-                    .First())
-                .ToDictionaryAsync(s => s.Signature, ct);
             var tickets = await db.Tickets.AsNoTracking()
                 .Where(t => t.ErrorSignature != null && signatures.Contains(t.ErrorSignature))
                 .GroupBy(t => t.ErrorSignature!)
@@ -56,8 +37,8 @@ public static class StaffErrorEndpoints
             return Results.Ok(groups.Select(g => new
             {
                 product = products.GetValueOrDefault(g.ProductId),
-                g.Signature, g.count, g.customers, g.firstSeen, g.lastSeen,
-                sample = samples.GetValueOrDefault(g.Signature),
+                g.Signature, count = g.Count, customers = g.Customers, firstSeen = g.FirstSeen, lastSeen = g.LastSeen,
+                sample = new { g.Sample.Signature, g.Sample.ExceptionType, g.Sample.Message, g.Sample.Method, g.Sample.Route, g.Sample.Release, g.Sample.StatusCode },
                 tickets = tickets.TryGetValue(g.Signature, out var t) ? new { total = t.Total, open = t.Open } : new { total = 0, open = 0 },
             }));
         });
@@ -82,7 +63,121 @@ public static class StaffErrorEndpoints
             return Results.Ok(new { items });
         });
 
+        // The same groups for a routine reading the last day or so through the MCP: a token with the
+        // errors scope reaches this route and no other error route.
+        app.MapGet("/v1/staff/errors/recent", async (PitwallDb db, CancellationToken ct,
+            [FromQuery] string? since = null, [FromQuery] string? product = null, [FromQuery] int limit = 50) =>
+        {
+            var now = DateTime.UtcNow;
+            if (!TryParseSince(since, now, out var from))
+                return Results.BadRequest(new { message = "since: use um número de horas (até 720) ou uma data ISO." });
+            Guid? productId = null;
+            if (!string.IsNullOrWhiteSpace(product))
+            {
+                var slug = product.Trim().ToLowerInvariant();
+                productId = await db.Products.AsNoTracking().Where(p => p.Slug == slug).Select(p => (Guid?)p.Id).FirstOrDefaultAsync(ct);
+                if (productId is null) return Results.NotFound(new { message = "Sistema não encontrado. Use list_products." });
+            }
+
+            var groups = await GroupsAsync(db, from, productId, Math.Clamp(limit, 1, 200), byCount: true, ct);
+            var signatures = groups.Select(g => g.Signature).ToList();
+            var traces = groups.Select(g => g.Sample.TraceId).ToList();
+
+            // A ticket references a group by its signature or by a trace id it carries.
+            var tickets = await db.Tickets.AsNoTracking()
+                .Where(t => (t.ErrorSignature != null && signatures.Contains(t.ErrorSignature)) || t.TraceIds.Any(x => traces.Contains(x)))
+                .Select(t => new { t.ErrorSignature, t.TraceIds, Open = TicketStatuses.Active.Contains(t.Status) })
+                .ToListAsync(ct);
+            // A task references it by writing the signature or the trace id in its title or body.
+            var tasks = await db.TeamTasks.AsNoTracking().Where(t => t.ArchivedAt == null)
+                .OrderByDescending(t => t.UpdatedAt).Take(2000)
+                .Select(t => new { t.Code, t.Status, Text = t.Title + "\n" + t.Body })
+                .ToListAsync(ct);
+            var products = await db.Products.AsNoTracking().ToDictionaryAsync(p => p.Id, p => new { p.Slug, p.Name }, ct);
+
+            return Results.Ok(new
+            {
+                since = from,
+                items = groups.Select(g =>
+                {
+                    var ts = tickets.Where(t => t.ErrorSignature == g.Signature || t.TraceIds.Contains(g.Sample.TraceId)).ToList();
+                    var ks = tasks.Where(t => t.Text.Contains(g.Signature, StringComparison.OrdinalIgnoreCase)
+                                              || t.Text.Contains(g.Sample.TraceId, StringComparison.OrdinalIgnoreCase)).ToList();
+                    return new
+                    {
+                        product = products.GetValueOrDefault(g.ProductId),
+                        signature = g.Signature,
+                        route = g.Sample.Route,
+                        method = g.Sample.Method,
+                        exceptionType = g.Sample.ExceptionType,
+                        message = g.Sample.Message,
+                        statusCode = g.Sample.StatusCode,
+                        count = g.Count,
+                        customers = g.Customers,
+                        firstSeen = g.FirstSeen,
+                        lastSeen = g.LastSeen,
+                        traceId = g.Sample.TraceId,
+                        tickets = new { total = ts.Count, open = ts.Count(t => t.Open) },
+                        tasks = new { total = ks.Count, open = ks.Count(t => t.Status != TeamTaskStatuses.Done), codes = ks.Take(5).Select(t => t.Code) },
+                        tracked = ts.Count > 0 || ks.Count > 0,
+                    };
+                }),
+            });
+        }).RequireAuthorization(Policies.Errors).WithTags("Staff");
+
         return app;
+    }
+
+    /// <summary><c>since</c> as a number of hours (24 when left out, at most 30 days) or an ISO date.</summary>
+    internal static bool TryParseSince(string? raw, DateTime now, out DateTime from)
+    {
+        from = now.AddHours(-24);
+        if (string.IsNullOrWhiteSpace(raw)) return true;
+        raw = raw.Trim();
+        if (double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var hours))
+        {
+            if (hours <= 0 || hours > 720) return false;
+            from = now.AddHours(-hours);
+            return true;
+        }
+        if (!DateTimeOffset.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var at)) return false;
+        from = at.UtcDateTime < now.AddDays(-30) ? now.AddDays(-30) : at.UtcDateTime;
+        return true;
+    }
+
+    internal sealed record GroupSample(string Signature, string TraceId, string ExceptionType, string Message, string Method, string? Route, string? Release, int StatusCode);
+    internal sealed record ErrorGroup(Guid ProductId, string Signature, int Count, int Customers, DateTime FirstSeen, DateTime LastSeen, GroupSample Sample);
+
+    /// <summary>
+    /// Server errors since <paramref name="since"/> grouped by product and signature. The newest
+    /// occurrence of each group is its sample: it names the group.
+    /// </summary>
+    internal static async Task<List<ErrorGroup>> GroupsAsync(PitwallDb db, DateTime since, Guid? productId, int take, bool byCount, CancellationToken ct)
+    {
+        var q = db.ServerErrors.AsNoTracking().Where(e => e.OccurredAt > since);
+        if (productId is not null) q = q.Where(e => e.ProductId == productId);
+        var grouped = q.GroupBy(e => new { e.ProductId, e.Signature })
+            .Select(g => new
+            {
+                g.Key.ProductId, g.Key.Signature,
+                Count = g.Count(),
+                Customers = g.Select(e => e.CustomerRef).Distinct().Count(),
+                FirstSeen = g.Min(e => e.OccurredAt),
+                LastSeen = g.Max(e => e.OccurredAt),
+            });
+        var groups = await (byCount ? grouped.OrderByDescending(g => g.Count).ThenByDescending(g => g.LastSeen) : grouped.OrderByDescending(g => g.LastSeen))
+            .Take(take).ToListAsync(ct);
+
+        var signatures = groups.Select(g => g.Signature).ToList();
+        var samples = await db.ServerErrors.AsNoTracking()
+            .Where(e => signatures.Contains(e.Signature) && e.OccurredAt > since)
+            .GroupBy(e => e.Signature)
+            .Select(g => g.OrderByDescending(e => e.OccurredAt)
+                .Select(e => new GroupSample(e.Signature, e.TraceId, e.ExceptionType, e.Message, e.Method, e.RouteTemplate ?? e.Path, e.Release, e.StatusCode))
+                .First())
+            .ToDictionaryAsync(s => s.Signature, ct);
+        return groups.Where(g => samples.ContainsKey(g.Signature))
+            .Select(g => new ErrorGroup(g.ProductId, g.Signature, g.Count, g.Customers, g.FirstSeen, g.LastSeen, samples[g.Signature])).ToList();
     }
 }
 
