@@ -1,6 +1,7 @@
 # Pitwall console. Build from the repository root:  docker build -f apps/console/Dockerfile .
 FROM node:26-alpine AS build
-RUN corepack enable
+# O Node 25+ não traz mais o corepack; ele lê a versão do pnpm do packageManager do package.json.
+RUN npm install -g corepack@0.36.0 && corepack enable
 WORKDIR /repo
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/sdk/package.json packages/sdk/
