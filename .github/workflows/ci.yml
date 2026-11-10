@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   # A secret or a token in the tree or in the history fails the build.
   secrets:

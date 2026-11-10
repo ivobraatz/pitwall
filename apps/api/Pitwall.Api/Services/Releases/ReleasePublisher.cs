@@ -34,7 +34,7 @@ public sealed partial class ReleasePublisher(PitwallDb db, ReleaseWriter writer,
     public async Task<IngestOutcome> IngestAsync(Product product, IngestReleaseRequest req, CancellationToken ct)
     {
         var version = req.Version?.Trim();
-        if (string.IsNullOrWhiteSpace(version) || version.Length > 60)
+        if (string.IsNullOrWhiteSpace(version) || version.Length > 60 || version.Any(char.IsControl))
             return new IngestOutcome("failed", Reason: "a version of up to 60 characters is required");
         var commits = (req.Commits ?? [])
             .Where(c => !string.IsNullOrWhiteSpace(c.Subject))
@@ -109,7 +109,7 @@ public sealed partial class ReleasePublisher(PitwallDb db, ReleaseWriter writer,
         }
 
         logger.LogInformation("Release {Product} {Version}: {Status}, {Tickets} ticket(s) resolved",
-            product.Slug, version, release.Status, resolved.Count);
+            product.Slug, Clean.ForLog(version), release.Status, resolved.Count);
         var status = !noteworthy ? "skipped" : product.Settings.AutoPublishReleases ? "published" : "draft";
         return new IngestOutcome(status, release.Id, draft, noteworthy ? null : "nothing a customer would notice", resolved);
     }
