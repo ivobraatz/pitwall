@@ -4,7 +4,7 @@ import * as React from 'react';
 import { byUrgency, verdict, type Atlas, type AtlasService, type AtlasSystem, type SystemFlows, type Verdict } from '@/lib/atlas';
 import { ProductMark, ProductStripe } from '@/components/product';
 import { Button, cn } from '@/components/ui';
-import { Legend, SectionTitle, StateGlyph, liveClass, shortSha, useAgo, useLive, useWords } from './parts';
+import { Legend, MarkGlyph, SectionTitle, StateGlyph, conditionMark, liveClass, shortSha, useAgo, useLive, useWords } from './parts';
 import type { AtlasWord } from './words';
 
 const VERDICT_BLOCK: Record<Verdict, string> = {
@@ -66,6 +66,12 @@ function SystemRow({ system: s, atlas, onOpen }: { system: AtlasSystem; atlas: A
             <Count n={s.pending.tickets} label={t('pending.tickets')} />
             <Count n={s.pending.errors} label={t('pending.errors')} loud />
             <span title={s.pending.alerts === null ? t('pending.unknown') : undefined}><Count n={s.pending.alerts} label={t('pending.alerts')} loud /></span>
+            {s.attention.gaps > 0 && (
+              <span data-testid="atlas-gaps" className="inline-flex items-center gap-1 font-semibold text-danger"><MarkGlyph mark="gap" size={13} />{t('attention.gaps', { n: s.attention.gaps })}</span>
+            )}
+            {s.attention.warnings > 0 && (
+              <span data-testid="atlas-warnings" className="inline-flex items-center gap-1 font-semibold text-warning"><MarkGlyph mark="warn" size={13} />{t('attention.warnings', { n: s.attention.warnings })}</span>
+            )}
           </span>
           <span className="flex min-w-0 items-center gap-2 text-[13px]">
             {now.length === 0 ? <span className="text-fg-subtle">{t('idle')}</span> : (
@@ -85,21 +91,25 @@ function SystemRow({ system: s, atlas, onOpen }: { system: AtlasSystem; atlas: A
 
 // ── Engine: systems down, environments across ──────────────────────────────────────────
 
-function ServiceLine({ service: s, live, onRemove }: { service: AtlasService; live: string | false; onRemove?: (s: AtlasService) => void }) {
+function ServiceLine({ service: s, live, onRemove, onOpen }: { service: AtlasService; live: string | false; onRemove?: (s: AtlasService) => void; onOpen?: (s: AtlasService) => void }) {
   const t = useWords();
   const since = useAgo();
   return (
-    <li data-testid="atlas-service" data-state={s.state} className={cn('group/s flex items-start gap-2.5 bg-well px-3 py-2', live)}>
-      <StateGlyph state={s.state} className="mt-[3px]" />
+    <li data-testid="atlas-service" data-state={s.state} data-condition={s.condition}
+      className={cn('group/s flex items-start gap-2.5 bg-well px-3 py-2', s.condition === 'gap' && 'atlas-hatch-loud', s.condition === 'planned' && 'atlas-dashed', live)}>
+      {s.condition === 'gap' || s.condition === 'planned' ? <MarkGlyph mark={conditionMark(s.condition)} className="mt-[3px]" /> : <StateGlyph state={s.state} className="mt-[3px]" />}
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-baseline gap-x-2">
-          {s.url ? <a href={s.url} target="_blank" rel="noreferrer" className="font-semibold text-fg underline-offset-2 hover:underline">{s.name}</a>
-            : <span className="font-semibold text-fg">{s.name}</span>}
+          <button type="button" onClick={() => onOpen?.(s)} aria-label={`${t('service.details')}: ${s.name}`} className="text-left font-semibold text-fg underline-offset-2 hover:underline">{s.name}</button>
           {s.provider && <span className="text-[13px] text-fg-muted">{s.provider}</span>}
+          {s.condition === 'gap' && <span className="text-[13px] font-semibold text-danger">{t('cond.gap')}</span>}
+          {s.condition === 'warn' && <span className="inline-flex items-center gap-1 text-[13px] font-semibold text-warning"><MarkGlyph mark="warn" size={12} />{t('cond.warn')}</span>}
+          {s.condition === 'planned' && <span className="text-[13px] text-fg-muted">{t('cond.planned')}</span>}
+          {s.condition === 'local' && <span title={t('cond.localHint')} className="inline-flex items-center gap-1 text-[13px] text-fg-muted"><MarkGlyph mark="local" size={12} />{t('cond.local')}</span>}
         </span>
         <span className="block text-[13px] text-fg-muted">
           <span className="sr-only">{t(`state.${s.state}` as AtlasWord)} · </span>
-          {s.lastDeployAt ? <>{t('engine.deploy')} {since(s.lastDeployAt)}{shortSha(s.commitSha) && <> · <code>{shortSha(s.commitSha)}</code></>}</>
+          {s.condition === 'gap' ? t('cond.gap') : s.lastDeployAt ? <>{t('engine.deploy')} {since(s.lastDeployAt)}{shortSha(s.commitSha) && <> · <code>{shortSha(s.commitSha)}</code></>}</>
             : s.monitorStatus ? t(`state.${s.state}` as AtlasWord) : t('engine.never')}
         </span>
       </span>
@@ -111,7 +121,24 @@ function ServiceLine({ service: s, live, onRemove }: { service: AtlasService; li
   );
 }
 
-export function Engine({ atlas, systemId, onRemoveService }: { atlas: Atlas; systemId?: string; onRemoveService?: (s: AtlasService) => void }) {
+/** Services of one cell, under the block (group) each declares; the ungrouped come first, without a heading. */
+function GroupedServices({ services, render }: { services: AtlasService[]; render: (s: AtlasService) => React.ReactNode }) {
+  const groups = [...new Set(services.map((s) => s.group).filter((g): g is string => !!g))];
+  const plain = services.filter((s) => !s.group);
+  return (
+    <div className="flex flex-col gap-2">
+      {plain.length > 0 && <ul className="flex flex-col gap-1">{plain.map(render)}</ul>}
+      {groups.map((g) => (
+        <div key={g} data-testid="atlas-group" data-group={g}>
+          <h4 className="mb-1 px-1 text-[13px] font-semibold text-fg-muted">{g}</h4>
+          <ul className="flex flex-col gap-1">{services.filter((s) => s.group === g).map(render)}</ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function Engine({ atlas, systemId, onRemoveService, onService }: { atlas: Atlas; systemId?: string; onRemoveService?: (s: AtlasService) => void; onService?: (s: AtlasService) => void }) {
   const t = useWords();
   const since = useAgo();
   const live = useLive(atlas);
@@ -145,7 +172,7 @@ export function Engine({ atlas, systemId, onRemoveService }: { atlas: Atlas; sys
                     <div role="cell" key={e.id} data-testid="atlas-cell" data-empty={here.length === 0 || undefined}
                       className={cn('p-1.5', here.length === 0 ? 'atlas-hatch flex items-center justify-center text-[13px] text-fg-subtle' : 'bg-surface')}>
                       {here.length === 0 ? <span className="bg-bg px-2 py-0.5">{t('engine.none')}</span>
-                        : <ul className="flex flex-col gap-1">{here.map((x) => <ServiceLine key={x.id} service={x} live={liveClass(live, x.id)} onRemove={onRemoveService} />)}</ul>}
+                        : <GroupedServices services={here} render={(x) => <ServiceLine key={x.id} service={x} live={liveClass(live, x.id)} onRemove={onRemoveService} onOpen={onService} />} />}
                     </div>
                   );
                 })}
@@ -195,7 +222,7 @@ export function Engine({ atlas, systemId, onRemoveService }: { atlas: Atlas; sys
                 <li key={x.id} data-testid="atlas-external" className="group/s bg-surface px-4 py-3 text-[14px]">
                   <span className="flex items-center gap-2">
                     <StateGlyph state={x.state} />
-                    <span className="font-semibold text-fg">{x.name}</span>
+                    <button type="button" onClick={() => onService?.(x)} aria-label={`${t('service.details')}: ${x.name}`} className="text-left font-semibold text-fg underline-offset-2 hover:underline">{x.name}</button>
                     {x.provider && <span className="text-[13px] text-fg-muted">{x.provider}</span>}
                     {onRemoveService && <button type="button" onClick={() => onRemoveService(x)} aria-label={`${t('action.remove')}: ${x.name}`}
                       className="ml-auto px-1 text-[13px] text-fg-subtle opacity-0 hover:text-danger focus-visible:opacity-100 group-hover/s:opacity-100">×</button>}

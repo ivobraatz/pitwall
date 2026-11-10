@@ -220,7 +220,8 @@ if (args.Length > 0 && args[0] == "import-atlas")
     if (file is null) { Console.Error.WriteLine("O arquivo está vazio."); Environment.ExitCode = 2; return; }
     var result = await scope.ServiceProvider.GetRequiredService<AtlasImporter>().RunAsync(file, args.Contains("--dry-run"), CancellationToken.None);
     foreach (var error in result.Errors) Console.Error.WriteLine(error);
-    Console.WriteLine($"systems {result.Systems}, services {result.Services}, links {result.Links}, repos {result.Repos}, routines {result.Routines}, errors {result.Errors.Count}");
+    Console.WriteLine($"systems {result.Systems}, services {result.Services}, links {result.Links}, repos {result.Repos}, routines {result.Routines}, " +
+                      $"processes {result.Processes}, steps {result.Steps}, errors {result.Errors.Count}");
     if (result.Errors.Count > 0) Environment.ExitCode = 1;
     return;
 }

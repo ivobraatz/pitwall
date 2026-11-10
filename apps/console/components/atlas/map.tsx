@@ -9,7 +9,9 @@ import '@xyflow/react/dist/style.css';
 import type { Atlas, AtlasRepo, AtlasService, AtlasSystem, ServiceState } from '@/lib/atlas';
 import { ProductMark } from '@/components/product';
 import { cn } from '@/components/ui';
-import { Legend, StateGlyph, liveClass, useLive, useWords } from './parts';
+import { LINK_COLOR, Legend, MarkGlyph, StateGlyph, conditionMark, liveClass, useLive, useWords } from './parts';
+import { LINK_KINDS } from '@/lib/atlas';
+import type { AtlasWord } from './words';
 
 /*
  * The map. Zoom is the level of detail: from afar one node per system, with what it leans on;
@@ -45,9 +47,10 @@ function SystemNode({ data }: NodeProps<Node<SystemData>>) {
 function ServiceNode({ data }: NodeProps<Node<ServiceData>>) {
   const s = data.service;
   return (
-    <div data-testid="atlas-node-service" className={cn('flex h-[52px] w-[260px] items-center gap-2.5 px-3', s.productId ? 'bg-well' : 'bg-chip', data.live)}>
+    <div data-testid="atlas-node-service" data-condition={s.condition}
+      className={cn('flex h-[52px] w-[260px] items-center gap-2.5 px-3', s.productId ? 'bg-well' : 'bg-chip', s.condition === 'gap' && 'atlas-hatch-loud', s.condition === 'planned' && 'atlas-dashed', data.live)}>
       <Handle type="target" position={Position.Top} className={hidden} />
-      <StateGlyph state={s.state} />
+      {s.condition === 'gap' || s.condition === 'planned' ? <MarkGlyph mark={conditionMark(s.condition)} /> : <StateGlyph state={s.state} />}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[14px] font-semibold text-fg">{s.name}</span>
         {s.provider && <span className="block truncate text-[13px] text-fg-muted">{s.provider}</span>}
@@ -84,9 +87,12 @@ function Graph({ atlas, onSystem }: { atlas: Atlas; onSystem: (slug: string) => 
     const edges: Edge[] = [];
     const byId = new Map(atlas.services.map((s) => [s.id, s]));
     const stroke = 'var(--ds-border-loud)';
-    const edge = (id: string, source: string, target: string, moving: boolean): Edge => ({
+    const edge = (id: string, source: string, target: string, moving: boolean, kind?: keyof typeof LINK_COLOR | null, planned?: boolean): Edge => ({
       id, source, target, animated: moving, focusable: false,
-      style: { stroke: moving ? 'var(--ds-running)' : stroke, strokeWidth: moving ? 2 : 1.25 },
+      style: {
+        stroke: moving ? 'var(--ds-running)' : kind ? LINK_COLOR[kind] : stroke, strokeWidth: moving ? 2 : kind ? 2 : 1.25,
+        ...(planned ? { strokeDasharray: '6 5' } : {}),
+      },
     });
 
     let deepest = 0;
@@ -137,7 +143,7 @@ function Graph({ atlas, onSystem }: { atlas: Atlas; onSystem: (slug: string) => 
       if (source === target || seen.has(key)) continue;
       seen.add(key);
       const moving = live.flowing.has(from.id) || live.flowing.has(to.id);
-      edges.push(edge(key, source, target, moving));
+      edges.push(edge(key, source, target, moving, link.kind, link.planned));
     }
     return { nodes, edges };
   }, [atlas, near, live, t]);
@@ -166,6 +172,16 @@ export function AtlasMap({ atlas, onSystem }: { atlas: Atlas; onSystem: (slug: s
       <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2">
         <p className="text-[14px] text-fg-muted">{t('map.hint')}</p>
         <Legend className="ml-auto" />
+      </div>
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-fg-muted" data-testid="atlas-map-legend" aria-label={t('map.legendLinks')}>
+        <span className="font-semibold">{t('map.legendLinks')}</span>
+        {LINK_KINDS.map((k) => (
+          <span key={k} className="inline-flex items-center gap-1.5">
+            <span aria-hidden className="h-0 w-5 border-t-[3px]" style={{ borderColor: LINK_COLOR[k] }} />{t(`link.${k}` as AtlasWord)}
+          </span>
+        ))}
+        <span className="inline-flex items-center gap-1.5"><span aria-hidden className="h-0 w-5 border-t-[3px] border-dashed" style={{ borderColor: 'var(--ds-fg-secondary)' }} />{t('map.planned')}</span>
+        <span className="inline-flex items-center gap-1.5"><span aria-hidden className="atlas-hatch-loud inline-block h-3.5 w-5" />{t('map.gap')}</span>
       </div>
       <div className="atlas-flow h-[62vh] min-h-[420px] bg-alt">
         <ReactFlowProvider><Graph atlas={atlas} onSystem={onSystem} /></ReactFlowProvider>

@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
 import { setLocale, useLocale } from '@/lib/i18n';
-import { useAtlas, useFlows, useRoutines, type AtlasService, type Routine } from '@/lib/atlas';
+import { useAtlas, useAttention, useFlows, useProcesses, useRoutines, type AtlasProcess, type AtlasService, type AttentionItem, type ProcessStep, type Routine } from '@/lib/atlas';
 import { useMe } from '@/components/shell';
 import { ProductMark } from '@/components/product';
 import { Button, Empty, ErrorBox, PageHeader, Shimmer, cn, useToast } from '@/components/ui';
@@ -14,12 +14,13 @@ import { AtlasForm, type FormKind, type FormState } from '@/components/atlas/for
 import { NowStrip, SectionTitle, useWords } from '@/components/atlas/parts';
 import { Routines } from '@/components/atlas/routines';
 import { DiscoveryList, Engine, Flows, Overview } from '@/components/atlas/views';
+import { AttentionList, Processes, ServiceDrawer, StepDrawer, Suppliers } from '@/components/atlas/insight';
 import type { AtlasWord } from '@/components/atlas/words';
 
 // The map measures the screen and draws on it: there is nothing to render on the server.
 const AtlasMap = dynamic(() => import('@/components/atlas/map').then((m) => m.AtlasMap), { ssr: false, loading: () => <Shimmer className="h-[62vh]" /> });
 
-const VIEWS = ['overview', 'engine', 'map', 'flows', 'routines', 'discovery'] as const;
+const VIEWS = ['overview', 'attention', 'processes', 'engine', 'map', 'suppliers', 'flows', 'routines', 'discovery'] as const;
 type View = (typeof VIEWS)[number];
 
 function Atlas() {
@@ -34,6 +35,10 @@ function Atlas() {
   const atlas = useAtlas();
   const routines = useRoutines();
   const flows = useFlows();
+  const processes = useProcesses();
+  const attention = useAttention();
+  const [serviceId, setServiceId] = React.useState<string | null>(null);
+  const [stepOpen, setStepOpen] = React.useState<{ step: ProcessStep; process: AtlasProcess } | null>(null);
   const [form, setForm] = React.useState<FormState | null>(null);
   const [menu, setMenu] = React.useState(false);
   const [collecting, setCollecting] = React.useState(false);
@@ -53,6 +58,16 @@ function Atlas() {
   const data = atlas.data;
   const system = systemSlug ? data.systems.find((s) => s.slug === systemSlug) : undefined;
   const empty = data.systems.length === 0 && data.services.length === 0;
+
+  const openService = (s: AtlasService) => { setStepOpen(null); setServiceId(s.id); };
+  const openAttention = (i: AttentionItem) => {
+    if (i.source === 'service') { const s = data.services.find((x) => x.id === i.serviceId); if (s) openService(s); return; }
+    for (const p of processes.data ?? []) {
+      const step = p.steps.find((x) => x.id === i.id);
+      if (step) { setServiceId(null); setStepOpen({ step, process: p }); return; }
+    }
+  };
+  const openedService = data.services.find((s) => s.id === serviceId) ?? null;
 
   const act = async (run: () => Promise<unknown>, done: AtlasWord) => {
     try { await run(); await queryClient.invalidateQueries({ queryKey: ['atlas'] }); toast('ok', t(done)); }
@@ -120,7 +135,7 @@ function Atlas() {
                 <h2 className="display text-[30px] text-fg">{system.name}</h2>
                 {system.description && <p className="text-[14px] text-fg-muted">{system.description}</p>}
               </div>
-              <Engine atlas={data} systemId={system.id} onRemoveService={removeService} />
+              <Engine atlas={data} systemId={system.id} onRemoveService={removeService} onService={openService} />
               <SectionTitle>{t('view.flows')}</SectionTitle>
               {flows.data ? <Flows flows={flows.data} systemId={system.id} /> : <Shimmer className="h-40" />}
               <SectionTitle>{t('view.routines')}</SectionTitle>
@@ -134,12 +149,16 @@ function Atlas() {
                     className={cn('flex h-10 shrink-0 items-center gap-2 px-4 text-[14px] whitespace-nowrap transition-colors duration-150',
                       view === v ? 'bg-active font-semibold text-fg' : 'bg-surface text-fg-muted hover:bg-hover hover:text-fg')}>
                     {t(`view.${v}` as AtlasWord)}
+                    {v === 'attention' && (attention.data?.length ?? 0) > 0 && <span className="figures bg-warning px-1.5 text-[13px] font-bold text-on-status">{attention.data!.length}</span>}
                     {v === 'discovery' && data.discoveries.length > 0 && <span className="figures bg-warning px-1.5 text-[13px] font-bold text-on-status">{data.discoveries.length}</span>}
                   </button>
                 ))}
               </nav>
               {view === 'overview' && <Overview atlas={data} onSystem={openSystem} />}
-              {view === 'engine' && <Engine atlas={data} onRemoveService={removeService} />}
+              {view === 'attention' && (attention.data ? <AttentionList items={attention.data} onOpen={openAttention} /> : <Shimmer className="h-40" />)}
+              {view === 'processes' && (processes.data ? <Processes processes={processes.data} atlas={data} onStep={(step, process) => { setServiceId(null); setStepOpen({ step, process }); }} /> : <Shimmer className="h-40" />)}
+              {view === 'suppliers' && <Suppliers atlas={data} onService={openService} />}
+              {view === 'engine' && <Engine atlas={data} onRemoveService={removeService} onService={openService} />}
               {view === 'map' && <AtlasMap atlas={data} onSystem={openSystem} />}
               {view === 'flows' && (flows.data ? <Flows flows={flows.data} /> : <Shimmer className="h-40" />)}
               {view === 'routines' && (routines.data ? <Routines routines={routines.data} onEdit={(routine) => setForm({ kind: 'routine', routine })} onRemove={removeRoutine} /> : <Shimmer className="h-20" />)}
@@ -154,6 +173,8 @@ function Atlas() {
           )}
         </>
       )}
+      <ServiceDrawer service={openedService} atlas={data} onClose={() => setServiceId(null)} onService={openService} />
+      <StepDrawer step={stepOpen?.step ?? null} process={stepOpen?.process ?? null} atlas={data} onClose={() => setStepOpen(null)} onService={openService} />
       <AtlasForm state={form} atlas={data} onClose={() => { setForm(null); void routines.refetch(); }} />
     </>
   );

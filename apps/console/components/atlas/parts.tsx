@@ -1,9 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useT, useLocale, ago } from '@/lib/i18n';
-import type { Atlas, NowItem, ServiceState } from '@/lib/atlas';
-import { cn } from '@/components/ui';
+import type { Atlas, Condition, Impact, LinkKind, NowItem, Owner, ServiceState, SystemRef } from '@/lib/atlas';
+import { ProductStripe } from '@/components/product';
+import { IconClose, cn } from '@/components/ui';
 import { WORDS, type AtlasWord } from './words';
 
 export function useWords() { return useT(WORDS); }
@@ -121,3 +123,102 @@ export function SectionTitle({ children, hint }: { children: React.ReactNode; hi
 }
 
 export function shortSha(sha: string | null | undefined) { return sha ? sha.slice(0, 7) : null; }
+
+// ── What is declared: shape and colour, again both ─────────────────────────────────────
+
+export type Mark = 'ok' | 'warn' | 'gap' | 'next' | 'idea' | 'local';
+const MARK_COLOR: Record<Mark, string> = {
+  ok: 'text-success', warn: 'text-warning', gap: 'text-danger', next: 'text-info', idea: 'text-fg-muted', local: 'text-fg-muted',
+};
+/** ok = solid square · warn = triangle · gap = cross in a frame · next = arrow · idea = dashed circle · local = diamond. */
+export function MarkGlyph({ mark, size = 14, className }: { mark: Mark; size?: number; className?: string }) {
+  const shape = {
+    ok: <rect x="3" y="3" width="10" height="10" fill="currentColor" />,
+    warn: <path d="M8 2.5 14 13.5H2Z" fill="currentColor" />,
+    gap: <><rect x="2.5" y="2.5" width="11" height="11" stroke="currentColor" strokeWidth="1.5" fill="none" /><path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="currentColor" strokeWidth="2" /></>,
+    next: <path d="M2.5 8h9M8 3.5 12.5 8 8 12.5" stroke="currentColor" strokeWidth="2.2" fill="none" />,
+    idea: <circle cx="8" cy="8" r="5" stroke="currentColor" strokeWidth="1.8" strokeDasharray="2.6 2" fill="none" />,
+    local: <path d="M8 2.5 13.5 8 8 13.5 2.5 8Z" stroke="currentColor" strokeWidth="1.6" fill="none" />,
+  }[mark];
+  return <svg viewBox="0 0 16 16" width={size} height={size} aria-hidden data-mark={mark} className={cn('shrink-0', MARK_COLOR[mark], className)}>{shape}</svg>;
+}
+
+export const conditionMark = (c: Condition): Mark => (c === 'planned' ? 'idea' : c);
+
+export function ImpactTag({ impact, className }: { impact: Impact | null; className?: string }) {
+  const t = useWords();
+  const tone = impact === 'high' ? 'bg-danger text-on-status' : impact === 'medium' ? 'bg-warning text-on-status' : 'bg-chip text-fg-secondary';
+  return <span className={cn('inline-block px-2 py-0.5 text-[13px] font-semibold whitespace-nowrap', tone, className)}>{t(`impact.${impact ?? 'none'}` as AtlasWord)}</span>;
+}
+
+export function OwnerTag({ owner }: { owner: Owner | null }) {
+  const t = useWords();
+  if (!owner) return null;
+  return <span className="bg-chip px-2 py-0.5 text-[13px] text-fg-secondary whitespace-nowrap">{t(`owner.${owner}` as AtlasWord)}</span>;
+}
+
+/** The task opens in the board's own drawer. */
+export function TaskLink({ code }: { code: string | null }) {
+  const t = useWords();
+  if (!code) return null;
+  return (
+    <Link href={`/tasks?task=${encodeURIComponent(code)}`} aria-label={`${t('task.label')} ${code}`}
+      className="figures bg-chip px-2 py-0.5 text-[13px] font-semibold whitespace-nowrap text-fg underline-offset-2 hover:underline">{code}</Link>
+  );
+}
+
+export function SystemChip({ system }: { system: SystemRef | null }) {
+  const t = useWords();
+  if (!system) return <span className="text-[13px] text-fg-subtle">{t('attention.noSystem')}</span>;
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-fg">
+      <ProductStripe product={system} className="h-4 w-1" /><span className="truncate">{system.name}</span>
+    </span>
+  );
+}
+
+/** One small palette for the kinds of link, readable on both grounds; the legend names each. */
+export const LINK_COLOR: Record<LinkKind | 'none', string> = {
+  host: 'var(--ds-info)', deploy: 'var(--ds-info)', dns: 'var(--ds-violet)', integration: 'var(--ds-violet)',
+  storage: 'var(--ds-running)', payment: 'var(--ds-success)', business: 'var(--ds-success)',
+  email: 'var(--ds-warning)', support: 'var(--ds-warning)', ai: 'var(--ds-accent-fg)', measure: 'var(--ds-accent-fg)',
+  login: 'var(--ds-fg-secondary)', monitor: 'var(--ds-running)', none: 'var(--ds-border-loud)',
+};
+
+/** A panel from the right edge (the whole width on a phone). Escape and the scrim close it. */
+export function Drawer({ open, onClose, title, subtitle, children, testId }: {
+  open: boolean; onClose: () => void; title: React.ReactNode; subtitle?: React.ReactNode; children: React.ReactNode; testId?: string;
+}) {
+  const t = useWords();
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="fade-in fixed inset-0 z-50 flex justify-end bg-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <aside role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} data-testid={testId}
+        className="rise flex h-full w-full flex-col overflow-y-auto bg-overlay shadow-popover sm:max-w-[32rem]">
+        <header className="flex items-start gap-3 px-5 pt-5 pb-3">
+          <div className="min-w-0 flex-1">
+            <h2 className="display text-[26px] break-words text-fg">{title}</h2>
+            {subtitle && <div className="mt-1 text-[13px] text-fg-muted">{subtitle}</div>}
+          </div>
+          <button type="button" className="grid size-9 shrink-0 place-items-center text-fg-muted hover:bg-hover hover:text-fg" onClick={onClose} aria-label={t('action.close')}><IconClose /></button>
+        </header>
+        <div className="flex flex-col gap-5 px-5 pt-2 pb-8">{children}</div>
+      </aside>
+    </div>
+  );
+}
+
+export function DrawerSection({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className="mb-1.5 text-[13px] font-semibold text-fg-muted">{label}</h3>
+      <div className="text-[14px] text-fg">{children}</div>
+    </section>
+  );
+}

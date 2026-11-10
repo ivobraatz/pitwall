@@ -7,8 +7,11 @@ cada instalação ficam só no banco dela, nunca no código.
 | Vista | O que mostra |
 |---|---|
 | Geral | Uma faixa por sistema: saúde, pendências (tarefas, chamados, erros em 24 h, alertas de segurança) e o que roda agora. O que está fora do ar vem primeiro. Clicar abre o sistema. |
-| Motor | Grade de sistema por ambiente, com os serviços de cada célula: estado, último deploy e commit no ar. Ambiente que não existe aparece hachurado. Abaixo, a esteira (última execução de cada repositório), os serviços externos e os coletores. |
-| Mapa | O grafo. De longe, um nó por sistema; perto, os serviços e as ligações. O nó em que algo acontece pulsa; a ligação só se move quando há trabalho passando. |
+| Pede atenção | O que foi declarado como lacuna ou aviso, em serviços e etapas de processo, agrupado por impacto (alto, médio, baixo, sem impacto), com sistema, onde, próximo passo, responsável e a tarefa (link para o quadro). |
+| Processos | Cada processo como uma linha de etapas coloridas pela situação; com estágios, uma matriz sistema × estágio com célula vazia hachurada. Clicar na etapa abre o hoje, o ideal, o próximo passo, responsável, impacto, tarefa e serviços. Filtro por sistema. |
+| Fornecedores | Grade fornecedor (campo `provider` do serviço) × sistema, com a contagem e os nomes dos serviços; os compartilhados ficam numa coluna própria. |
+| Motor | Grade de sistema por ambiente, com os serviços de cada célula: estado, último deploy e commit no ar. Ambiente que não existe aparece hachurado; serviço que falta (`gap`) também, planejado fica tracejado, e os serviços se agrupam pelo `group`. Clicar num serviço abre seus detalhes, itens e ligações. Abaixo, a esteira (última execução de cada repositório), os serviços externos e os coletores. |
+| Mapa | O grafo. De longe, um nó por sistema; perto, os serviços e as ligações. O nó em que algo acontece pulsa; a ligação só se move quando há trabalho passando. A cor da ligação diz o tipo (legenda acima do mapa), a planejada é tracejada e o serviço que falta, hachurado. |
 | Fluxos | Por sistema, da esquerda para a direita, com o número de cada etapa: código (commit → CI → deploy → produção), erros (erro → chamado → tarefa → correção) e conteúdo (novidade → rascunho → aprovação → rede social). Etapa sem dado ou sem processo aparece como lacuna. |
 | Rotinas | O que roda sozinho, por frequência, com a última execução, o resultado e o que ela gerou. |
 | Descoberta | O que os coletores acharam nos provedores e ninguém cadastrou, com botão para cadastrar ou ignorar. |

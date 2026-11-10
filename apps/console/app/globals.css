@@ -37,10 +37,12 @@
   --ds-shadow-popover: 0 16px 40px rgb(0 0 0 / .5);
   --viz-1: #ffd400; --viz-2: #5eb0ff; --viz-3: #ff5f52; --viz-4: #34d08c;
   --viz-5: #ff9b3d; --viz-6: #2cc4c9; --viz-7: #f27fb2; --viz-8: #c3c8cc;
+  --ds-violet: #b9a2ff;
 }
 
 :root[data-mode="light"], :root[data-mode="dark"] .opposite, :root:not([data-mode="light"]) .opposite {
   color-scheme: light;
+  --ds-violet: #6a4bc4;
   --ds-bg-deep: #e4e6e8; --ds-bg: #eef0f1; --ds-bg-alt: #f7f8f8;
   --ds-bg-surface: #ffffff; --ds-bg-overlay: #ffffff; --ds-bg-well: #f4f5f6;
   --ds-bg-chip: #e6e8ea; --ds-bg-hover: #f0f2f3; --ds-bg-active: #dde0e3;
@@ -178,6 +180,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--ds-accent); wi
 .atlas-live::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 2px var(--ds-running); animation: atlas-pulse 1.4s var(--ease) infinite; }
 .atlas-live-down::after { box-shadow: inset 0 0 0 2px var(--ds-danger); }
 .atlas-hatch { background-image: repeating-linear-gradient(135deg, var(--ds-border-subtle) 0 1px, transparent 1px 9px); box-shadow: inset 0 0 0 1px var(--ds-border-subtle); }
+.atlas-hatch-loud { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ds-danger) 55%, transparent) 0 1.5px, transparent 1.5px 8px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ds-danger) 45%, transparent); }
+.atlas-dashed { outline: 1.5px dashed var(--ds-border-loud); outline-offset: -3px; }
 .atlas-flow .react-flow {
   --xy-background-color: var(--ds-bg-alt);
   --xy-edge-stroke: var(--ds-border-loud);

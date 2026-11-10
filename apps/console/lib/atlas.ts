@@ -5,12 +5,21 @@ import { api } from './api';
 
 /* The Atlas as the API hands it over (see StaffAtlasEndpoints). */
 
+/** What is declared about a service beyond what the collectors read. */
+export type Condition = 'ok' | 'warn' | 'gap' | 'planned' | 'local';
+export type Impact = 'high' | 'medium' | 'low';
+export type Owner = 'auto' | 'agent' | 'person' | 'together';
+export const LINK_KINDS = ['host', 'dns', 'storage', 'payment', 'email', 'ai', 'login', 'measure', 'monitor', 'support', 'deploy', 'integration', 'business'] as const;
+export type LinkKind = (typeof LINK_KINDS)[number];
+export type StepStatus = 'ok' | 'warn' | 'gap' | 'next' | 'idea';
+
 export type ServiceState = 'up' | 'down' | 'deploying' | 'degraded' | 'unknown';
 
 export interface AtlasSystem {
   id: string; slug: string; name: string; color: string | null; description: string | null; websiteUrl: string | null;
   health: { total: number; up: number; down: number; degraded: number; deploying: number; unknown: number };
   pending: { tasks: number; tickets: number; errors: number; alerts: number | null };
+  attention: { gaps: number; warnings: number };
 }
 export interface AtlasEnvironment { id: string; slug: string; name: string }
 export interface AtlasService {
@@ -18,8 +27,10 @@ export interface AtlasService {
   externalRef: string | null; url: string | null; monitor: string | null; notes: string | null;
   state: ServiceState; monitorStatus: string | null; deployStatus: string | null; lastDeployAt: string | null;
   commitSha: string | null; checkedAt: string | null;
+  group: string | null; condition: Condition; facts: Array<{ key: string; value: string }>; items: string[];
+  impact: Impact | null; owner: Owner | null; task: string | null;
 }
-export interface AtlasLink { id: string; from: string; to: string; label: string | null }
+export interface AtlasLink { id: string; from: string; to: string; label: string | null; kind: LinkKind | null; planned: boolean }
 export interface AtlasRepo {
   id: string; productId: string | null; fullName: string; lastRunName: string | null; lastRunStatus: string | null;
   lastRunAt: string | null; lastRunUrl: string | null; lastRunSha: string | null;
@@ -63,6 +74,29 @@ export function useRoutineRuns(slug: string | null) {
 }
 export function useFlows() {
   return useQuery({ queryKey: ['atlas', 'flows'], queryFn: () => api<SystemFlows[]>('/staff/atlas/flows'), refetchInterval: 60_000 });
+}
+
+export interface SystemRef { id: string; slug: string; name: string; color: string | null }
+export interface ProcessStep {
+  id: string; slug: string; name: string; status: StepStatus; stage: string | null; owner: Owner | null;
+  today: string | null; ideal: string | null; next: string | null; task: string | null; impact: Impact | null;
+  services: string[]; position: number; updatedAt: string; system: SystemRef | null;
+}
+export interface AtlasProcess {
+  id: string; slug: string; name: string; description: string | null; updatedAt: string; system: SystemRef | null;
+  stages: Array<{ key: string; name: string; description: string | null }>; steps: ProcessStep[];
+}
+export interface AttentionItem {
+  source: 'service' | 'step'; id: string; status: 'gap' | 'warn'; title: string; detail: string | null; next: string | null;
+  impact: Impact | null; owner: Owner | null; task: string | null; system: SystemRef | null; where: string | null;
+  processId: string | null; serviceId: string | null;
+}
+
+export function useProcesses() {
+  return useQuery({ queryKey: ['atlas', 'processes'], queryFn: () => api<AtlasProcess[]>('/staff/atlas/processes'), refetchInterval: 60_000 });
+}
+export function useAttention() {
+  return useQuery({ queryKey: ['atlas', 'attention'], queryFn: () => api<AttentionItem[]>('/staff/atlas/attention'), refetchInterval: 60_000 });
 }
 
 /** What a system asks of the person looking: something is down, something waits, or nothing. */
