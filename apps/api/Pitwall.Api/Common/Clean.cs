@@ -13,6 +13,9 @@ public static class Clean
         return t.Length <= max ? t : t[..max];
     }
 
+    /// <summary>A value from outside, safe for one log line: no line breaks to forge another entry.</summary>
+    public static string ForLog(string? s) => (s ?? "").Replace("\r", "").Replace("\n", "");
+
     /// <summary>A screen path: must be relative to the product's origin. Anything else is dropped, not stored.</summary>
     public static string? Route(string? route)
     {

@@ -108,13 +108,13 @@ public sealed class ReleaseWriter(IReleaseNoteModel model, ILogger<ReleaseWriter
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(ex, "The release note model call failed for {Product} {Version}", product.Slug, version);
+            logger.LogWarning(ex, "The release note model call failed for {Product} {Version}", product.Slug, Clean.ForLog(version));
             return null;
         }
         if (reply is null) return null;
         var draft = Parse(reply, locales);
         if (draft is null)
-            logger.LogWarning("Release note {Product} {Version}: unusable reply ({Length} chars)", product.Slug, version, reply.Length);
+            logger.LogWarning("Release note {Product} {Version}: unusable reply ({Length} chars)", product.Slug, Clean.ForLog(version), reply.Length);
         return draft;
     }
 
