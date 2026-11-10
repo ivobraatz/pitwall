@@ -1,0 +1,36 @@
+# Dependency updates, one grouped PR per ecosystem per month.
+#
+# Monthly and grouped because every PR runs CI, and the Actions minutes do not cover one run per
+# package. Security fixes do not wait for this: GitHub opens those as soon as an advisory lands.
+# Majors stay out of the groups: they break on purpose and each one deserves its own PR.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 3
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: nuget
+    directories: [/apps/api/Pitwall.Api, /apps/api/Pitwall.Tests, /packages/dotnet/Pitwall.AspNetCore]
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 3
+    groups:
+      nuget-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directories: [/apps/api, /apps/console]
+    schedule: { interval: monthly }
+    groups:
+      docker:
+        patterns: ['*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    groups:
+      actions:
+        patterns: ['*']
