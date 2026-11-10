@@ -10,8 +10,17 @@ function check(ok, what) {
   console.log(`ok - ${what}`);
 }
 
+// Each probe has a deadline on a live timer: while the containers start, a connection can be left
+// with nothing holding the process, and Node would exit with the await unsettled (exit code 13).
+const probe = (u) => new Promise((resolve) => {
+  const deadline = setTimeout(resolve, 15_000, false);
+  fetch(u, { signal: AbortSignal.timeout(10_000) })
+    .then((r) => r.ok, () => false)
+    .then((ok) => { clearTimeout(deadline); resolve(ok); });
+});
+
 for (let i = 0; ; i++) {
-  const up = await Promise.all([`${API}/health`, `${CONSOLE}/login`].map((u) => fetch(u).then((r) => r.ok, () => false)));
+  const up = await Promise.all([`${API}/health`, `${CONSOLE}/login`].map(probe));
   if (up.every(Boolean)) break;
   if (i === 60) check(false, 'API e console no ar em até 5 minutos');
   await new Promise((r) => setTimeout(r, 5000));
