@@ -82,9 +82,10 @@ dados não abrem. No Pitwall, é a `PITWALL_SECRET_KEY`.
 
 ## Cofre (Vaultwarden)
 
-O Vaultwarden roda na mesma VM e guarda os segredos de que a restauração precisa. Sem ele, os dumps não se
-recuperam. O `/opt/vaultwarden/backup.sh` gera todo dia uma cópia consistente do SQLite e da chave RSA
-em `/opt/vaultwarden/backups`. Depois dele, `deploy/bancos/backup-cofre.sh` roda como root, pelo
+Opcional: vale quando um Vaultwarden na mesma VM guarda os segredos de que a restauração precisa. Sem
+ele, os dumps não se recuperam. O backup do próprio Vaultwarden gera todo dia uma cópia consistente do
+SQLite e da chave RSA na pasta `COFRE_BACKUPS` (padrão `/opt/vaultwarden/backups`). Depois dele,
+`deploy/bancos/backup-cofre.sh` roda como root, pelo
 `/etc/cron.d/backup-cofre`, pega a cópia mais recente, cifra e envia para `diario/vaultwarden/`. O log
 fica em `/opt/backups/logs/cofre.log`, e o aviso vai para `PUSH_COFRE`.
 
