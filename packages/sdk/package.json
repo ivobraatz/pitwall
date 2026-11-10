@@ -62,9 +62,9 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@rrweb/record": "2.1.6",
-    "@rrweb/replay": "2.1.6",
-    "@rrweb/types": "2.1.6",
+    "@rrweb/record": "2.2.1",
+    "@rrweb/replay": "2.2.1",
+    "@rrweb/types": "2.2.1",
     "lit": "^3.2.0"
   },
   "devDependencies": {
