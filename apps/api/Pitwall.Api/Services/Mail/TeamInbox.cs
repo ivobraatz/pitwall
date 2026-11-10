@@ -75,7 +75,7 @@ public sealed class TeamInbox(IConfiguration config, ILogger<TeamInbox> logger)
         await smtp.ConnectAsync(config["Smtp:Host"], port, port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable, ct);
         if (!string.IsNullOrWhiteSpace(config["Smtp:User"]))
             await smtp.AuthenticateAsync(config["Smtp:User"], config["Smtp:Password"], ct);
-        await smtp.SendAsync(message, ct);
+        await smtp.SendAsync(new SmtpSendRequest(message), ct);
         await smtp.DisconnectAsync(true, ct);
     }
 }
