@@ -17,3 +17,6 @@ next-env.d.ts
 backups/
 .deploy.lock
 .deploy-failed
+
+# Sites of this installation that Caddy imports (deploy/Caddyfile): never in the repository
+deploy/caddy.d/*.caddy

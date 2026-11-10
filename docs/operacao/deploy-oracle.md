@@ -470,6 +470,11 @@ $COMPOSE logs -f caddy
 Procure por `certificate obtained successfully` para `pitwall-api.braatz.com.br` e para
 `pitwall.braatz.com.br`. Saia com `Ctrl+C`.
 
+Outro site servido pelo mesmo Caddy (um app na rede `pitwall_default`, por exemplo) vai num arquivo
+`deploy/caddy.d/<nome>.caddy`, que o Git ignora e o deploy não apaga. Depois de criar ou mudar um:
+`$COMPOSE exec caddy caddy reload --config /etc/caddy/Caddyfile`. Durante um deploy, o Caddy espera até
+30 s pela API e pelo console em vez de responder 502.
+
 Confira o primeiro admin:
 
 ```bash
