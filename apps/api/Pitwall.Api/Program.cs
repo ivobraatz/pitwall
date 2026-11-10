@@ -202,17 +202,7 @@ if (!app.Environment.IsEnvironment("Testing"))
         await bucket.EnsureBucketAsync(app.Logger, CancellationToken.None);
 }
 
-// One-off commands instead of serving: `dotnet Pitwall.Api.dll import-datarunner [--dry-run]`.
-if (args.Length > 0 && args[0] == "import-datarunner")
-{
-    using var scope = app.Services.CreateScope();
-    var importer = ActivatorUtilities.CreateInstance<Pitwall.Tools.DataRunnerImporter>(scope.ServiceProvider);
-    var result = await importer.RunAsync(args.Contains("--dry-run"), CancellationToken.None);
-    Console.WriteLine($"tickets {result.Tickets}, messages {result.Messages}, attachments {result.Attachments} " +
-                      $"(missing bytes {result.MissingBlobs}), server errors {result.ServerErrors}, skipped {result.Skipped}");
-    return;
-}
-
+// One-off command instead of serving.
 // `dotnet Pitwall.Api.dll import-atlas <file.json> [--dry-run]`: loads an installation's own map
 // from a file outside the repository (format in docs/operacao/atlas.md).
 if (args.Length > 0 && args[0] == "import-atlas")

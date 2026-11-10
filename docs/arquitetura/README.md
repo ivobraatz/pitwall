@@ -4,14 +4,14 @@
 
 **Um serviço interno, não um SaaS.** Uma instância, operada pela equipe. O "tenant" do modelo é o
 **sistema** (produto); o cliente final de cada sistema é só um identificador externo
-(`customerRef`: o workspace no DataRunner, a empresa no RH Flex). Sem cadastro público, sem
+(`customerRef`: o workspace num sistema, a empresa em outro). Sem cadastro público, sem
 cobrança, sem isolamento entre organizações que não existem. O código pode virar open source
 depois sem mudar nada aqui — os dados ficam na instância, não no código.
 
 **Postgres, não NoSQL.** Chamado → mensagens → anexos → release são relações, e a fila precisa de
-filtros e ordenação cruzados ("abertos do RH Flex aguardando a equipe, por atualização"). O que
+filtros e ordenação cruzados ("abertos do Acme aguardando a equipe, por atualização"). O que
 varia entre sistemas mora em `jsonb` (diagnóstico do navegador, metadados de gravação,
-configurações do sistema). Os três produtos já usam Postgres.
+configurações do sistema).
 
 **A identidade fica no produto.** O Pitwall não conhece os usuários dos sistemas. O backend do
 sistema autentica a pessoa como sempre e afirma ao Pitwall quem ela é (cabeçalho `Pitwall-Actor`),
@@ -119,8 +119,8 @@ atlas_discoveries   source, kind (service|repo|monitor), external_ref, name, env
 - **Gravações.** rrweb grava DOM, não pixels; com "ocultar dados" (padrão) textos de tabela,
   `[data-pw-mask]` e todos os inputs viram asteriscos; senhas nunca. Nada sai do navegador sem a
   pessoa anexar e revisar. Os anexos ficam num bucket privado, servidos só por endpoints autenticados.
-- **Minimização.** Mande ao Pitwall o mínimo: ids e nomes. E-mail é opcional. No RH Flex,
-  marque com `data-pw-mask` tudo que for dado de funcionário (LGPD).
+- **Minimização.** Mande ao Pitwall o mínimo: ids e nomes. E-mail é opcional. Num sistema com
+  dados pessoais sensíveis (de funcionários, de saúde), marque com `data-pw-mask` tudo que for desse tipo (LGPD).
 - **Coletores.** Cada token de provedor é só de leitura, fica em variável de ambiente e viaja só no cabeçalho da
   requisição; a mensagem de erro de um coletor traz o status HTTP, nunca o token.
 - **Retenção.** Erros do servidor: 30 dias (o chamado guarda a assinatura). Gravações: 90 dias após o

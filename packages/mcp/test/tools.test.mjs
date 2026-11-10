@@ -265,12 +265,12 @@ test('a process is written whole, a step alone, and both read back in order', as
 test('atlas_attention lists gaps with impact and what to do next', async () => {
   const items = [
     { source: 'service', status: 'gap', title: 'App da loja', detail: 'Sai como pacote avulso.', next: null, impact: 'high', owner: 'person', task: 'T-ABC12', system: { slug: 'acme' }, where: 'Na web' },
-    { source: 'step', status: 'warn', title: 'Nota fiscal', detail: null, next: 'Ligar a emissão.', impact: null, owner: null, task: null, system: null, where: 'Venda' },
+    { source: 'step', status: 'warn', title: 'Faturamento', detail: null, next: 'Ligar a emissão.', impact: null, owner: null, task: null, system: null, where: 'Venda' },
   ];
   const { client } = await connect({ respond: () => json(200, items) });
   const out = text(await client.callTool({ name: 'atlas_attention', arguments: {} }));
   assert.match(out, /\[gap\] App da loja — acme · Na web \(impacto alto, T-ABC12\)\n {4}Sai como pacote avulso\./);
-  assert.match(out, /\[warn\] Nota fiscal — Venda\n {4}Ligar a emissão\./);
+  assert.match(out, /\[warn\] Faturamento — Venda\n {4}Ligar a emissão\./);
   const { client: empty } = await connect({ respond: () => json(200, []) });
   assert.match(text(await empty.callTool({ name: 'atlas_attention', arguments: {} })), /Nada declarado/);
 });

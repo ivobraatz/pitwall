@@ -1,4 +1,4 @@
-# Installed by docs/operacao/deploy-oracle.md (parte 19). Runs deploy/auto-update.sh once; the timer repeats it.
+# Installed by docs/operacao/deploy-oracle.md (parte 18). Runs deploy/auto-update.sh once; the timer repeats it.
 [Unit]
 Description=Pitwall: deploy the newest commit that passed CI
 Wants=network-online.target docker.service

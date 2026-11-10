@@ -10,7 +10,7 @@ namespace Pitwall.Services.Errors;
 /// left out so a deploy that shifts code does not split one bug into two.
 ///
 /// Understands both stack formats the products produce:
-/// <c>at DataRunner.Api.Endpoints.X.Y(Int32 id) in /src/X.cs:line 42</c> (.NET) and
+/// <c>at Acme.Api.Endpoints.X.Y(Int32 id) in /src/X.cs:line 42</c> (.NET) and
 /// <c>at handler (/app/apps/api/src/routes/flows.ts:120:15)</c> (Node).
 /// </summary>
 public static partial class ErrorSignature

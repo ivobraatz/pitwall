@@ -38,7 +38,7 @@ export default function ProductsPage() {
         actions={me?.role === 'admin' && <Button variant="primary" onClick={() => setOpen(true)}>Novo sistema</Button>}
       />
       {q.isLoading ? <div className="flex flex-col gap-1">{[1, 2, 3].map((i) => <Shimmer key={i} className="h-24" />)}</div> : q.data && q.data.length === 0 ? (
-        <Card><Empty title="Nenhum carro na pista.">Cadastre o primeiro sistema (DataRunner, RH Flex, metrifree…) e gere a chave do backend dele.</Empty></Card>
+        <Card><Empty title="Nenhum carro na pista.">Cadastre o primeiro sistema (Acme, Globex…) e gere a chave do backend dele.</Empty></Card>
       ) : (
         <div className="flex flex-col gap-1">
           {q.data?.map((p, i) => (
@@ -72,10 +72,10 @@ export default function ProductsPage() {
       )}
       <Dialog open={open} onClose={() => setOpen(false)} title="Novo sistema">
         <div className="flex flex-col gap-4">
-          <Field label="Nome"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value, slug: form.slug || '' })} placeholder="DataRunner" /></Field>
-          <Field label="Identificador" hint="Minúsculas, números e hífen. Aparece nas chaves e no changelog público."><Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })} placeholder="datarunner" /></Field>
+          <Field label="Nome"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value, slug: form.slug || '' })} placeholder="Acme" /></Field>
+          <Field label="Identificador" hint="Minúsculas, números e hífen. Aparece nas chaves e no changelog público."><Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase() })} placeholder="acme" /></Field>
           <Field label="O que é" hint="Uma ou duas frases. O redator das novidades lê isso para saber quem são os leitores."><Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
-          <Field label="Endereço do sistema" hint="Opcional. Vira um link no chamado."><Input code type="url" value={form.websiteUrl} placeholder="https://datarunner.app" onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} /></Field>
+          <Field label="Endereço do sistema" hint="Opcional. Vira um link no chamado."><Input code type="url" value={form.websiteUrl} placeholder="https://acme.example" onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} /></Field>
           <div className="flex flex-col gap-1.5">
             <span className="text-[14px] font-semibold text-fg-secondary">Cor</span>
             <div className="flex items-center gap-4">

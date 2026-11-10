@@ -1,14 +1,14 @@
 namespace Pitwall.Domain;
 
 /// <summary>
-/// One of the systems the team supports (DataRunner, RH Flex, metrifree…). Everything else in
+/// One of the systems the team supports (Acme, Globex…). Everything else in
 /// Pitwall — tickets, server errors, release notes, webhooks — belongs to exactly one product,
 /// and a product's backend can only ever reach its own rows: its keys carry its id.
 /// </summary>
 public class Product
 {
     public Guid Id { get; set; }
-    /// <summary>URL-safe handle (<c>datarunner</c>), used by the public changelog and in key prefixes.</summary>
+    /// <summary>URL-safe handle (<c>acme</c>), used by the public changelog and in key prefixes.</summary>
     public string Slug { get; set; } = null!;
     public string Name { get; set; } = null!;
     /// <summary>
@@ -16,7 +16,7 @@ public class Product
     /// the readers are; the console shows it under the name.
     /// </summary>
     public string? Description { get; set; }
-    /// <summary>The product's own address (<c>https://datarunner.app</c>), linked from the console.</summary>
+    /// <summary>The product's own address (<c>https://acme.example</c>), linked from the console.</summary>
     public string? WebsiteUrl { get; set; }
     /// <summary>
     /// The colour the console marks the product with everywhere (<c>#2cc4c9</c>). Null = one picked
@@ -30,7 +30,7 @@ public class Product
     /// <summary>The team member who answers for the product: who the others ask first.</summary>
     public Guid? OwnerId { get; set; }
     public StaffUser? Owner { get; set; }
-    /// <summary>Where events go (<c>https://api.datarunner.app/api/v1/webhooks/pitwall</c>); null = no webhooks.</summary>
+    /// <summary>Where events go (<c>https://api.acme.example/api/v1/webhooks/pitwall</c>); null = no webhooks.</summary>
     public string? WebhookUrl { get; set; }
     /// <summary>The HMAC secret, sealed with the instance key — Pitwall has to sign with it, so it cannot be a hash.</summary>
     public string? WebhookSecretSealed { get; set; }
@@ -49,7 +49,7 @@ public class ProductSettings
     /// <summary>The name the customer sees on team replies. Defaults to the product name.</summary>
     public string? TeamName { get; set; }
     /// <summary>
-    /// Stack-frame markers that identify the product's own code (<c>DataRunner.</c>,
+    /// Stack-frame markers that identify the product's own code (<c>Acme.</c>,
     /// <c>/apps/api/src/</c>). The error signature keys on the first frame that matches, so a
     /// framework frame at the top of the stack does not split one bug into many.
     /// </summary>
@@ -73,7 +73,7 @@ public class ProductKey
     public Guid Id { get; set; }
     public Guid ProductId { get; set; }
     public string Name { get; set; } = null!;
-    /// <summary>The first characters of the key (<c>pw_datarunner_3fK9</c>), so the team can tell keys apart.</summary>
+    /// <summary>The first characters of the key (<c>pw_acme_3fK9</c>), so the team can tell keys apart.</summary>
     public string Prefix { get; set; } = null!;
     public string Hash { get; set; } = null!;
     /// <summary>support | errors | releases</summary>

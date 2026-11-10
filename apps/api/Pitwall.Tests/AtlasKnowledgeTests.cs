@@ -92,7 +92,7 @@ public class AtlasKnowledgeTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
                     steps = new object[]
                     {
                         new { slug = "acme-oferta", name = "Planos", system = acme, stage = "oferta", status = "ok", owner = "auto", services = new[] { $"{acme}/API" } },
-                        new { slug = "acme-nota", name = "Nota fiscal", system = acme, stage = "receita", status = "warn", impact = "medium", today = "Sem emitir." },
+                        new { slug = "acme-fatura", name = "Faturamento", system = acme, stage = "receita", status = "warn", impact = "medium", today = "Sem emitir." },
                         new { slug = "globex-oferta", name = "Planos", system = globex, stage = "oferta", status = "gap", impact = "low", next = "Escrever a oferta." },
                     },
                 },
@@ -141,7 +141,7 @@ public class AtlasKnowledgeTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
         var attention = await OkAsync(admin.GetAsync($"/v1/staff/atlas/attention"));
         var mine = attention.EnumerateArray().Where(i => i.GetProperty("system").ValueKind == JsonValueKind.Object
             && i.GetProperty("system").GetProperty("slug").GetString() is { } s && (s == acme || s == globex)).ToList();
-        Assert.Equal(["App da loja", "Nota fiscal", "Planos"], mine.Select(i => i.GetProperty("title").GetString()));
+        Assert.Equal(["App da loja", "Faturamento", "Planos"], mine.Select(i => i.GetProperty("title").GetString()));
         Assert.Equal("service", mine[0].GetProperty("source").GetString());
         Assert.Equal("Escrever a oferta.", mine[2].GetProperty("next").GetString());
     }

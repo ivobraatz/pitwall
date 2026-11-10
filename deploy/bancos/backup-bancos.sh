@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Backup central dos Postgres da Braatz (docs/operacao/backup-bancos.md). Roda na VM Oracle, pelo cron.
+# Backup central dos Postgres dos sistemas (docs/operacao/backup-bancos.md). Roda na VM Oracle, pelo cron.
 #
 #   backup-bancos.sh                      todos os sistemas de /opt/backups/bancos
-#   backup-bancos.sh rhflex               só este sistema, sempre em diario/
+#   backup-bancos.sh acme                 só este sistema, sempre em diario/
 #   backup-bancos.sh --restaurar          todos, com o teste de restauração
 #
 # Para cada sistema: pg_dump com o usuário somente leitura, confere o arquivo, cifra com age (a VM só
 # tem a chave pública) e envia ao R2. Nada é apagado daqui: a expiração é regra do bucket, e o bloqueio
-# do bucket impede que uma invasão da VM apague os backups recentes. Cada resultado vai para o Kuma.
+# do bucket impede que uma invasão da VM apague os backups recentes. Cada resultado vai para o Kuma, na
+# URL PUSH_<SISTEMA> do backups.env (bancos/acme.env → PUSH_ACME; hífen vira _).
 set -uo pipefail
 
 dir="${BACKUPS_DIR:-/opt/backups}"
@@ -180,7 +181,7 @@ fazer_backup() {
 }
 
 for sistema in "${alvos[@]}"; do
-  chave="PUSH_$(echo "$sistema" | tr '[:lower:]' '[:upper:]')"
+  chave="PUSH_$(echo "$sistema" | tr '[:lower:]-' '[:upper:]_')"
   if fazer_backup "$sistema"; then
     log "$sistema: $motivo"
     avisar "$(valor "$config" "$chave")" up "$motivo"

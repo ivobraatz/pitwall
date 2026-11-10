@@ -68,7 +68,7 @@ public static class Tokens
         return new string(chars);
     }
 
-    /// <summary><c>pw_datarunner_…</c>: says what it is and whose it is when it turns up in a log.</summary>
+    /// <summary><c>pw_acme_…</c>: says what it is and whose it is when it turns up in a log.</summary>
     public static string NewProductKey(string slug) => $"pw_{slug}_{Random(32)}";
 
     public static string NewWebhookSecret() => $"pwhs_{Random(40)}";
