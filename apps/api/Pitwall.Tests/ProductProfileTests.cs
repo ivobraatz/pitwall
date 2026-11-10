@@ -51,10 +51,10 @@ public class ProductProfileTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
         var (admin, adminId) = await SignInAsAdminAsync();
 
         var res = await admin.PatchAsJsonAsync($"/v1/staff/products/{product.Id}",
-            new { websiteUrl = "https://datarunner.app", color = "#2CC4C9", ownerId = adminId.ToString() });
+            new { websiteUrl = "https://acme.example", color = "#2CC4C9", ownerId = adminId.ToString() });
         var view = await res.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-        Assert.Equal("https://datarunner.app", view.GetProperty("websiteUrl").GetString());
+        Assert.Equal("https://acme.example", view.GetProperty("websiteUrl").GetString());
         Assert.Equal("#2cc4c9", view.GetProperty("color").GetString());
         Assert.Equal("Ana Admin", view.GetProperty("owner").GetProperty("name").GetString());
 
@@ -65,7 +65,7 @@ public class ProductProfileTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
         // An empty string clears; a field left out stays.
         view = await (await admin.PatchAsJsonAsync($"/v1/staff/products/{product.Id}", new { color = "" })).Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(JsonValueKind.Null, view.GetProperty("color").ValueKind);
-        Assert.Equal("https://datarunner.app", view.GetProperty("websiteUrl").GetString());
+        Assert.Equal("https://acme.example", view.GetProperty("websiteUrl").GetString());
         Assert.Equal("Ana Admin", view.GetProperty("owner").GetProperty("name").GetString());
     }
 

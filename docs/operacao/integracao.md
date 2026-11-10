@@ -2,13 +2,12 @@
 
 Este guia diz o que um sistema precisa implementar para usar o Pitwall (chamados, erros de servidor,
 avisos e novidades). O [produto demo](../../examples/demo-product) implementa tudo isso em um arquivo,
-e é a referência para testar. Os sistemas reais estão na seção [Sistemas já integrados](#sistemas-já-integrados-referência).
+e é a referência para testar.
 
 - [Visão geral](#visão-geral)
 - [Checklist: ligar um sistema novo](#checklist-ligar-um-sistema-novo)
 - [Por stack](#por-stack)
 - [Contrato HTTP](#contrato-http)
-- [Sistemas já integrados (referência)](#sistemas-já-integrados-referência)
 - [Referência rápida do SDK](#referência-rápida-do-sdk)
 - [Problemas comuns](#problemas-comuns)
 
@@ -67,12 +66,12 @@ Faça na ordem. Cada passo termina com uma forma de verificar antes de seguir.
 ### 1. Cadastrar o sistema no console
 
 - **Faça:** no console, *Sistemas → Novo sistema*. Preencha **Nome**, **Identificador** (minúsculas, aparece
-  nas chaves e no changelog público, ex.: `datarunner`) e **O que é** (uma ou duas frases; o redator das
+  nas chaves e no changelog público, ex.: `acme`) e **O que é** (uma ou duas frases; o redator das
   novidades lê isso para saber quem são os leitores).
   Depois, na página do sistema, configure:
   - **Nome da equipe para o cliente**: quem assina as respostas. Padrão: o nome do sistema.
   - **Tela do chamado no sistema**: para o link "ver no sistema" nos e-mails da equipe. Use `{id}`.
-  - **Marcadores do código próprio**: um por linha, ex.: `DataRunner.` ou `/apps/api/src/`. A assinatura
+  - **Marcadores do código próprio**: um por linha, ex.: `Acme.` ou `/apps/api/src/`. A assinatura
     de um erro usa o primeiro frame do stack que contém um desses marcadores, então um frame de framework
     no topo não divide um bug em vários.
 - **Verifique:** o sistema aparece na lista de *Sistemas* e a página abre sem erro.
@@ -100,7 +99,7 @@ Pitwall__WebhookSecret=pwhs_…                        # card Webhook → Gerar 
 Pitwall__Release=1.4.2                               # opcional: versão que aparece nos erros
 Pitwall__Environment=production                      # opcional
 
-# Node (o demo e o metrifree usam estes nomes)
+# Node (o demo usa estes nomes)
 PITWALL_URL=https://pitwall.suaempresa.com
 PITWALL_KEY=pw_<identificador>_…
 PITWALL_WEBHOOK_SECRET=pwhs_…
@@ -120,6 +119,8 @@ Esses valores ficam só no backend. Nenhum deles vai para o bundle do navegador.
   - `customerId` é a fronteira: a pessoa vê os chamados do próprio cliente (workspace, empresa, organização)
     e de nenhum outro. Use o id estável do cliente no seu sistema.
   - `userEmail` só se a equipe precisa dele para responder. É opcional.
+  - Se o front tem um proxy próprio até o backend (um route handler do Next.js, por exemplo), ele repassa o
+    corpo cru e o `Content-Type` originais: anexos e gravações vão em multipart.
 - **Verifique:** logada, a pessoa acessa `GET /api/v1/support/config` no seu front e recebe `product`,
   `teamName`, `categories`, `severities`, `statuses` e `maxAttachmentBytes`. Sem sessão, recebe 401.
 
@@ -139,8 +140,8 @@ Esses valores ficam só no backend. Nenhum deles vai para o bundle do navegador.
   1. lê o **corpo cru** (texto), antes de qualquer parse de JSON;
   2. verifica `Pitwall-Signature` contra esse corpo (ver [Contrato HTTP → Webhooks](#webhooks)); assinatura inválida, ausente ou com mais de 5 minutos: responde 401;
   3. guarda `id` do evento e pula eventos já tratados. O Pitwall reenvia tudo que não recebeu 2xx, então o
-     tratamento tem que ser idempotente. O demo do metrifree faz isso com um insert com `onConflictDoNothing`
-     em uma tabela de chaves;
+     tratamento tem que ser idempotente. Um insert com `ON CONFLICT DO NOTHING` numa tabela de ids de
+     evento já tratados resolve;
   4. responde 2xx **rápido**. O Pitwall espera 15 s no máximo; trabalho pesado vai para uma fila.
 
   O que fazer por evento:
@@ -217,10 +218,9 @@ banco e das suas funções são placeholders para trocar.
 
 ### ASP.NET Core
 
-**1. Referência ao pacote, com checkout local quando existir.** Use este bloco no `.csproj` da API, como
-faz o DataRunner (`apps/api/DataRunner.Api/DataRunner.Api.csproj`). Com um checkout do Pitwall ao lado do
-repositório, o cliente é compilado do código-fonte. Sem ele (CI, Railway), o pacote NuGet é usado. Ajuste o
-número de `..` para a profundidade do seu `.csproj`; o caminho aponta para `…\pitwall\packages\dotnet\Pitwall.AspNetCore\Pitwall.AspNetCore.csproj`:
+**1. Referência ao pacote, com checkout local quando existir.** Use este bloco no `.csproj` da API. Com um
+checkout do Pitwall ao lado do repositório, o cliente é compilado do código-fonte. Sem ele (CI, Railway), o
+pacote NuGet é usado. Ajuste o número de `..` para a profundidade do seu `.csproj`; o caminho aponta para `…\pitwall\packages\dotnet\Pitwall.AspNetCore\Pitwall.AspNetCore.csproj`:
 
 ```xml
   <PropertyGroup>
@@ -414,7 +414,7 @@ export async function registerPitwall(app: FastifyInstance) {
 }
 ```
 
-Para o trace id funcionar, gere o id da requisição como o metrifree faz: `genReqId: () => randomUUID().replaceAll('-', '')`
+Para o trace id funcionar, gere o id da requisição assim: `genReqId: () => randomUUID().replaceAll('-', '')`
 na criação do Fastify. O id precisa ser único entre reinícios, porque é o trace id que o Pitwall guarda.
 
 ### Vue
@@ -460,7 +460,7 @@ O botão "Relatar um problema" chama `Pitwall.current.openNewTicket()`.
 
 ### React (Next.js)
 
-**Tipagem JSX dos elementos.** Copie o arquivo de tipos do DataRunner (`apps/console/components/support/pitwall-elements.d.ts`):
+**Tipagem JSX dos elementos.** Declare as tags num arquivo de tipos do projeto (por exemplo `pitwall-elements.d.ts`):
 
 ```ts
 import type * as React from 'react';
@@ -535,8 +535,7 @@ recordRequest({ method: 'GET', path: '/api/reports', status: 500, ms: 84, traceI
 ```
 
 O cliente HTTP do produto alimenta esses buffers. Se o produto já liga o `fetch` por conta própria, use
-`captureFetch: false` na inicialização e chame `recordRequest` e `pitwall.reportServerFailure` você mesmo, como
-o DataRunner faz em `apps/console/lib/pitwall.ts`.
+`captureFetch: false` na inicialização e chame `recordRequest` e `pitwall.reportServerFailure` você mesmo.
 
 ### Outra linguagem
 
@@ -696,9 +695,9 @@ Pitwall faz `POST` na URL do produto, com corpo JSON:
 
 ```json
 { "id": "5b1c…", "type": "ticket.replied", "createdAt": "2026-10-22T14:03:00Z",
-  "product": { "id": "…", "slug": "datarunner" },
+  "product": { "id": "…", "slug": "acme" },
   "data": { "ticket": { "id": "…", "code": "20261016-7K3Q", "status": "in_progress", "customerId": "ws-123", "openedByUserId": "u-42", "…": "…" },
-            "message": { "id": "…", "body": "Já corrigimos.", "createdAt": "…", "teamName": "Equipe DataRunner" } } }
+            "message": { "id": "…", "body": "Já corrigimos.", "createdAt": "…", "teamName": "Equipe Acme" } } }
 ```
 
 Cabeçalhos:
@@ -727,41 +726,6 @@ cabem em cerca de 4 horas. Depois da última, a entrega fica como `failed` no co
 **Idempotência:** trate cada `id` uma vez. Reentregas usam o mesmo `id`.
 
 Eventos e o formato de cada `data` estão em [arquitetura.md → Webhooks](../arquitetura/README.md#webhooks).
-
----
-
-## Sistemas já integrados (referência)
-
-Use estes como exemplos reais. Os caminhos são relativos a cada repositório.
-
-### DataRunner
-
-Repositório `DataRunner`, branch `feat/pitwall`.
-
-- `apps/api/DataRunner.Api/Support/PitwallSupport.cs`: registra o cliente (`AddPitwall`), mapeia a ponte e o webhook. `ResolveActorAsync` lê o workspace do token e busca o nome e o e-mail no banco.
-- `apps/api/DataRunner.Api/Support/PitwallEventHandler.cs`: trata cada evento uma vez (recibo por `evt.Id`) e avisa as pessoas pelo sistema de notificações do próprio DataRunner. `release.published` vira um post de changelog.
-- `apps/api/DataRunner.Api/Middleware/ErrorHandlingMiddleware.cs`: envia cada 5xx ao `IPitwallErrorReporter` e devolve o `traceId` no corpo.
-- `apps/console/lib/pitwall.ts`: `startSupport` (inicia o SDK com `captureFetch: false`, porque o cliente HTTP próprio alimenta os buffers) e as funções que o resto do console usa.
-- `apps/console/components/shell/SupportBridge.tsx`: monta o SDK no shell, liga as falhas de API ao `reportServerFailure` e registra eventos de tempo real.
-- `apps/console/components/support/`: `SupportTicketsPage.tsx`, `SupportTicketPage.tsx` e `pitwall-elements.d.ts` (tipagem JSX).
-
-### RH Flex
-
-Repositório `rhflex`. Em integração: ainda não está em produção.
-
-- `apps/api/RhFlex.Api/Modules/Suporte/SuporteModule.cs`: a ponte (`MapPitwallSupport`) e o webhook. Substitui o módulo antigo de suporte.
-- `apps/api/RhFlex.Api/Common/Middleware/ExceptionMiddleware.cs`: reporta o 500 com o trace id e o devolve no cabeçalho `X-Trace-Id` e no corpo.
-- `apps/console/app/api/suporte/chamados/[[...path]]/route.ts`: proxy que repassa o corpo cru e o `Content-Type`, para anexos multipart e gravações.
-- `apps/console/components/support/PitwallSupport.tsx`: `Pitwall.init` no console, com `endpoint: "/api/suporte/chamados"`, e a função `relatarProblema`.
-
-### metrifree
-
-Repositório `metrifree`.
-
-- `apps/api/src/routes/support.ts`: a ponte (`pitwallSupport`) e o webhook com idempotência por `pitwall:event:<id>`.
-- `apps/api/src/app.ts`: `createErrorReporter` no `setErrorHandler`, com `genReqId` como trace id.
-- `apps/web/src/lib/support.ts`: `Pitwall.init` depois do login, com `x-org-id`, e `destroy` no logout.
-- `apps/web/src/views/SupportView.vue` e `TicketView.vue`: `<pitwall-tickets />` e `<pitwall-ticket :ticket-id>`.
 
 ---
 
@@ -821,7 +785,7 @@ Ao criar um chamado pelo formulário, `window` recebe `pitwall:ticket-created` c
 |---|---|
 | `data-pw-mask` ou `.pw-mask` | o texto sai mascarado na gravação. Tabelas e inputs já são mascarados quando "ocultar dados" está ligado (padrão) |
 | `data-pw-block` ou `.pw-block` | o elemento nunca é gravado |
-| `recording.maskSelector` / `blockSelector` | seletores extras do produto, ex.: `[data-dr-mask]` |
+| `recording.maskSelector` / `blockSelector` | seletores extras do produto, ex.: `[data-acme-mask]` |
 
 Variáveis de tema (herdam para dentro do Shadow DOM):
 
@@ -891,7 +855,7 @@ do webhook pode ser `http://localhost:<porta>/…`.
 | **400** `The Pitwall-Actor header is missing or invalid.` | `customerId` vazio ou actor acima de 4096 caracteres | Confira o JSON antes do base64url. Nomes longos são cortados pelo Pitwall, mas o `customerId` não |
 | **403** de escopo | a chave não tem `support` (ou `errors` no reporte) | Crie uma chave com os escopos certos e troque a variável |
 | **401** `A valid product key is required.` | chave errada, revogada, ou de produto desativado | A revogação leva até um minuto para valer |
-| CORS: o `fetch` do SDK falha ao chamar a ponte | a ponte está em outra origem | O SDK envia com `credentials: 'include'` e pode mandar `Authorization`. Sua API precisa de origem explícita (não `*`), `AllowCredentials` e `Authorization` entre os cabeçalhos permitidos. O DataRunner faz isso em `Program.cs` |
+| CORS: o `fetch` do SDK falha ao chamar a ponte | a ponte está em outra origem | O SDK envia com `credentials: 'include'` e pode mandar `Authorization`. Sua API precisa de origem explícita (não `*`), `AllowCredentials` e `Authorization` entre os cabeçalhos permitidos |
 | Trace id não liga o chamado ao erro | `X-Trace-Id` não é visível ao navegador em outra origem | Exponha o cabeçalho (`Access-Control-Expose-Headers: X-Trace-Id`) ou devolva `traceId` no corpo 5xx. O SDK lê os dois |
 | Erro nunca aparece em *Erros* | status menor que 500 (não é reportado de propósito), chave sem `errors`, ou limite de 600 por minuto | Confira o status e o escopo. Um 429 no reporte significa muitos erros de uma vez |
 | Webhook responde **401** no teste | segredo errado, segredo trocado (**Trocar segredo** invalida o antigo), ou relógio com mais de 5 minutos de diferença | Copie o segredo atual para `Pitwall__WebhookSecret`. Sincronize o relógio do servidor (NTP). Sem segredo configurado no produto, o ASP.NET também responde 401 |

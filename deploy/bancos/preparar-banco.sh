@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Liga um sistema ao backup central (docs/operacao/backup-bancos.md). Rode uma vez por sistema, na VM:
 #
-#   preparar-banco.sh rhflex | datarunner | metrifree | fiscal   pede a URL pública de admin do Postgres
-#   preparar-banco.sh pitwall                             usa o Postgres local do Pitwall
+#   preparar-banco.sh <sistema> [tabela...]   pede a URL pública de admin do Postgres
+#   preparar-banco.sh pitwall                 usa o Postgres local do Pitwall
 #
-# Nos sistemas da Railway, cria o usuário backup_ro, que só lê. A URL de admin fica só na memória deste
+# Nos outros sistemas, cria o usuário backup_ro, que só lê. A URL de admin fica só na memória deste
 # script: nem ela nem a senha nova aparecem na tela. Rodar de novo troca a senha do backup_ro.
+#
+# As tabelas são as principais do sistema: no teste de restauração, cada uma precisa chegar à cópia com
+# pelo menos 95% das linhas da origem. Sem tabelas na linha de comando, valem as do <sistema>.env que já
+# existe; sem nenhuma, o teste compara só o número de tabelas.
 set -euo pipefail
 
 dir="${BACKUPS_DIR:-/opt/backups}"
@@ -13,17 +17,24 @@ bancos="$dir/bancos"
 imagem="postgres:17-alpine"
 sistema="${1:-}"
 
-case "$sistema" in
-  rhflex) tabelas="Tenants Funcionarios RegistrosPonto" ;;
-  datarunner) tabelas="tenants users connections" ;;
-  metrifree) tabelas="users posts" ;;
-  fiscal) tabelas="nfse evento_stripe" ;;
-  pitwall) tabelas="tickets products team_tasks" ;;
-  *) echo "uso: preparar-banco.sh rhflex|datarunner|metrifree|fiscal|pitwall" >&2; exit 2 ;;
-esac
+if [[ ! "$sistema" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+  echo "uso: preparar-banco.sh <sistema> [tabela...]  (sistema em minúsculas, números, - ou _)" >&2
+  exit 2
+fi
+shift
+
+arquivo="$bancos/$sistema.env"
+tabelas="$*"
+[[ -n "$tabelas" ]] || tabelas=$(grep -m1 '^TABELAS=' "$arquivo" 2>/dev/null | cut -d= -f2- || true)
+[[ -n "$tabelas" || "$sistema" != pitwall ]] || tabelas="tickets products team_tasks"
+for tabela in $tabelas; do
+  if [[ ! "$tabela" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+    echo "Nome de tabela inválido: $tabela" >&2
+    exit 2
+  fi
+done
 
 mkdir -p -m 700 "$bancos"
-arquivo="$bancos/$sistema.env"
 umask 077
 
 if [[ "$sistema" == pitwall ]]; then
@@ -88,4 +99,9 @@ for tabela in $tabelas; do
   total=$(docker run --rm "${rede_args[@]}" --env-file "$arquivo" "$imagem" psql -Atc "SELECT count(*) FROM \"$tabela\"")
   echo "$tabela: $total registros"
 done
+if [[ -z "$tabelas" ]]; then
+  total=$(docker run --rm "${rede_args[@]}" --env-file "$arquivo" "$imagem" psql -Atc \
+    "SELECT count(*) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema')")
+  echo "$total tabelas, nenhuma conferida linha a linha (passe as principais: preparar-banco.sh $sistema <tabela...>)"
+fi
 echo "Pronto: $sistema conectado (Postgres $versao), em $arquivo."

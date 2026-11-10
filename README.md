@@ -4,8 +4,7 @@ Chamados, erros e novidades de todos os sistemas, num lugar só.
 
 O pitwall é o muro dos boxes: de lá a equipe acompanha todos os carros ao mesmo tempo — a
 telemetria (erros do servidor), o rádio (chamados), a câmera onboard (gravações de tela) e o
-boletim (changelog). Aqui, os carros são o **DataRunner**, o **RH Flex** e o **metrifree** — e
-qualquer sistema que vier depois.
+boletim (changelog). Aqui, os carros são os sistemas que a equipe mantém, quantos forem.
 
 O Pitwall é um serviço de suporte open source para quem mantém vários sistemas: o cliente abre o
 chamado dentro do próprio produto, com o contexto técnico já anexado, e a equipe responde tudo

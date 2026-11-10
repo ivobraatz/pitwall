@@ -112,7 +112,7 @@ export default function ProductPage() {
                 <span className="text-[13px] leading-[1.45] text-fg-muted">A faixa do sistema na fila, nos erros e nas novidades.</span>
               </div>
               <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Endereço do sistema"><Input code type="url" value={form.websiteUrl} placeholder="https://datarunner.app" onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} /></Field>
+                <Field label="Endereço do sistema"><Input code type="url" value={form.websiteUrl} placeholder="https://acme.example" onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} /></Field>
                 <Field label="Responsável" hint="Quem a equipe procura primeiro.">
                   <Select value={form.ownerId} onChange={(e) => setForm({ ...form, ownerId: e.target.value })} className="w-full"
                     options={[{ value: '', label: 'Ninguém' }, ...(team.data ?? []).filter((m) => !m.disabled || m.id === form.ownerId).map((m) => ({ value: m.id, label: m.name }))]} />
@@ -126,7 +126,7 @@ export default function ProductPage() {
               <Field label="O que é" hint="Contexto para o redator das novidades."><Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
               <Field label="Nome da equipe para o cliente" hint="Quem assina as respostas. Padrão: o nome do sistema."><Input value={s.teamName ?? ''} onChange={(e) => setS({ teamName: e.target.value || null })} /></Field>
               <Field label="Tela do chamado no sistema" hint="Para o link “ver no sistema”. Use {id}."><Input code value={s.customerTicketUrl ?? ''} placeholder="https://app.exemplo.com/support/view?id={id}" onChange={(e) => setS({ customerTicketUrl: e.target.value || null })} /></Field>
-              <Field label="Marcadores do código próprio (stack trace)" hint="Um por linha. Ex.: DataRunner. ou /apps/api/src/ — a assinatura do erro usa o primeiro frame que bate.">
+              <Field label="Marcadores do código próprio (stack trace)" hint="Um por linha. Ex.: Acme. ou /apps/api/src/ — a assinatura do erro usa o primeiro frame que bate.">
                 <Textarea rows={3} code value={s.ownFramePrefixes.join('\n')} onChange={(e) => setS({ ownFramePrefixes: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) })} /></Field>
               <div className="grid gap-5 sm:grid-cols-2">
                 <Field label="Idiomas das novidades"><Input value={s.locales.join(', ')} onChange={(e) => setS({ locales: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></Field>

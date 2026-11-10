@@ -5,6 +5,12 @@
 //   POST /teste   manda um e-mail agora, com o cabeçalho x-beat-key
 //   GET  /status  mostra o estado, sem nenhum segredo
 //
+// Configuração no painel do Worker (docs/operacao/deploy-oracle.md, parte 16), nunca no repositório:
+//   BEAT_KEY, RESEND_API_KEY   segredos
+//   ALERT_FROM                 remetente, num domínio verificado no Resend: "Monitor <monitor@example.com>"
+//   ALERT_TO                   destinatários, separados por vírgula: "suporte@example.com"
+//   STATE                      namespace KV
+//
 // O plano gratuito do KV aceita 1.000 gravações por dia: o sinal e a agenda usam 576. Não reduza os 5 minutos.
 
 const LIMITE_MS = 15 * 60 * 1000;
@@ -12,13 +18,19 @@ const LIMITE_MS = 15 * 60 * 1000;
 const minutosDesde = (valor) => (valor ? Math.round((Date.now() - Number(valor)) / 60000) : null);
 
 async function enviar(env, assunto, texto) {
+  const para = (env.ALERT_TO ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+  if (!env.ALERT_FROM || para.length === 0) {
+    const erro = 'Faltam as variáveis ALERT_FROM e ALERT_TO do Worker';
+    await env.STATE.put('erro', erro);
+    return erro;
+  }
   try {
     const resposta = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: 'Monitor Braatz <monitor@braatz.com.br>',
-        to: ['suporte@braatz.com.br'],
+        from: env.ALERT_FROM,
+        to: para,
         subject: assunto,
         text: texto,
       }),
@@ -51,6 +63,7 @@ export default {
         alertaAtivo: Boolean(alertado),
         erroDoEmail: erro,
         segredos: { BEAT_KEY: Boolean(env.BEAT_KEY), RESEND_API_KEY: Boolean(env.RESEND_API_KEY) },
+        variaveis: { ALERT_FROM: Boolean(env.ALERT_FROM), ALERT_TO: Boolean(env.ALERT_TO) },
       });
     }
 

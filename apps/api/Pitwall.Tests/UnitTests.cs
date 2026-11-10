@@ -14,23 +14,23 @@ namespace Pitwall.Tests;
 
 public class ErrorSignatureTests
 {
-    private static readonly string[] DotnetPrefixes = ["DataRunner."];
+    private static readonly string[] DotnetPrefixes = ["Acme."];
 
     [Fact]
     public void Same_bug_on_another_line_keeps_its_signature()
     {
         var a = ErrorSignature.Compute("System.InvalidOperationException", "/api/v1/reports/{id}/run",
-            "at System.Linq.Enumerable.First()\n   at DataRunner.Reports.Runner.Run(Int32 id) in /src/Runner.cs:line 42", DotnetPrefixes);
+            "at System.Linq.Enumerable.First()\n   at Acme.Reports.Runner.Run(Int32 id) in /src/Runner.cs:line 42", DotnetPrefixes);
         var b = ErrorSignature.Compute("System.InvalidOperationException", "/api/v1/reports/{id}/run",
-            "at System.Linq.Enumerable.First()\n   at DataRunner.Reports.Runner.Run(Int32 id) in /src/Runner.cs:line 57", DotnetPrefixes);
+            "at System.Linq.Enumerable.First()\n   at Acme.Reports.Runner.Run(Int32 id) in /src/Runner.cs:line 57", DotnetPrefixes);
         Assert.Equal(a, b);
     }
 
     [Fact]
     public void Different_own_frame_is_a_different_bug()
     {
-        var a = ErrorSignature.Compute("X", "/r", "at Lib.F()\n at DataRunner.A.B()", DotnetPrefixes);
-        var b = ErrorSignature.Compute("X", "/r", "at Lib.F()\n at DataRunner.A.C()", DotnetPrefixes);
+        var a = ErrorSignature.Compute("X", "/r", "at Lib.F()\n at Acme.A.B()", DotnetPrefixes);
+        var b = ErrorSignature.Compute("X", "/r", "at Lib.F()\n at Acme.A.C()", DotnetPrefixes);
         Assert.NotEqual(a, b);
     }
 
@@ -170,9 +170,9 @@ public class ReleaseWriterTests
     [Fact]
     public void Prompt_names_the_product_and_languages()
     {
-        var product = new Product { Name = "RH Flex", Description = "HR for small companies.", Settings = new() };
+        var product = new Product { Name = "Globex", Description = "HR for small companies.", Settings = new() };
         var prompt = ReleaseWriter.SystemPrompt(product, Locales);
-        Assert.Contains("RH Flex: HR for small companies.", prompt);
+        Assert.Contains("Globex: HR for small companies.", prompt);
         Assert.Contains("Brazilian Portuguese and English", prompt);
     }
 }

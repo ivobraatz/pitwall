@@ -10,22 +10,22 @@ certo. Faça na ordem. Para comparar com outros ambientes, veja [deploy.md](depl
 
 | Endereço | O que é | Quem acessa |
 |---|---|---|
-| `https://pitwall-api.braatz.com.br` | API do Pitwall | os backends do DataRunner, RH Flex e metrifree, e o CI deles |
-| `https://pitwall.braatz.com.br` | console da equipe | só você e a equipe, depois do login do Cloudflare Access |
+| `https://pitwall-api.example.com` | API do Pitwall | os backends dos sistemas e o CI deles |
+| `https://pitwall.example.com` | console da equipe | só você e a equipe, depois do login do Cloudflare Access |
 
-O Pitwall atende todos os produtos, então fica no domínio da software house, `braatz.com.br`, e não
-no de um produto. Os dois nomes são de primeiro nível (`pitwall-api.` e `pitwall.`), para o
-certificado gratuito da Cloudflare cobrir o console quando ele passar pelo proxy.
+Troque `example.com` pelo seu domínio em todo o guia. Os dois nomes ficam no primeiro nível dele
+(`pitwall-api.` e `pitwall.`), para o certificado gratuito da Cloudflare cobrir o console quando ele
+passar pelo proxy.
 
 **Antes de começar, tenha à mão:**
 
-- Acesso à zona **`braatz.com.br`** na Cloudflare (DNS, Email Routing e Zero Trust).
+- O seu domínio na Cloudflare, com acesso a DNS, Email Routing e Zero Trust.
 - Uma **máquina sua, fora da Oracle**, para guardar os backups (parte 8.4).
 - Um **gerenciador de senhas** (1Password, Bitwarden…). Várias chaves aparecem uma vez só.
 - Um cartão de crédito (a Oracle pede para verificar a conta; o Always Free não cobra).
-- O domínio `braatz.com.br` verificado no **Resend** (já está) e uma API key do Resend para o
-  Pitwall (parte 8.2 mostra como criar). Os avisos de chamado novo vão para
-  `suporte@braatz.com.br`, que o Email Routing da Cloudflare entrega no seu e-mail pessoal.
+- O domínio verificado no **Resend** e uma API key do Resend para o Pitwall (parte 8.2 mostra
+  como). Os avisos de chamado novo vão para uma caixa da equipe (`suporte@example.com`), que o
+  Email Routing da Cloudflare entrega no seu e-mail pessoal.
 - Uma chave da Anthropic (`ANTHROPIC_API_KEY`) para as notas de versão. Opcional: sem ela o resto
   funciona.
 - Cerca de 1h30.
@@ -296,7 +296,7 @@ git log --oneline -1
 ```
 
 O servidor roda a branch `main`. O `git log` mostra o commit em uso; anote-o, ele é o ponto de
-volta se uma atualização der errado (parte 18).
+volta se uma atualização der errado (parte 17).
 
 Crie um atalho para os comandos do compose, valendo em qualquer pasta e em toda sessão:
 
@@ -310,6 +310,8 @@ A última linha deve imprimir `docker compose -f /opt/pitwall/docker-compose.pro
 
 ---
 
+## Parte 8 — Chaves e o `.env`
+
 O `.env` guarda tudo que o Pitwall precisa. Um script gera as senhas internas e escreve o arquivo;
 você só busca as chaves de fora. Abra o gerenciador de senhas e crie um item **"Pitwall produção"**:
 cada valor vai para lá assim que aparecer (vários aparecem uma vez só).
@@ -317,6 +319,7 @@ cada valor vai para lá assim que aparecer (vários aparecem uma vez só).
 | O quê | De onde vem | Passo |
 | --- | --- | --- |
 | `POSTGRES_PASSWORD`, `PITWALL_SECRET_KEY`, `SEAWEEDFS_SECRET_KEY`, `PITWALL_ADMIN_PASSWORD` | gerados pelo script | 8.6 |
+| Domínios do console e da API, remetente dos e-mails | o seu domínio | 8.2 e 8.6 |
 | `SMTP_PASSWORD` | Resend | 8.2 |
 | `PITWALL_INBOX_EMAIL` | Email Routing da Cloudflare | 8.3 |
 | Máquina que guarda os backups (não vai no `.env`) | você | 8.4 |
@@ -337,31 +340,32 @@ commit (o CI testa). Reserve cerca de 500 MB de memória para ele.
 
 ### 8.2 Resend: chave para enviar e-mail (`SMTP_PASSWORD`)
 
-O Pitwall manda e-mail para a equipe (chamado novo, resposta do cliente) pelo Resend, onde
-`braatz.com.br` já está verificado.
+O Pitwall manda e-mail para a equipe (chamado novo, resposta do cliente) pelo Resend, com o seu
+domínio verificado.
 
-1. Entre em https://resend.com e confira em **Domains** que `braatz.com.br` aparece como
-   **Verified**.
+1. Entre em https://resend.com e confira em **Domains** que o seu domínio aparece como **Verified**.
+   Se não aparecer, **Add Domain** e crie na Cloudflare os registros DNS que o Resend mostrar.
 2. Vá em **API Keys** (https://resend.com/api-keys) → **Create API Key**.
-3. *Name*: `pitwall`; *Permission*: **Sending access**; *Domain*: `braatz.com.br`.
+3. *Name*: `pitwall`; *Permission*: **Sending access**; *Domain*: o seu domínio.
 4. **Add**. A chave aparece **uma vez** e começa com `re_`. **Copie para o gerenciador de senhas**
    como `SMTP_PASSWORD`.
 
-O remetente vai ser `pitwall@braatz.com.br`. Ele não precisa existir como caixa de e-mail: basta o
+O remetente (por exemplo `pitwall@example.com`) não precisa existir como caixa de e-mail: basta o
 domínio estar verificado no Resend.
 
 ### 8.3 Cloudflare Email Routing: a caixa da equipe (`PITWALL_INBOX_EMAIL`)
 
-Os avisos vão para `suporte@braatz.com.br`, que a Cloudflare entrega no seu e-mail pessoal.
+Os avisos vão para uma caixa da equipe, aqui `suporte@example.com`, que a Cloudflare entrega no seu
+e-mail pessoal.
 
-1. https://dash.cloudflare.com → `braatz.com.br` → **Email** → **Email Routing** → **Routing
+1. https://dash.cloudflare.com → o seu domínio → **Email** → **Email Routing** → **Routing
    rules**.
-2. Se já existe uma regra para `suporte@braatz.com.br`, ou o **Catch-all address** está ativo
+2. Se já existe uma regra para `suporte@example.com`, ou o **Catch-all address** está ativo
    mandando para o seu e-mail, não precisa fazer nada.
 3. Se não existe: **Create address** → *Custom address* `suporte` → *Action* **Send to an email** →
    *Destination* o seu e-mail pessoal → **Save**.
 
-Teste: mande um e-mail qualquer para `suporte@braatz.com.br` e confira que chegou no seu e-mail
+Teste: mande um e-mail qualquer para `suporte@example.com` e confira que chegou no seu e-mail
 pessoal.
 
 ### 8.4 Uma máquina sua para guardar os backups
@@ -392,10 +396,11 @@ cd /opt/pitwall
 bash deploy/gerar-env.sh
 ```
 
-O script pergunta o e-mail com que você vai entrar (use o mesmo que vai liberar no Cloudflare Access,
-parte 11.4), a chave do Resend e a da Anthropic. Depois gera as senhas, escreve o `.env` só com
-permissão para o seu usuário e mostra os valores gerados. **Copie-os para o gerenciador de senhas
-agora:**
+O script pergunta os domínios do console e da API, o e-mail da equipe (8.3), o remetente (8.2), o
+e-mail com que você vai entrar (use o mesmo que vai liberar no Cloudflare Access, parte 11.4), a chave
+do Resend e a da Anthropic. Cada um pode vir de uma variável de ambiente de mesmo nome (a lista está no
+começo do script). Depois gera as senhas, escreve o `.env` só com permissão para o seu usuário e mostra
+os valores gerados. **Copie-os para o gerenciador de senhas agora:**
 
 - `PITWALL_SECRET_KEY`: **nunca pode mudar nem se perder.** Ela cifra os segredos de webhook e as
   sementes do 2FA guardadas no banco. Sem ela, um backup do banco não serve para nada.
@@ -403,9 +408,8 @@ agora:**
   `.env` não troca a senha já gravada no banco.
 - `PITWALL_ADMIN_PASSWORD`: seu primeiro login; sai do servidor na parte 12.
 
-O script se recusa a sobrescrever um `.env` existente, para não perder a `PITWALL_SECRET_KEY`. Os
-valores fixos (domínios, Resend, `suporte@braatz.com.br`) já vêm preenchidos; para ajustar algo, use
-`nano .env`.
+O script se recusa a sobrescrever um `.env` existente, para não perder a `PITWALL_SECRET_KEY`. Para
+ajustar algo depois, use `nano .env`.
 
 ### 8.7 Conferir
 
@@ -425,7 +429,7 @@ Resend não chegam e-mails, e sem a da Anthropic só as notas de versão ficam d
 O Caddy precisa que os nomes apontem direto para a VM na primeira subida, para emitir os
 certificados.
 
-1. https://dash.cloudflare.com → `braatz.com.br` → **DNS** → **Records** → **Add record**:
+1. https://dash.cloudflare.com → o seu domínio → **DNS** → **Records** → **Add record**:
    - *Type*: `A`; *Name*: `pitwall-api`; *IPv4 address*: `<IP-DA-VM>`; *Proxy status*: **desligado**
      (nuvem cinza, "DNS only"); **Save**.
 2. **Add record** de novo:
@@ -435,8 +439,8 @@ certificados.
 Confira **(no seu computador)**:
 
 ```powershell
-Resolve-DnsName pitwall-api.braatz.com.br
-Resolve-DnsName pitwall.braatz.com.br
+Resolve-DnsName pitwall-api.example.com
+Resolve-DnsName pitwall.example.com
 ```
 
 Os dois devem responder `<IP-DA-VM>`. Se ainda não responder, espere alguns minutos.
@@ -467,8 +471,8 @@ Acompanhe o Caddy pegando os certificados:
 $COMPOSE logs -f caddy
 ```
 
-Procure por `certificate obtained successfully` para `pitwall-api.braatz.com.br` e para
-`pitwall.braatz.com.br`. Saia com `Ctrl+C`.
+Procure por `certificate obtained successfully` para `pitwall-api.example.com` e para
+`pitwall.example.com`. Saia com `Ctrl+C`.
 
 Outro site servido pelo mesmo Caddy (um app na rede `pitwall_default`, por exemplo) vai num arquivo
 `deploy/caddy.d/<nome>.caddy`, que o Git ignora e o deploy não apaga. Depois de criar ou mudar um:
@@ -493,12 +497,12 @@ Deve aparecer `Created the attachments bucket pitwall-anexos.` e `200`.
 Teste a API **(no seu computador)**:
 
 ```powershell
-curl.exe -sS https://pitwall-api.braatz.com.br/health
+curl.exe -sS https://pitwall-api.example.com/health
 ```
 
 Resposta esperada: `{"status":"ok"}`.
 
-Se algo falhar aqui, veja a parte 20 (problemas comuns).
+Se algo falhar aqui, veja a parte 19 (problemas comuns).
 
 ---
 
@@ -508,13 +512,13 @@ Ordem importa: primeiro o certificado (parte 10 ok), depois o proxy e o Access.
 
 ### 11.1 SSL só para o console
 
-A zona `braatz.com.br` é a da software house; não mude o modo SSL da zona inteira (outros sites dela
-podem depender do modo atual). Crie uma regra só para o console:
+Não mude o modo SSL da zona inteira: outros sites do mesmo domínio podem depender do modo atual. Crie
+uma regra só para o console:
 
-1. Cloudflare → `braatz.com.br` → **Rules** → **Configuration Rules** → **Create rule**.
+1. Cloudflare → o seu domínio → **Rules** → **Configuration Rules** → **Create rule**.
 2. *Rule name*: `Pitwall console SSL`.
 3. *If incoming requests match*: **Custom filter expression** → *Field* `Hostname`, *Operator*
-   `equals`, *Value* `pitwall.braatz.com.br`.
+   `equals`, *Value* `pitwall.example.com`.
 4. *Then the settings are*: **SSL** → **Add** → **Full (strict)**.
 5. **Deploy**.
 
@@ -530,7 +534,7 @@ O registro `pitwall-api` **continua cinza**.
 
 ### 11.3 Aceitar o console só pela Cloudflare
 
-Sem isso, alguém que acesse o IP da VM direto, com o nome `pitwall.braatz.com.br`, passaria por
+Sem isso, alguém que acesse o IP da VM direto, com o nome `pitwall.example.com`, passaria por
 fora do Access.
 
 **(na VM)**
@@ -553,8 +557,8 @@ $COMPOSE up -d caddy
 Confira **(no seu computador)**. Pelo nome (via Cloudflare) responde; pelo IP direto, não:
 
 ```powershell
-curl.exe -s -o NUL -w "%{http_code}`n" https://pitwall.braatz.com.br/login
-curl.exe -sk -o NUL -w "%{http_code}`n" --resolve pitwall.braatz.com.br:443:<IP-DA-VM> https://pitwall.braatz.com.br/login
+curl.exe -s -o NUL -w "%{http_code}`n" https://pitwall.example.com/login
+curl.exe -sk -o NUL -w "%{http_code}`n" --resolve pitwall.example.com:443:<IP-DA-VM> https://pitwall.example.com/login
 ```
 
 O primeiro dá `200` (ou `302`, depois do 11.4); o segundo tem que dar `403`.
@@ -565,7 +569,7 @@ este passo (apague antes a linha antiga com `nano .env`).
 ### 11.4 Cloudflare Access (login antes do console)
 
 1. Abra https://one.dash.cloudflare.com (Cloudflare **Zero Trust**). Na primeira vez, escolha um
-   *team name* (qualquer, por exemplo `ivobraatz`) e o plano **Free** (até 50 usuários).
+   *team name* (qualquer, por exemplo o nome da empresa) e o plano **Free** (até 50 usuários).
 
 **Antes da aplicação: ativar o login por código no e-mail (One-time PIN).** Ele não vem ativo; sem
 isso, a aplicação só oferece a opção "Cloudflare".
@@ -579,7 +583,7 @@ isso, a aplicação só oferece a opção "Cloudflare".
 
 4. **Access** → **Applications** → **Add an application** → **Self-hosted**.
 5. *Application name*: `Pitwall console`; *Session Duration*: `24 hours`.
-6. **Add public hostname**: *Subdomain* `pitwall`, *Domain* `braatz.com.br`, *Path* vazio.
+6. **Add public hostname**: *Subdomain* `pitwall`, *Domain* o seu domínio, *Path* vazio.
    **Não** adicione o `pitwall-api`.
 7. Avance até **Policies** → **Add a policy**:
    - *Policy name*: `Equipe`; *Action*: **Allow**;
@@ -590,14 +594,14 @@ isso, a aplicação só oferece a opção "Cloudflare".
    *Login methods* para marcar o One-time PIN.
 9. Salve (**Save application**).
 
-Confira: numa **janela anônima**, abra `https://pitwall.braatz.com.br`. Deve aparecer a tela da
+Confira: numa **janela anônima**, abra `https://pitwall.example.com`. Deve aparecer a tela da
 Cloudflare pedindo e-mail; um código chega no seu e-mail; depois aparece o login do Pitwall.
 
 ---
 
 ## Parte 12 — Primeiro login e 2FA
 
-1. Em `https://pitwall.braatz.com.br`, passe pelo Access e entre com `PITWALL_ADMIN_EMAIL` e
+1. Em `https://pitwall.example.com`, passe pelo Access e entre com `PITWALL_ADMIN_EMAIL` e
    `PITWALL_ADMIN_PASSWORD`.
 2. Como `PITWALL_REQUIRE_TOTP=true`, aparece um aviso pedindo o 2FA: clique em **Ir para Conta**
    (ou no menu **Conta e equipe**) → **Ativar autenticador** → escaneie o QR code no app autenticador (1Password, Google
@@ -622,32 +626,24 @@ política do Access (11.4, passo 5).
 
 ---
 
-## Parte 13 — Cadastrar os três sistemas
+## Parte 13 — Cadastrar os sistemas
 
-Repita para **DataRunner**, **RH Flex** e **metrifree**. Tenha o gerenciador de senhas aberto: chaves
-e segredos aparecem **uma vez só**.
+Repita para cada sistema que vai usar o Pitwall. Os exemplos usam dois sistemas fictícios: **Acme**,
+em ASP.NET Core, e **Globex**, em Node. Tenha o gerenciador de senhas aberto: chaves e segredos
+aparecem **uma vez só**.
 
 ### 13.1 Criar o sistema
 
-**Sistemas** → **Novo sistema**:
-
-| Sistema | Slug | Nome |
-|---|---|---|
-| DataRunner | `datarunner` | DataRunner |
-| RH Flex | `rhflex` | RH Flex |
-| metrifree | `metrifree` | metrifree |
-
-O slug do DataRunner precisa ser exatamente `datarunner` (o importador da parte 17 procura por ele).
-**Criar**, depois abra o sistema na lista.
+**Sistemas** → **Novo sistema**: *Nome* (`Acme`) e *Identificador* (`acme`: minúsculas, números e
+hífen; aparece nas chaves e no changelog público). **Criar**, depois abra o sistema na lista.
 
 ### 13.2 Ajustar o sistema
 
 No cartão **Geral**:
 
-- *Nome da equipe para o cliente*: como o cliente vê quem responde (por exemplo `Equipe DataRunner`).
+- *Nome da equipe para o cliente*: como o cliente vê quem responde (por exemplo `Equipe Acme`).
 - *Tela do chamado no sistema*: o endereço da página do chamado dentro do produto, com `{id}`. Por
-  exemplo DataRunner `https://app.<domínio do DataRunner>/support/view?id={id}`. (É o link usado
-  nos e-mails.)
+  exemplo `https://app.acme.example/support/view?id={id}`. (É o link usado nos e-mails.)
 - *Idiomas das novidades*: `pt` e `en` (ou só `pt`).
 - *Publicar novidades sozinho*: ligado se quiser que as notas do Haiku saiam sem revisão; desligado
   para revisar em **Novidades** antes.
@@ -666,18 +662,17 @@ No cartão **Chaves** → **Nova chave**, duas vezes:
 
 No cartão **Webhook**:
 
-1. *URL*:
+1. *URL*: o endpoint de webhook do sistema ([integracao.md](integracao.md), passo 6). Por exemplo:
 
    | Sistema | URL do webhook |
    |---|---|
-   | DataRunner | `https://<API do DataRunner>/api/v1/webhooks/pitwall` |
-   | RH Flex | `https://<API do RH Flex>/api/v1/webhooks/pitwall` |
-   | metrifree | `https://<domínio do metrifree>/api/webhooks/pitwall` |
+   | Acme (ASP.NET Core) | `https://api.acme.example/api/v1/webhooks/pitwall` |
+   | Globex (Node) | `https://globex.example/api/webhooks/pitwall` |
 
 2. **Salvar** (no topo da página).
 3. **Gerar segredo** → **Copiar** → guarde como "Pitwall – <sistema> – webhook" → **Já copiei**.
 4. O botão **Testar** só vai dar certo depois que o sistema estiver com as variáveis da parte 14 e
-   com a branch `feat/pitwall` no ar.
+   com a integração no ar.
 
 ---
 
@@ -687,41 +682,31 @@ No cartão **Webhook**:
 
 No painel de onde cada sistema roda (Railway, por exemplo → serviço da API → **Variables**):
 
-| Sistema | Variável | Valor |
+| Stack | Variável | Valor |
 |---|---|---|
-| DataRunner (API) | `Pitwall__BaseUrl` | `https://pitwall-api.braatz.com.br` |
-| | `Pitwall__ApiKey` | chave "DataRunner – backend" |
-| | `Pitwall__WebhookSecret` | segredo "DataRunner – webhook" |
-| RH Flex (API) | `Pitwall__BaseUrl` | `https://pitwall-api.braatz.com.br` |
-| | `Pitwall__ApiKey` | chave "RH Flex – backend" |
-| | `Pitwall__WebhookSecret` | segredo "RH Flex – webhook" |
-| metrifree | `PITWALL_URL` | `https://pitwall-api.braatz.com.br` |
-| | `PITWALL_KEY` | chave "metrifree – backend" |
-| | `PITWALL_WEBHOOK_SECRET` | segredo "metrifree – webhook" |
+| ASP.NET Core | `Pitwall__BaseUrl` | `https://pitwall-api.example.com` |
+| | `Pitwall__ApiKey` | chave "<sistema> – backend" |
+| | `Pitwall__WebhookSecret` | segredo "<sistema> – webhook" |
+| Node | `PITWALL_URL` | `https://pitwall-api.example.com` |
+| | `PITWALL_KEY` | chave "<sistema> – backend" |
+| | `PITWALL_WEBHOOK_SECRET` | segredo "<sistema> – webhook" |
 
 ### 14.2 Secrets e variáveis no GitHub de cada sistema (novidades)
 
-**(no seu computador)**, com o `gh` logado. Cada comando pede para colar o valor (cole a chave "ci"
-do sistema e aperte Enter):
+**(no seu computador)**, com o `gh` logado. Troque `<dono>/<repositório>` pelo repositório do sistema.
+O primeiro comando pede para colar o valor (cole a chave "ci" do sistema e aperte Enter):
 
 ```powershell
-gh secret set PITWALL_RELEASE_KEY -R ivobraatz/DataRunner
-gh variable set PITWALL_URL -R ivobraatz/DataRunner --body "https://pitwall-api.braatz.com.br"
-
-gh secret set PITWALL_RELEASE_KEY -R ivobraatz/rhflex
-gh variable set PITWALL_URL -R ivobraatz/rhflex --body "https://pitwall-api.braatz.com.br"
-
-gh secret set PITWALL_RELEASE_KEY -R ivobraatz/metrifree
-gh variable set PITWALL_URL -R ivobraatz/metrifree --body "https://pitwall-api.braatz.com.br"
+gh secret set PITWALL_RELEASE_KEY -R <dono>/<repositório>
+gh variable set PITWALL_URL -R <dono>/<repositório> --body "https://pitwall-api.example.com"
 ```
 
-O RH Flex usa também a variável `PITWALL_FIRST_COMMIT` no workflow de novidades (o commit a partir do
-qual as notas começam); defina-a se quiser limitar o histórico da primeira nota.
+Para limitar o histórico da primeira nota, passe à action `release-notes` a entrada `first-commit` (o
+commit a partir do qual as notas começam).
 
 ### 14.3 Publicar a integração
 
-As integrações estão nas branches `feat/pitwall` de cada repositório. Faça o merge e o deploy de
-cada sistema (o RH Flex depois da `console/novo-shell`). No DataRunner, siga logo depois a parte 17.
+Faça o merge e o deploy da integração de cada sistema ([integracao.md](integracao.md)).
 
 ### 14.4 Conferir
 
@@ -731,7 +716,7 @@ Para cada sistema:
    entregue.
 2. No produto, logado como cliente: **Relatar um problema** → abra um chamado de teste.
 3. No console do Pitwall, o chamado aparece em **Chamados**; responda.
-4. No produto, a resposta aparece (e, no DataRunner, chega a notificação).
+4. No produto, a resposta aparece (e chega o aviso, se o sistema trata o `ticket.replied`).
 5. Anexe um print no chamado de teste e veja se ele abre no console. Se o anexo falhar, veja
    `$COMPOSE logs api | grep -iE "s3|bucket"` e `$COMPOSE logs seaweedfs`. Vídeos entram pela conversa do
    chamado; o formulário de abertura aceita só imagens. Nos produtos em .NET, o limite de 90 MB só
@@ -836,13 +821,42 @@ $COMPOSE --profile backup run --rm --no-deps rclone copy /backups/anexos bucket:
 ## Parte 16 — Monitoramento
 
 Se o Pitwall cair, os sistemas não conseguem abrir chamados. O monitoramento usa o Uptime Kuma, que
-roda na VM, e um Worker da Cloudflare que avisa se a VM ou o próprio Kuma caírem:
+roda na VM, e um Worker da Cloudflare que avisa se a VM ou o próprio Kuma caírem.
+
+### 16.1 Uptime Kuma
 
 1. No Uptime Kuma → **Add New Monitor**.
-2. *Monitor Type*: **HTTP(s)**; *URL*: `https://pitwall-api.braatz.com.br/health`; alerta pelo seu
+2. *Monitor Type*: **HTTP(s)**; *URL*: `https://pitwall-api.example.com/health`; alerta pelo seu
    e-mail → **Save**.
 
 (Não monitore o console: o Access bloqueia o robô, e a API já cobre o servidor.)
+
+### 16.2 Vigia do monitor (Worker da Cloudflare)
+
+Se a VM cair, o Kuma cai junto e nenhum alerta dele sai. O `deploy/vigia-monitor/worker.js` roda na
+Cloudflare: recebe um sinal (`POST /beat`, com o cabeçalho `x-beat-key`) a cada 5 minutos e manda um
+e-mail pelo Resend quando o sinal passa de 15 minutos sem chegar, e outro quando ele volta. Mande o sinal
+a partir do próprio Kuma (por exemplo, um monitor **HTTP(s)** com *Method* `POST`, o cabeçalho e intervalo de
+300 s): assim a queda do Kuma também vira alerta.
+
+Na Cloudflare, em **Workers & Pages** → o Worker → **Settings**:
+
+| Onde | Nome | Valor |
+|---|---|---|
+| *Variables and Secrets*, tipo **Secret** | `BEAT_KEY` | um valor aleatório (`openssl rand -hex 24`), o mesmo do cabeçalho `x-beat-key` |
+| *Variables and Secrets*, tipo **Secret** | `RESEND_API_KEY` | uma chave do Resend com *Sending access* |
+| *Variables and Secrets*, tipo **Text** | `ALERT_FROM` | o remetente, num domínio verificado no Resend: `Monitor <monitor@example.com>` |
+| *Variables and Secrets*, tipo **Text** | `ALERT_TO` | quem recebe, separado por vírgula: `suporte@example.com` |
+| *Bindings* → **KV namespace** | `STATE` | um namespace KV só para ele |
+| *Cron Triggers* | — | `*/5 * * * *` |
+
+Esses valores ficam só no painel, nunca no repositório. Num Worker que já está no ar, crie
+`ALERT_FROM` e `ALERT_TO` **antes** de publicar a versão nova do código: sem elas, ele não manda alerta.
+
+Confira: `POST /teste` com o cabeçalho `x-beat-key` manda um e-mail na hora, e `GET /status` mostra há
+quantos minutos chegou o último sinal e se falta algum segredo ou variável.
+
+### 16.3 Logs
 
 Para olhar os logs quando quiser **(na VM)**:
 
@@ -855,65 +869,9 @@ $COMPOSE logs --tail=200 caddy
 
 ---
 
-## Parte 17 — Importar o histórico de chamados do DataRunner (uma vez)
+## Parte 17 — Atualizar o Pitwall
 
-Faça logo depois do deploy do DataRunner com a branch `feat/pitwall` (esse deploy renomeia as tabelas
-antigas para `legacy_*`; entre um e outro, os chamados antigos ficam invisíveis para o cliente).
-
-Você vai precisar: a connection string do Postgres do DataRunner (Railway → Postgres → **Connect** →
-URL pública) e as credenciais do bucket R2 onde o DataRunner guarda anexos.
-
-**(na VM)** Crie o arquivo de credenciais temporário:
-
-```bash
-nano /opt/pitwall/import.env
-```
-
-Conteúdo (troque os `< >`; se a senha tiver espaço, `$`, `&`, `;` ou aspas, envolva o valor inteiro
-da linha em aspas simples):
-
-```dotenv
-Import__SourceConnectionString=Host=<host>;Port=<porta>;Database=<banco>;Username=<usuário>;Password=<senha>
-Import__SourceStorage__Provider=s3
-Import__SourceStorage__ServiceUrl=https://<account-id>.r2.cloudflarestorage.com
-Import__SourceStorage__Bucket=<bucket do DataRunner>
-Import__SourceStorage__AccessKey=<access key>
-Import__SourceStorage__SecretKey=<secret key>
-```
-
-```bash
-chmod 600 /opt/pitwall/import.env
-cd /opt/pitwall
-```
-
-**Simulação** (não grava nada):
-
-```bash
-$COMPOSE run --rm --env-from-file /opt/pitwall/import.env api import-datarunner --dry-run
-```
-
-A última linha mostra quantos chamados, mensagens, anexos (e anexos sem arquivo), erros e itens
-pulados. Confira se bate com o que o DataRunner tinha.
-
-**Importação de verdade:**
-
-```bash
-$COMPOSE run --rm --env-from-file /opt/pitwall/import.env api import-datarunner
-```
-
-**Limpeza:**
-
-```bash
-rm -f /opt/pitwall/import.env
-```
-
-Confira no console: **Chamados**, filtrando pelo sistema DataRunner. Rodar de novo não duplica nada.
-
----
-
-## Parte 18 — Atualizar o Pitwall
-
-Depois da parte 19, isto acontece sozinho; os comandos abaixo são para atualizar à mão (ou
+Depois da parte 18, isto acontece sozinho; os comandos abaixo são para atualizar à mão (ou
 entender o que o automático faz).
 
 Quando houver mudanças novas na `main` **(na VM)**:
@@ -925,7 +883,7 @@ $COMPOSE exec -T postgres pg_dump -U pitwall -Fc pitwall > /opt/pitwall/backups/
 git pull
 $COMPOSE up -d --build
 $COMPOSE ps
-curl -sS https://pitwall-api.braatz.com.br/health
+curl -sS https://pitwall-api.example.com/health
 ```
 
 As migrações do banco rodam sozinhas quando a API sobe.
@@ -946,7 +904,7 @@ Se a versão nova tiver mudado o banco, restaure também o `antes-da-atualizacao
 
 ---
 
-## Parte 19 — Atualização automática (CI/CD)
+## Parte 18 — Atualização automática (CI/CD)
 
 Com isto, todo commit que entra na `main` do Pitwall e **passa no CI** do GitHub chega sozinho na
 VM em até uns 5 minutos depois do CI terminar. Você não precisa entrar na VM para atualizar.
@@ -967,7 +925,7 @@ VM em até uns 5 minutos depois do CI terminar. Você não precisa entrar na VM 
 Por isso o GitHub não precisa de acesso à VM: nenhuma chave SSH do servidor fica em lugar nenhum e a
 porta 22 continua só para você.
 
-### 19.1 Conferir a VM
+### 18.1 Conferir a VM
 
 **(na VM)**
 
@@ -989,7 +947,7 @@ git pull
 $COMPOSE up -d --build
 ```
 
-### 19.2 Instalar o que o script usa
+### 18.2 Instalar o que o script usa
 
 ```bash
 sudo apt -y install jq
@@ -999,7 +957,7 @@ ls -l /opt/pitwall/deploy/auto-update.sh
 O `ls` deve mostrar `-rwxr-xr-x` (executável). Se não mostrar o `x`, rode
 `chmod +x /opt/pitwall/deploy/auto-update.sh`.
 
-### 19.3 Testar sem mudar nada
+### 18.3 Testar sem mudar nada
 
 ```bash
 /opt/pitwall/deploy/auto-update.sh --dry-run
@@ -1013,9 +971,9 @@ Respostas possíveis, todas normais:
 | `atualizando abc1234 → def5678: …` e `(dry-run) pararia aqui` | há versão nova com CI verde; sem o `--dry-run`, ela seria instalada |
 | `CI de def5678 ainda não terminou (in_progress null)` | o CI do commit novo ainda está rodando |
 
-Se aparecer `command not found: jq`, volte ao 19.2.
+Se aparecer `command not found: jq`, volte ao 18.2.
 
-### 19.4 Ligar o timer
+### 18.4 Ligar o timer
 
 ```bash
 sudo cp /opt/pitwall/deploy/systemd/pitwall-update.service /etc/systemd/system/
@@ -1037,7 +995,7 @@ journalctl -u pitwall-update.service -n 20 --no-pager
 Se não havia nada novo, o `journalctl` não mostra mensagem do script (ele só escreve quando há o que
 fazer); aparece apenas `Finished pitwall-update.service`.
 
-### 19.5 O dia a dia
+### 18.5 O dia a dia
 
 - **Publicar uma atualização:** faça commit e push na `main` do Pitwall (ou merge de um PR). O CI
   roda no GitHub (uns 5 minutos); em até 5 minutos depois de ele ficar verde, a VM atualiza. Uma
@@ -1069,10 +1027,10 @@ fazer); aparece apenas `Finished pitwall-update.service`.
 - **Voltar o banco** depois de uma atualização que mudou o banco e deu errado: os dumps
   `antes-de-<commit>.dump` ficam em `/opt/pitwall/backups/`; restaure como na parte 15.4.
 
-### 19.6 Ser avisado quando der errado
+### 18.6 Ser avisado quando der errado
 
 O monitor do Uptime Kuma (parte 16) avisa se o Pitwall sair do ar. Para saber também de uma
-atualização que voltou sozinha para a versão anterior, olhe o `journalctl` do 19.5 de vez em quando,
+atualização que voltou sozinha para a versão anterior, olhe o `journalctl` do 18.5 de vez em quando,
 ou procure por `não subiu` e `ATENÇÃO`:
 
 ```bash
@@ -1081,7 +1039,7 @@ journalctl -u pitwall-update.service --since "7 days ago" --no-pager | grep -E "
 
 ---
 
-## Parte 20 — Problemas comuns
+## Parte 19 — Problemas comuns
 
 | Sintoma | Causa e solução |
 |---|---|
@@ -1090,14 +1048,14 @@ journalctl -u pitwall-update.service --since "7 days ago" --no-pager | grep -E "
 | Caddy não pega o certificado | DNS ainda não aponta para a VM (`Resolve-DnsName`), nuvem laranja ligada antes da emissão (parte 9 pede cinza), ou porta 80 fechada. Veja `$COMPOSE logs caddy`. O Let's Encrypt limita tentativas: espere 10 minutos e rode `$COMPOSE restart caddy` |
 | Console dá 403 pelo navegador | O DNS do `pitwall` está cinza (sem proxy) mas o 11.3 já foi aplicado: ligue a nuvem laranja. Ou as faixas da Cloudflare mudaram: refaça o 11.3 |
 | Erro 526 da Cloudflare no console | Regra *Full (strict)* do 11.1 ativa, mas o Caddy ainda sem certificado: confira o 10 (certificado emitido) |
-| Erro 525 ou loop de redirecionamento no console | A regra do 11.1 não pegou e a zona está em *Flexible*: confira o *Hostname* da regra (`pitwall.braatz.com.br`) |
+| Erro 525 ou loop de redirecionamento no console | A regra do 11.1 não pegou e a zona está em *Flexible*: confira o *Hostname* da regra (`pitwall.example.com`) |
 | `api` reiniciando em loop | `$COMPOSE logs api`. Normalmente `.env` incompleto (`PITWALL_SECRET_KEY` vazio) ou Postgres ainda subindo |
 | Não chega e-mail | Dados de SMTP ou remetente não verificado no provedor. Veja `$COMPOSE logs api \| grep -i smtp` |
 | "Out of capacity" ao criar a VM | Sem ARM livre na região: outro *availability domain*, outro horário, ou conta Pay As You Go |
 | A VM parou sozinha depois de dias | Recuperação de VM ociosa: passe a conta para Pay As You Go (1.2) e ligue a VM de novo |
 | Depois de reiniciar a VM o site não volta | `sudo iptables -L INPUT -n` (as regras do 5.3 continuam?) e `$COMPOSE ps`; se precisar, `sudo systemctl restart docker && $COMPOSE up -d` |
-| Webhook **Testar** falha | O sistema ainda não tem `…WebhookSecret`/`PITWALL_WEBHOOK_SECRET` igual ao gerado, ou a branch `feat/pitwall` ainda não está no ar, ou a URL está errada |
-| A VM não atualizou depois do push | `journalctl -u pitwall-update.service -n 50 --no-pager`. Causas comuns: CI vermelho ou ainda rodando, commit marcado em `.deploy-failed` (parte 19.5), mudanças locais no servidor (`git status`), timer parado (`systemctl list-timers`) |
+| Webhook **Testar** falha | O sistema ainda não tem `…WebhookSecret`/`PITWALL_WEBHOOK_SECRET` igual ao gerado, ou a integração ainda não está no ar, ou a URL está errada |
+| A VM não atualizou depois do push | `journalctl -u pitwall-update.service -n 50 --no-pager`. Causas comuns: CI vermelho ou ainda rodando, commit marcado em `.deploy-failed` (parte 18.5), mudanças locais no servidor (`git status`), timer parado (`systemctl list-timers`) |
 | `required variable SEAWEEDFS_ACCESS_KEY is missing` | `.env` de antes do SeaweedFS: acrescente as linhas de "Já tem uma VM do Pitwall?", no início do guia |
 | `api` reiniciando e o log fala em bucket | O SeaweedFS não respondeu ou a chave do `.env` está errada. Veja `$COMPOSE logs seaweedfs` |
 | Fotos do login dão 404 | O console está numa imagem antiga: `$COMPOSE up -d --build console` |
@@ -1107,23 +1065,22 @@ journalctl -u pitwall-update.service --since "7 days ago" --no-pager | grep -E "
 
 ---
 
-## Parte 21 — Checklist final
+## Parte 20 — Checklist final
 
 - [ ] Conta Oracle em Pay As You Go, com orçamento de US$ 1 e alerta.
 - [ ] VM `pitwall` (A1.Flex, Ubuntu 24.04 aarch64) com portas 80/443 na Security List e no iptables.
 - [ ] Docker instalado, logs limitados, `$COMPOSE` no `~/.bashrc`.
 - [ ] `.env` com `chmod 600`; todas as chaves da parte 8 no item "Pitwall produção" do gerenciador de senhas.
-- [ ] `https://pitwall-api.braatz.com.br/health` responde `{"status":"ok"}`; DNS do `pitwall-api` cinza.
-- [ ] DNS do `pitwall` laranja, regra *Full (strict)* só para `pitwall.braatz.com.br`, `PITWALL_CONSOLE_ALLOWED_IPS` aplicado (IP direto dá 403).
+- [ ] `https://pitwall-api.example.com/health` responde `{"status":"ok"}`; DNS do `pitwall-api` cinza.
+- [ ] DNS do `pitwall` laranja, regra *Full (strict)* só para `pitwall.example.com`, `PITWALL_CONSOLE_ALLOWED_IPS` aplicado (IP direto dá 403).
 - [ ] Cloudflare Access pedindo e-mail antes do console.
 - [ ] Primeiro login, 2FA ativo, `PITWALL_ADMIN_*` vazios no `.env` e `api` recriado.
-- [ ] DataRunner, RH Flex e metrifree cadastrados, cada um com chave `backend`, chave `ci` e webhook.
+- [ ] Cada sistema cadastrado, com chave `backend`, chave `ci` e webhook.
 - [ ] Variáveis em cada sistema e `PITWALL_RELEASE_KEY` / `PITWALL_URL` no GitHub de cada um.
 - [ ] SeaweedFS no ar, bucket `pitwall-anexos` criado (`$COMPOSE logs api | grep -i "attachments bucket"`) e o print de teste abrindo no console.
 - [ ] Backups: cron do `deploy/backup.sh`, cópia em outra máquina (15.2), política do boot volume.
-- [ ] Monitor do Uptime Kuma no `/health`.
+- [ ] Monitor do Uptime Kuma no `/health` e o vigia do monitor mandando o e-mail do `/teste`.
 - [ ] Timer `pitwall-update.timer` ativo (`systemctl list-timers pitwall-update.timer`).
-- [ ] Importação do DataRunner feita e `import.env` apagado.
 
 ---
 

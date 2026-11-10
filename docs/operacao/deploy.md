@@ -55,7 +55,7 @@ escolha antes do primeiro anexo.
 
 | Ambiente | Mecanismo | Como ligar | Se a versão nova não subir |
 |---|---|---|---|
-| Oracle | timer pergunta ao GitHub a cada 5 minutos, roda o `deploy/auto-update.sh` | [parte 19](deploy-oracle.md#parte-19--atualização-automática-cicd) | volta o código sozinho; o dump feito antes fica em `backups/` |
+| Oracle | timer pergunta ao GitHub a cada 5 minutos, roda o `deploy/auto-update.sh` | [parte 18](deploy-oracle.md#parte-18--atualização-automática-cicd) | volta o código sozinho; o dump feito antes fica em `backups/` |
 
 **O dia a dia é igual em todos:** faça merge ou push na `main`. Com CI vermelho, nada é publicado.
 
