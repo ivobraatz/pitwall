@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, type StaffTokenInfo } from '@/lib/api';
-import { Button, Card, Field, Input, Pill, Select, dateTime, rel, useToast } from '@/components/ui';
+import { Button, Card, Check, Field, Input, Pill, Select, dateTime, rel, useToast } from '@/components/ui';
 
 type Created = { id: string; name: string; prefix: string; expiresAt: string | null; token: string };
 
@@ -39,6 +39,7 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
   const tokens = useQuery({ queryKey: ['me', 'tokens'], queryFn: () => api<StaffTokenInfo[]>('/staff/me/tokens') });
   const [name, setName] = React.useState('');
   const [days, setDays] = React.useState('90');
+  const [errors, setErrors] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [created, setCreated] = React.useState<Created | null>(null);
   const [confirming, setConfirming] = React.useState<string | null>(null);
@@ -46,7 +47,7 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
   const create = async () => {
     setBusy(true);
     try {
-      const res = await api<Created>('/staff/me/tokens', { method: 'POST', json: { name, expiresInDays: days === 'never' ? null : Number(days), scopes: ['tasks', 'atlas'] } });
+      const res = await api<Created>('/staff/me/tokens', { method: 'POST', json: { name, expiresInDays: days === 'never' ? null : Number(days), scopes: errors ? ['tasks', 'atlas', 'errors'] : ['tasks', 'atlas'] } });
       setCreated(res); setName('');
       void tokens.refetch();
     } catch (e) { toast('error', e instanceof Error ? e.message : 'Erro.'); } finally { setBusy(false); }
@@ -63,7 +64,7 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
         <p className="max-w-xl leading-[1.5] text-fg-secondary">
           Para o Claude Code ler e atualizar o quadro de <strong className="font-semibold text-fg">Tarefas</strong> em seu nome, pelo MCP do Pitwall.
           Ele também registra sistemas, rotinas e atividade no <strong className="font-semibold text-fg">Atlas</strong>.
-          O token só alcança as tarefas e o Atlas: não lê chamados nem a equipe.
+          Com a opção de erros, também lê os erros do servidor (para a triagem diária). O token não lê chamados nem a equipe.
         </p>
 
         {created ? (
@@ -85,6 +86,7 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
               <Select value={days} onChange={(e) => setDays(e.target.value)}
                 options={[{ value: '30', label: '30 dias' }, { value: '90', label: '90 dias' }, { value: '365', label: '1 ano' }, { value: 'never', label: 'Sem expiração' }]} />
             </Field>
+            <Check checked={errors} onChange={setErrors}>Ler erros do servidor</Check>
             <Button variant="primary" loading={busy} disabled={!name.trim() || active >= 10} onClick={create}>Novo token</Button>
           </div>
         )}

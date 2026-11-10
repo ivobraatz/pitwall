@@ -7,7 +7,7 @@ moveu ou bloqueou, confere e comenta.
 
 O servidor fala com o **console** da sua instalação, a mesma URL que você abre no navegador,
 usando um token pessoal. O token só alcança `/v1/staff/tasks/*` (escopo `tasks`) e `/v1/staff/atlas/*`
-(escopo `atlas`): não lê chamados nem a equipe.
+(escopo `atlas`) e, com o escopo opcional `errors`, lê `/v1/staff/errors/recent`: não lê chamados nem a equipe.
 
 ## Instalar
 
@@ -78,6 +78,12 @@ Atlas (escopo `atlas`):
 | `register_routine`, `list_routines` | Rotinas: o que roda sozinho, com a instrução do agente. |
 | `start_activity`, `finish_activity` | Avisam o que a sessão está fazendo, para a faixa "Agora". |
 | `start_routine_run`, `finish_routine_run` | Registram a execução de uma rotina e o que ela gerou. |
+
+Erros do servidor (escopo `errors`, marcado ao criar o token):
+
+| Tool | Para quê |
+|---|---|
+| `list_errors` | Erros agrupados por assinatura (`since` em horas ou data ISO, padrão 24; `product`; `limit`): rota, exceção, contagem, primeira e última ocorrência, um trace e se já há chamado ou tarefa. Para a triagem diária. |
 
 Cada tool devolve primeiro um texto curto, como
 `T-7K2QM [blocked] Configurar callback (demo) — nota: …`, e depois o JSON completo num segundo bloco.

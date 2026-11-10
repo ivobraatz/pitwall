@@ -31,6 +31,9 @@ public static class StaffTokenScopes
     /// <summary>The Atlas: <c>/v1/staff/atlas/*</c> (register systems and services, report activity and routine runs).</summary>
     public const string Atlas = "atlas";
 
-    public static readonly string[] All = [Tasks, Atlas];
+    /// <summary>Server errors, read only: <c>/v1/staff/errors/recent</c>.</summary>
+    public const string Errors = "errors";
+
+    public static readonly string[] All = [Tasks, Atlas, Errors];
     public static bool IsValid(string? s) => s is not null && All.Contains(s);
 }

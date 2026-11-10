@@ -130,6 +130,8 @@ public static class Policies
     public const string Tasks = "tasks";
     /// <summary>The Atlas: the console session, or a personal token with the atlas scope.</summary>
     public const string Atlas = "atlas";
+    /// <summary>Server errors, read only: the console session, or a personal token with the errors scope.</summary>
+    public const string Errors = "errors";
     public const string Support = "support";
     public const string IngestErrors = "ingest:errors";
     public const string IngestReleases = "ingest:releases";

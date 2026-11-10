@@ -52,7 +52,7 @@ public static class StaffTokenEndpoints
                 return Results.BadRequest(new { message = "A validade é de 30, 90 ou 365 dias, ou sem expiração." });
             var scopes = (req.Scopes ?? [StaffTokenScopes.Tasks]).Select(s => s?.Trim().ToLowerInvariant()).Distinct().ToArray();
             if (scopes.Length == 0 || !scopes.All(StaffTokenScopes.IsValid))
-                return Results.BadRequest(new { message = "Escopo desconhecido. Use tasks, atlas ou os dois." });
+                return Results.BadRequest(new { message = "Escopo desconhecido. Use tasks, atlas, errors ou uma combinação." });
 
             var me = http.StaffId();
             var now = DateTime.UtcNow;
