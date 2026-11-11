@@ -1,0 +1,49 @@
+name: Pitwall Atlas sync
+description: >
+  Sends the repository's manifests and commit to Pitwall (pitwall-atlas sync), so the Atlas gets the
+  services of a repo from CI, independent of the agents. The calling workflow must check out the repo
+  (fetch-depth 0 is recommended) and keep the token in a secret.
+
+inputs:
+  pitwall-url:
+    description: The Pitwall console URL (https://<seu-dominio>), not the API host.
+    required: true
+  token:
+    description: A personal token (pwt_...) with the atlas scope (store it as a secret).
+    required: true
+  scope:
+    description: local, pushed or deployed. In CI use pushed; deployed needs environment.
+    required: false
+    default: pushed
+  environment:
+    description: Environment slug, required with scope deployed.
+    required: false
+    default: ''
+  system:
+    description: System slug; only used when the repository is not associated yet.
+    required: false
+    default: ''
+  version:
+    description: pitwall-mcp version range to run.
+    required: false
+    default: ^0.4
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+    - shell: bash
+      env:
+        PITWALL_URL: ${{ inputs.pitwall-url }}
+        PITWALL_TOKEN: ${{ inputs.token }}
+        SCOPE: ${{ inputs.scope }}
+        ENVIRONMENT: ${{ inputs.environment }}
+        SYSTEM: ${{ inputs.system }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        ARGS=(--source ci --tool github-actions --scope "$SCOPE" --quiet)
+        if [ -n "$ENVIRONMENT" ]; then ARGS+=(--environment "$ENVIRONMENT"); fi
+        if [ -n "$SYSTEM" ]; then ARGS+=(--system "$SYSTEM"); fi
+        npx -y -p "pitwall-mcp@$VERSION" pitwall-atlas sync "${ARGS[@]}"
