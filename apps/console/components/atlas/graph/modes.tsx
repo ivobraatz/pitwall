@@ -89,7 +89,7 @@ export function OperationPanel({ slug, systemId }: { slug: string; systemId: str
   );
 }
 
-export function AttentionPanel({ slug, onNode }: { slug: string; onNode: (id: string) => void }) {
+export function AttentionPanel({ slug, onNode, names }: { slug: string; onNode: (id: string) => void; names: ReadonlyMap<string, string> }) {
   const t = useGraphWords();
   const insights = useInsights(slug);
   if (insights.data === undefined) return null;
@@ -108,7 +108,7 @@ export function AttentionPanel({ slug, onNode }: { slug: string; onNode: (id: st
           {i.nodeIds.length > 0 && (
             <span className="mt-1.5 flex flex-wrap gap-1.5">
               {i.nodeIds.map((id) => (
-                <button key={id} type="button" onClick={() => onNode(id)} className="h-6 rounded-full bg-chip px-2.5 font-mono text-[12px] text-fg-secondary hover:bg-active">{id.slice(0, 8)}</button>
+                <button key={id} type="button" onClick={() => onNode(id)} className="h-6 max-w-full truncate rounded-full bg-chip px-2.5 text-[12px] text-fg-secondary hover:bg-active">{names.get(id) ?? t('insight.node')}</button>
               ))}
             </span>
           )}

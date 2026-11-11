@@ -239,6 +239,7 @@ function ProductCanvas({ system, environments, environment, onEnvironment, node,
 
   const data = graph.data;
   const allNodes = data?.nodes ?? [];
+  const nodeNames = React.useMemo(() => new Map(allNodes.map((n) => [n.id, n.name] as const)), [allNodes]);
   const allEdges = data?.edges ?? [];
   const visible = React.useMemo(() => allNodes.filter((n) => passesFilters(n, filters)), [allNodes, filters]);
   const visibleIds = new Set(visible.map((n) => n.id));
@@ -424,7 +425,7 @@ function ProductCanvas({ system, environments, environment, onEnvironment, node,
           <aside className="flex flex-col gap-3" aria-label={t('mode.label')}>
             {mode === 'flows' && <FlowsPanel processes={processList} flowId={flowId} onFlow={setFlowId} onStep={onStep} />}
             {mode === 'operation' && <OperationPanel slug={system.slug} systemId={system.id} />}
-            {mode === 'attention' && <AttentionPanel slug={system.slug} onNode={onNode} />}
+            {mode === 'attention' && <AttentionPanel slug={system.slug} onNode={onNode} names={nodeNames} />}
             {mode === 'evolution' && (
               <>
                 <SincePicker choice={since} date={sinceDate} onChoice={setSince} onDate={setSinceDate} />

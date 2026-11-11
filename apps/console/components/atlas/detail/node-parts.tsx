@@ -239,12 +239,29 @@ function sourceKey(source: string) {
   return ({ console: 'console', mcp: 'mcp', import: 'import', collector: 'collector', sync: 'sync', system: 'system', agent: 'agent' } as Record<string, string>)[source] ?? 'system';
 }
 
+/** The history names fields as the server does (Name, Signature…); the reader sees them in their language. */
+const FIELD_LABELS: Record<string, { pt: string; en: string }> = {
+  Name: { pt: 'Nome', en: 'Name' }, Kind: { pt: 'Tipo', en: 'Kind' }, Engine: { pt: 'Motor', en: 'Engine' },
+  Provider: { pt: 'Provedor', en: 'Provider' }, ExternalRef: { pt: 'Referência externa', en: 'External ref' },
+  Url: { pt: 'Endereço', en: 'URL' }, MonitorRef: { pt: 'Monitor', en: 'Monitor' }, Notes: { pt: 'Notas', en: 'Notes' },
+  Condition: { pt: 'Condição', en: 'Condition' }, Facts: { pt: 'Detalhes', en: 'Details' }, Group: { pt: 'Grupo', en: 'Group' },
+  Impact: { pt: 'Impacto', en: 'Impact' }, Items: { pt: 'Itens', en: 'Items' }, Owner: { pt: 'Responsável', en: 'Owner' },
+  TaskCode: { pt: 'Tarefa', en: 'Task' }, Key: { pt: 'Chave', en: 'Key' }, Signature: { pt: 'Assinatura', en: 'Signature' },
+  Origin: { pt: 'Origem', en: 'Origin' }, Aliases: { pt: 'Nomes antigos', en: 'Former names' },
+  RetiredAt: { pt: 'Retirado em', en: 'Retired at' }, EnvironmentId: { pt: 'Ambiente', en: 'Environment' },
+  ProductId: { pt: 'Sistema', en: 'System' }, Relation: { pt: 'Relação', en: 'Relation' }, Label: { pt: 'Rótulo', en: 'Label' },
+  Planned: { pt: 'Planejada', en: 'Planned' }, Role: { pt: 'Papel', en: 'Role' }, ServiceIds: { pt: 'Serviços', en: 'Services' },
+  FullName: { pt: 'Repositório', en: 'Repository' }, Description: { pt: 'Descrição', en: 'Description' },
+  Status: { pt: 'Situação', en: 'Status' },
+};
+
 export function FieldChanges({ fields }: { fields: FieldChange[] }) {
+  const locale = useLocale();
   return (
     <dl className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-[13px]">
       {fields.map((f) => (
         <React.Fragment key={f.field}>
-          <dt className="text-fg-muted">{f.field}</dt>
+          <dt className="text-fg-muted">{FIELD_LABELS[f.field]?.[locale === 'pt' ? 'pt' : 'en'] ?? f.field}</dt>
           <dd className="min-w-0 break-words text-fg-secondary">
             <span className="line-through decoration-fg-subtle">{f.before ?? '—'}</span>
             <span aria-hidden className="mx-1.5 text-fg-subtle">→</span>

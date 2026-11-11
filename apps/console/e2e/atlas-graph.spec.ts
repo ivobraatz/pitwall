@@ -372,6 +372,8 @@ test('the attention mode shows the insights and dims the nodes without attention
   await page.getByRole('tab', { name: 'Atenção', exact: true }).click();
   const insights = page.getByTestId('atlas-graph-insights');
   await expect(insights).toContainText('Banco sem backup');
+  // The insight points to its node by name, never by an internal id.
+  await expect(insights.getByRole('button', { name: 'Banco', exact: true })).toBeVisible();
   await expect(nodeCard(page, 'blog')).toHaveAttribute('data-dim');
   await expect(nodeCard(page, 'worker')).not.toHaveAttribute('data-dim');
   await expectNoSidewaysScroll(page);

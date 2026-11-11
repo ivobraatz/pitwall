@@ -39,7 +39,7 @@ const pt = {
   'flow.pick': 'Processo', 'flow.none': 'Nenhum processo com etapas.', 'flow.steps': 'Etapas',
   'flow.noNodes': 'Nenhum serviço desta etapa aparece no mapa.', 'flow.task': 'Tarefa',
 
-  'insight.title': 'Pede atenção', 'insight.none': 'Nada pede atenção agora.', 'insight.check': 'Conferir', 'insight.suggestion': 'Sugestão',
+  'insight.title': 'Pede atenção', 'insight.none': 'Nada pede atenção agora.', 'insight.check': 'Conferir', 'insight.suggestion': 'Sugestão', 'insight.node': 'Componente',
 
   'evo.since': 'Desde', 'evo.1d': '24 h', 'evo.7d': '7 dias', 'evo.30d': '30 dias', 'evo.date': 'Data',
   'evo.added': 'adicionado', 'evo.changed': 'alterado', 'evo.removed': 'removido',
@@ -103,7 +103,7 @@ const en: Record<keyof typeof pt, string> = {
   'flow.pick': 'Process', 'flow.none': 'No process with steps.', 'flow.steps': 'Steps',
   'flow.noNodes': 'No service of this step shows on the map.', 'flow.task': 'Task',
 
-  'insight.title': 'Needs attention', 'insight.none': 'Nothing needs attention now.', 'insight.check': 'Check', 'insight.suggestion': 'Suggestion',
+  'insight.title': 'Needs attention', 'insight.none': 'Nothing needs attention now.', 'insight.check': 'Check', 'insight.suggestion': 'Suggestion', 'insight.node': 'Component',
 
   'evo.since': 'Since', 'evo.1d': '24 h', 'evo.7d': '7 days', 'evo.30d': '30 days', 'evo.date': 'Date',
   'evo.added': 'added', 'evo.changed': 'changed', 'evo.removed': 'removed',
