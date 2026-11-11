@@ -94,6 +94,16 @@ const ATTENTION = [
   { source: 'service', id: service(2), status: 'warn', title: 'Worker', detail: null, next: null, impact: 'medium', owner: 'agent', task: null, system: ref, where: 'Núcleo', processId: null, serviceId: service(2) },
   { source: 'step', id: PROCESSES[0].steps[1].id, status: 'warn', title: 'Triar', detail: null, next: null, impact: null, owner: null, task: null, system: ref, where: 'Suporte', processId: 'p1', serviceId: null },
 ];
+const card = (id: string, slug: string, name: string, state: string, health: { total: number; up: number; down: number }) => ({
+  id, slug, name, color: null, description: null, state, shared: false, nodeCount: health.total,
+  health: { ...health, degraded: 0, deploying: 0, unknown: 0 }, attention: { failure: 0, security: 0, task: 0, improvement: 0, config: 0, unverified: 0 },
+  running: { deploys: 0, ci: 0, agents: 0, routines: 0 }, pending: { tasks: 0, tickets: 0, errors: 0, alerts: null }, coverage: { percent: 60, checks: [] },
+});
+const COMPANY = {
+  serverTime: ago(0),
+  systems: [card(ACME, 'acme', 'Acme', 'up', { total: 3, up: 3, down: 0 }), card(GLOBEX, 'globex', 'Globex', 'down', { total: 2, up: 1, down: 1 })],
+  shared: [], edges: [], sources: [],
+};
 const FLOWS = [flowsOf(ACME, 'acme', 'Acme'), flowsOf(GLOBEX, 'globex', 'Globex')];
 
 const product = (id: string, slug: string, name: string, color: string) => ({
@@ -157,7 +167,7 @@ test('a new installation opens an empty atlas with the invitation to register', 
 
 test('the overview says what is down, what is running now and which system needs someone', async ({ page }) => {
   await serve(page, FULL);
-  await page.goto('/atlas');
+  await page.goto('/atlas?view=overview');
 
   const now = page.getByTestId('atlas-now');
   await expect(now).toContainText('Fora do ar');
@@ -185,53 +195,54 @@ test('the overview says what is down, what is running now and which system needs
   await expect(detail.locator('[data-testid="atlas-service"][data-state="down"]')).toContainText('Portal');
   await expect(detail.getByTestId('atlas-repo')).toContainText('globex-corp/portal');
   await expect(detail.getByTestId('atlas-external')).toContainText('CDN');
+  await detail.locator('nav').getByRole('button', { name: 'Fluxos', exact: true }).click();
   await expect(detail.getByTestId('atlas-flows')).toBeVisible();
   await expectNoSidewaysScroll(page);
 });
 
 test('the engine marks the environments that do not exist and the collectors that are not connected', async ({ page }) => {
   await serve(page, FULL);
-  await page.goto('/atlas?view=engine');
+  await page.goto('/atlas?system=globex');
   const engine = page.getByTestId('atlas-engine');
-  await expect(engine.getByTestId('atlas-cell')).toHaveCount(4);
-  await expect(engine.getByTestId('atlas-group').first()).toBeVisible();
-  await expect(engine.locator('[data-testid="atlas-service"][data-condition="gap"]')).toContainText('Falta');
-  await expect(engine.locator('[data-testid="atlas-service"][data-condition="gap"]')).toHaveClass(/atlas-hatch-loud/);
+  await expect(engine.getByTestId('atlas-cell')).toHaveCount(2);
   const missing = engine.locator('[data-testid="atlas-cell"][data-empty]');
   await expect(missing).toHaveCount(1); // Globex has no staging
   await expect(missing).toContainText('Não existe');
   await expect(engine.getByTestId('atlas-service').first()).toContainText('abc1234');
-  await expect(engine.locator('[data-testid="atlas-collector"][data-connected="false"]')).toContainText('não conectado');
-  await expect(engine.getByTestId('atlas-external')).toContainText('Usado por: Acme · API, Globex · Portal');
+  await expect(engine.getByTestId('atlas-external')).toContainText('Usado por: Globex · Portal');
   await expect(engine.getByLabel('Legenda')).toContainText('Fora do ar');
   await expectNoSidewaysScroll(page);
+
+  await page.goto('/atlas?system=acme');
+  const acme = page.getByTestId('atlas-engine');
+  await expect(acme.locator('[data-testid="atlas-service"][data-condition="gap"]')).toContainText('Falta');
+  await expect(acme.locator('[data-testid="atlas-service"][data-condition="gap"]')).toHaveClass(/atlas-hatch-loud/);
+  await expect(acme.getByTestId('atlas-group').first()).toBeVisible();
+
+  await page.goto('/atlas?view=overview');
+  await expect(page.locator('[data-testid="atlas-collector"][data-connected="false"]')).toContainText('não conectado');
 });
 
-test('the map draws one node per system and opens them into services up close', async ({ page }) => {
+test('the company map draws one card per system and opens the system', async ({ page }) => {
   await serve(page, FULL);
-  await page.goto('/atlas?view=map');
-  const map = page.getByTestId('atlas-map');
-  await expect(map.getByTestId('atlas-node-system')).toHaveCount(2);
-  await expect(map.locator('.react-flow__edge').first()).toBeAttached();
+  await page.route('**/v1/staff/atlas/graph/company', (r) => r.fulfill({ json: COMPANY }));
+  await page.goto('/atlas');
+  const map = page.getByTestId('atlas-company-map');
+  await expect(map.getByTestId('atlas-company-system')).toHaveCount(2);
   await expectNoSidewaysScroll(page);
 
-  const zoomIn = map.getByRole('button', { name: /zoom in/i });
-  for (let i = 0; i < 6 && (await map.getByTestId('atlas-node-service').count()) < 7; i++) await zoomIn.click();
-  await expect(map.getByTestId('atlas-node-service')).toHaveCount(7);
-  // The service an agent is working on pulses; so does the edge that leaves it.
-  // What something is happening to pulses: the service an agent works on, and the one that is down.
-  await expect(map.locator('[data-testid="atlas-node-service"].atlas-live')).toHaveCount(2);
-  // An edge moves only where work is passing: the ones leaving the service being worked on.
-  await expect(map.locator('.react-flow__edge.animated')).toHaveCount(2); // both links leaving that service
+  await map.locator('[data-slug="globex"] button').click();
+  await expect(page).toHaveURL(/system=globex/);
+  await expect(page.getByTestId('atlas-system-detail')).toBeVisible();
 });
 
 test('flows show a number at each step and a gap where there is none', async ({ page }) => {
   await serve(page, FULL);
-  await page.goto('/atlas?view=flows');
+  await page.goto('/atlas?system=globex&view=flows');
   const flows = page.getByTestId('atlas-flows');
-  await expect(flows.getByTestId('atlas-step')).toHaveCount(24);
+  await expect(flows.getByTestId('atlas-step')).toHaveCount(12);
   const gaps = flows.locator('[data-testid="atlas-step"][data-gap]');
-  await expect(gaps).toHaveCount(2);
+  await expect(gaps).toHaveCount(1);
   await expect(gaps.first()).toContainText('Rede social');
   await expect(gaps.first()).toContainText('Lacuna');
   await expect(flows).toContainText('2 com falha');
@@ -265,12 +276,12 @@ test('routines list what ran and what it produced, and discovery offers to regis
 
 test('the screen reads in English when asked', async ({ page }) => {
   await serve(page, FULL);
-  await page.goto('/atlas');
+  await page.goto('/atlas?view=overview');
   await expect(page.getByTestId('atlas-now')).toContainText('Agora');
   await page.getByRole('button', { name: 'en', exact: true }).click();
   await expect(page.getByTestId('atlas-now')).toContainText('Now');
   await expect(page.getByTestId('atlas-system').first()).toContainText('1 down');
-  await expect(page.getByRole('button', { name: 'Engine' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Map', exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByTestId('atlas-system').first()).toContainText('1 down'); // the choice is kept
 });
@@ -340,7 +351,7 @@ test('processes show a row of steps, or a system by stage matrix, and a step ope
 
 test('a service opens with its facts, items and links', async ({ page }) => {
   await serve(page, FULL);
-  await page.goto('/atlas?view=engine');
+  await page.goto('/atlas?system=acme');
   await page.getByTestId('atlas-engine').getByRole('button', { name: /Detalhes do serviço: API/ }).nth(1).click();
   const drawer = page.getByTestId('atlas-service-drawer');
   await expect(drawer.getByTestId('atlas-facts')).toContainText('Health');
@@ -368,8 +379,8 @@ test('suppliers cross provider and system, shared services in their own column',
 
 test('the map has a legend for the link kinds', async ({ page }) => {
   await serve(page, FULL);
-  await page.goto('/atlas?view=map');
-  await expect(page.getByTestId('atlas-map-legend')).toContainText('Hospedagem');
-  await expect(page.getByTestId('atlas-map-legend')).toContainText('Planejada');
+  await page.goto('/atlas?system=acme');
+  await expect(page.getByTestId('atlas-graph-legend')).toContainText('Infraestrutura');
+  await expect(page.getByTestId('atlas-graph-legend')).toContainText('Planejada');
   await expectNoSidewaysScroll(page);
 });
