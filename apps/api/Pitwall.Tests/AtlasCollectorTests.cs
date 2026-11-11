@@ -64,6 +64,7 @@ public class AtlasCollectorTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
         {
             Id = Guid.NewGuid(), ProductId = productId, EnvironmentId = environmentId, Name = name, Provider = provider,
             ExternalRef = externalRef, MonitorRef = monitor, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+            Key = $"teste:{Guid.NewGuid():N}",
         };
         await WithDbAsync(fx, async db => { db.AtlasServices.Add(service); await db.SaveChangesAsync(); });
         return service;

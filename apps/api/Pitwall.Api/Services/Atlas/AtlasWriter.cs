@@ -123,14 +123,21 @@ public sealed class AtlasWriter(PitwallDb db)
         var created = service is null;
         if (service is null)
         {
+            var initialKind = kind is { Length: > 0 } ? kind : system is null ? AtlasServiceKinds.External : AtlasServiceKinds.Other;
             service = new AtlasService
             {
                 Id = Guid.NewGuid(), ProductId = productId, EnvironmentId = envId, Name = name, CreatedAt = now,
-                Kind = system is null ? AtlasServiceKinds.External : AtlasServiceKinds.Other,
+                Kind = initialKind, Engine = AtlasEngines.ForKind(initialKind),
+                Key = await NewKeyAsync(system, env, name, ct),
             };
             db.AtlasServices.Add(service);
         }
-        if (kind is { Length: > 0 }) service.Kind = kind;
+        // The map column follows the kind only while nobody chose one by hand.
+        else if (kind is { Length: > 0 } && kind != service.Kind)
+        {
+            if (service.Engine == AtlasEngines.ForKind(service.Kind)) service.Engine = AtlasEngines.ForKind(kind);
+            service.Kind = kind;
+        }
         if (input.Provider is not null) service.Provider = Clean.Cut(input.Provider, 40)?.ToLowerInvariant();
         if (input.ExternalRef is not null) service.ExternalRef = Clean.Cut(input.ExternalRef, 300);
         if (input.Url is not null) service.Url = Clean.Cut(input.Url, 500);
@@ -169,6 +176,33 @@ public sealed class AtlasWriter(PitwallDb db)
     private static string? Lower(string? s) => s?.Trim().ToLowerInvariant();
 
     /// <summary>
+    /// The stable key of a new service: <c>{system or shared}:{environment or any}:{name slug}</c>.
+    /// A taken key gets <c>-2</c>, <c>-3</c>… so two services with the same name stay two nodes.
+    /// </summary>
+    public async Task<string> NewKeyAsync(Product? system, AtlasEnvironment? env, string name, CancellationToken ct)
+    {
+        var baseKey = $"{system?.Slug ?? "shared"}:{env?.Slug ?? "any"}:{NameSlug(name)}";
+        var key = baseKey;
+        for (var n = 2; ; n++)
+        {
+            var taken = db.AtlasServices.Local.Any(s => s.Key == key)
+                || await db.AtlasServices.AnyAsync(s => s.Key == key, ct);
+            if (!taken) return key;
+            key = $"{baseKey}-{n}";
+        }
+    }
+
+    /// <summary>A name as a key part: no accents, lower case, anything but a-z and 0-9 becomes a dash, at most 60.</summary>
+    public static string NameSlug(string name)
+    {
+        var decomposed = name.Normalize(System.Text.NormalizationForm.FormD);
+        var plain = new string(decomposed.Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+        var dashed = System.Text.RegularExpressions.Regex.Replace(plain.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
+        if (dashed.Length > 60) dashed = dashed[..60].TrimEnd('-');
+        return dashed.Length == 0 ? "servico" : dashed;
+    }
+
+    /// <summary>
     /// A service by id, or by name: <c>Name</c> for an outside service, <c>system/Name</c> or
     /// <c>system/environment/Name</c> for one of a system's.
     /// </summary>
@@ -205,7 +239,10 @@ public sealed class AtlasWriter(PitwallDb db)
             ?? await db.AtlasLinks.FirstOrDefaultAsync(l => l.FromServiceId == a.Id && l.ToServiceId == b.Id, ct);
         if (link is null)
         {
-            link = new AtlasLink { Id = Guid.NewGuid(), FromServiceId = a.Id, ToServiceId = b.Id, CreatedAt = DateTime.UtcNow };
+            link = new AtlasLink
+            {
+                Id = Guid.NewGuid(), FromServiceId = a.Id, ToServiceId = b.Id, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+            };
             db.AtlasLinks.Add(link);
         }
         if (label is not null) link.Label = Clean.Cut(label, 80);

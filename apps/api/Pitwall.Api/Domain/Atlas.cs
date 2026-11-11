@@ -24,6 +24,31 @@ public class AtlasEnvironment
 public class AtlasService
 {
     public Guid Id { get; set; }
+    /// <summary>
+    /// Stable identifier: <c>{system or shared}:{environment or any}:{name slug}</c>, set on creation.
+    /// Renaming does not change it, so links, evidence and agents keep pointing at the same node.
+    /// </summary>
+    public string Key { get; set; } = null!;
+    /// <summary>The map column (<see cref="AtlasEngines"/>): set on creation from the kind, unless the input says otherwise.</summary>
+    public string Engine { get; set; } = AtlasEngines.App;
+    /// <summary>What it is, from a catalog: <c>stripe</c>, <c>postgres</c>, <c>cloudflare-worker</c>. Set by discovery.</summary>
+    public string? Signature { get; set; }
+    /// <summary>Who affirmed it exists (<see cref="AtlasOrigins"/>). Only ever gets stronger.</summary>
+    public string Origin { get; set; } = AtlasOrigins.Declared;
+    /// <summary>Former names: a reference by one of them still finds the node.</summary>
+    public List<string> Aliases { get; set; } = [];
+    /// <summary>Retired (soft delete). Reads leave it out unless asked; a restore clears it.</summary>
+    public DateTime? RetiredAt { get; set; }
+    public string? RetiredReason { get; set; }
+    /// <summary>Someone or something reported it gone. Waits for a person to confirm or dismiss.</summary>
+    public DateTime? RemovalReportedAt { get; set; }
+    /// <summary>The last confirmation by a provider's collector.</summary>
+    public DateTime? VerifiedAt { get; set; }
+    public string? VerifiedBy { get; set; }
+    /// <summary>A connected collector listed the provider and did not find this one. Cleared when it reappears.</summary>
+    public DateTime? MissingSince { get; set; }
+    /// <summary>Concurrency token: the row version. Two saves from stale copies fail instead of overwriting.</summary>
+    public uint Version { get; set; }
     /// <summary>Null = shared by the whole operation.</summary>
     public Guid? ProductId { get; set; }
     /// <summary>Null = not tied to an environment (an outside service).</summary>
@@ -107,6 +132,17 @@ public class AtlasLink
     public bool Planned { get; set; }
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>What the dependency means (<see cref="AtlasRelations"/>). Two links between the same pair differ by relation.</summary>
+    public string Relation { get; set; } = AtlasRelations.DependsOn;
+    public string Origin { get; set; } = AtlasOrigins.Declared;
+    public DateTime? RetiredAt { get; set; }
+    public DateTime? VerifiedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public uint Version { get; set; }
+
+    /// <summary>The edge's group, read from its relation. Not stored.</summary>
+    public string Category => AtlasRelations.Category(Relation);
+
     public AtlasService From { get; set; } = null!;
     public AtlasService To { get; set; } = null!;
 }
@@ -132,8 +168,32 @@ public class AtlasRepo
     public int? OpenAlerts { get; set; }
     public DateTime? CheckedAt { get; set; }
 
+    /// <summary><see cref="AtlasRepoRoles"/>: backend, frontend, infra…</summary>
+    public string? Role { get; set; }
+    /// <summary>The services this repository delivers.</summary>
+    public List<Guid> ServiceIds { get; set; } = [];
+    public string? DefaultBranch { get; set; }
+    /// <summary>The provider's id, stable across renames.</summary>
+    public string? ExternalId { get; set; }
+    /// <summary>What the repository is made of: language, framework, runtime. Read from its files.</summary>
+    public List<AtlasFact> Stack { get; set; } = [];
+    public int? OpenPullRequests { get; set; }
+    public DateTime? LastSyncAt { get; set; }
+    public string? LastSyncSha { get; set; }
+    /// <summary>local | pushed | deployed: how far the last sync reached.</summary>
+    public string? LastSyncScope { get; set; }
+    public string? LastScanHash { get; set; }
+    public string? LastDeployedSha { get; set; }
+    public DateTime? RetiredAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public Product? Product { get; set; }
+}
+
+public static class AtlasRepoRoles
+{
+    public static readonly string[] All = ["backend", "frontend", "fullstack", "marketing", "infra", "tools", "mobile", "docs", "other"];
+    public static bool IsValid(string? s) => s is not null && All.Contains(s);
 }
 
 /// <summary>Something that runs by itself on a schedule. The text of what to do lives here, not in the code.</summary>
@@ -198,9 +258,22 @@ public class AtlasActivity
     public string Source { get; set; } = TeamTaskSources.Manual;
     public DateTime StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
+    /// <summary>Where the session works: the repository, branch and commit it started from.</summary>
+    public string? Repo { get; set; }
+    public string? Branch { get; set; }
+    public string? HeadSha { get; set; }
+    /// <summary><see cref="AtlasTools"/>: the agent or tool that ran the session.</summary>
+    public string? Tool { get; set; }
+    /// <summary>The last sync that reported this session.</summary>
+    public DateTime? LastSyncAt { get; set; }
 
     public Product? Product { get; set; }
     public AtlasService? Service { get; set; }
+}
+
+public static class AtlasTools
+{
+    public static readonly string[] All = ["claude-code", "codex", "cursor", "other"];
 }
 
 /// <summary>Something a collector found that nobody registered: it stays in sight until it is registered or dismissed.</summary>
