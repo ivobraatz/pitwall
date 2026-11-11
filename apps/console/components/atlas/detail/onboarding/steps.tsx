@@ -112,7 +112,10 @@ export function StepRepos({ system }: Props) {
   const repos = useGitHubRepos(true);
   const write = useWrite();
   const sys = useSystem(atlas.data, system);
+  const graph = useGraph(system || null, null);
   const notConnected = repos.error instanceof ApiError && repos.error.status === 409;
+  // The services of this system: the ones this repository can deliver. Retired ones are not offered.
+  const services = (graph.data?.nodes ?? []).filter((n) => n.type === 'service' && !n.retiredAt);
 
   return (
     <Frame step={2} title={t('ob.s2')} hint={t('repo.pickSystem')}>
@@ -127,33 +130,57 @@ export function StepRepos({ system }: Props) {
       {repos.data && repos.data.length === 0 && <Notice>{t('repo.none')}</Notice>}
       {repos.data && repos.data.length > 0 && (
         <ul className="flex flex-col gap-2" data-testid="onboarding-repos">
-          {repos.data.map((r) => <RepoRow key={r.fullName} repo={r} system={sys} onAssociate={(role) => write(
-            '/staff/atlas/repos', { json: { fullName: r.fullName, system: system || undefined, role: role || undefined } }, 'ob.done')} />)}
+          {repos.data.map((r) => <RepoRow key={r.fullName} repo={r} system={sys} services={services} onAssociate={(role, ids) => write(
+            '/staff/atlas/repos', { json: { fullName: r.fullName, system: system || undefined, role: role || undefined, services: ids } }, 'ob.done')} />)}
         </ul>
       )}
     </Frame>
   );
 }
 
-function RepoRow({ repo, system, onAssociate }: { repo: GitHubRepo; system: AtlasSystem | undefined; onAssociate: (role: string) => Promise<unknown> }) {
+function RepoRow({ repo, system, services, onAssociate }: {
+  repo: GitHubRepo; system: AtlasSystem | undefined; services: GraphNode[]; onAssociate: (role: string, services: string[]) => Promise<unknown>;
+}) {
   const t = useDetailT();
   const [role, setRole] = React.useState(repo.role ?? '');
+  const [picked, setPicked] = React.useState<string[]>([]);
   const [busy, setBusy] = React.useState(false);
   const roleOptions = [{ value: '', label: t('repo.roleNone') }, ...ROLES.map((r) => ({ value: r, label: t(`repo.roles.${r}` as DetailWord) }))];
+  const toggle = (id: string, on: boolean) => setPicked((prev) => (on ? [...prev, id] : prev.filter((x) => x !== id)));
   return (
-    <li className="flex flex-col gap-2 rounded-tile bg-well px-4 py-3 sm:flex-row sm:items-center" data-testid="onboarding-repo" data-full-name={repo.fullName}>
-      <div className="min-w-0 flex-1">
-        <p className="font-medium break-all text-fg">{repo.fullName}</p>
-        <p className="text-[13px] text-fg-muted">{[repo.private ? 'privado' : 'público', repo.archived ? 'arquivado' : null, repo.defaultBranch].filter(Boolean).join(' · ')}</p>
-      </div>
-      {repo.registered ? (
-        <Pill tone="ok">{t('repo.registered')}{repo.system && ` · ${repo.system.name}`}</Pill>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="w-44"><Select aria-label={t('repo.role')} value={role} options={roleOptions} onChange={(e) => setRole(e.target.value)} /></div>
-          <Button size="sm" variant="secondary" disabled={!system} loading={busy}
-            onClick={async () => { setBusy(true); await onAssociate(role); setBusy(false); }}>{t('repo.associate')}</Button>
+    <li className="flex flex-col gap-3 rounded-tile bg-well px-4 py-3" data-testid="onboarding-repo" data-full-name={repo.fullName}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1">
+          <p className="font-medium break-all text-fg">{repo.fullName}</p>
+          <p className="text-[13px] text-fg-muted">{[repo.private ? 'privado' : 'público', repo.archived ? 'arquivado' : null, repo.defaultBranch].filter(Boolean).join(' · ')}</p>
         </div>
+        {repo.registered ? (
+          <Pill tone="ok">{t('repo.registered')}{repo.system && ` · ${repo.system.name}`}</Pill>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="w-44"><Select aria-label={t('repo.role')} value={role} options={roleOptions} onChange={(e) => setRole(e.target.value)} /></div>
+            <Button size="sm" variant="secondary" disabled={!system} loading={busy}
+              onClick={async () => { setBusy(true); await onAssociate(role, picked); setBusy(false); }}>{t('repo.associate')}</Button>
+          </div>
+        )}
+      </div>
+      {!repo.registered && (
+        <fieldset className="flex flex-col gap-1.5" data-testid="onboarding-repo-services">
+          <legend className="text-[13px] font-semibold text-fg-secondary">{t('repo.services')}</legend>
+          <p className="text-[13px] text-fg-muted">{t('repo.servicesHint')}</p>
+          {services.length === 0 ? <p className="text-[13px] text-fg-muted">{t('repo.noServices')}</p> : (
+            <ul className="flex flex-wrap gap-2">
+              {services.map((s) => (
+                <li key={s.id}>
+                  <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-full border border-border bg-surface px-3.5 text-[14px] text-fg-secondary has-[:checked]:border-btn has-[:checked]:bg-btn has-[:checked]:text-btn-fg">
+                    <input type="checkbox" className="sr-only" value={s.id} checked={picked.includes(s.id)} onChange={(e) => toggle(s.id, e.target.checked)} />
+                    {s.name}
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+        </fieldset>
       )}
     </li>
   );
