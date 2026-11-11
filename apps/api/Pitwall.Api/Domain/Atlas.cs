@@ -298,6 +298,8 @@ public static class AtlasServiceKinds
     [
         "site", "web", "app", "api", "worker", "database", "storage", "domain", "email", "monitor", "backup",
         "package", "integration", "analytics", External, Other,
+        "pipeline", "host", "dns", "cdn", "edge", "queue", "cache", "agent", "cron", "webhook", "payment", "fiscal",
+        "seo", "credential", "vault", "certificate",
     ];
     public static bool IsValid(string? s) => s is not null && All.Contains(s);
 }
