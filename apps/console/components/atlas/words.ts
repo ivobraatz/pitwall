@@ -22,9 +22,10 @@ const pt = {
 
   'col.system': 'Sistema', 'col.health': 'Saúde', 'col.pending': 'Pendências', 'col.now': 'Agora',
   'health.none': 'Sem serviços', 'health.up': '{up} de {total} no ar', 'health.down': '{n} fora do ar',
+  'health.unread': '{n} serviços · sem leitura', 'health.mixed': '{up} de {measured} no ar · {unread} sem leitura',
   'pending.tasks': 'tarefas', 'pending.tickets': 'chamados', 'pending.errors': 'erros 24h', 'pending.alerts': 'alertas',
   'pending.unknown': 'Alertas de segurança: sem leitura',
-  'verdict.down': 'Fora do ar', 'verdict.attention': 'Pede atenção', 'verdict.ok': 'Em ordem', 'verdict.empty': 'Sem serviços',
+  'verdict.down': 'Fora do ar', 'verdict.attention': 'Pede atenção', 'verdict.unread': 'Sem leitura', 'verdict.ok': 'Em ordem', 'verdict.empty': 'Sem serviços',
   'idle': 'Parado',
 
   'state.up': 'No ar', 'state.down': 'Fora do ar', 'state.deploying': 'Em deploy', 'state.degraded': 'Com problema', 'state.unknown': 'Sem leitura',
@@ -132,9 +133,10 @@ const en: typeof pt = {
 
   'col.system': 'System', 'col.health': 'Health', 'col.pending': 'Pending', 'col.now': 'Now',
   'health.none': 'No services', 'health.up': '{up} of {total} up', 'health.down': '{n} down',
+  'health.unread': '{n} services · not monitored', 'health.mixed': '{up} of {measured} up · {unread} not monitored',
   'pending.tasks': 'tasks', 'pending.tickets': 'tickets', 'pending.errors': 'errors 24h', 'pending.alerts': 'alerts',
   'pending.unknown': 'Security alerts: not read',
-  'verdict.down': 'Down', 'verdict.attention': 'Needs attention', 'verdict.ok': 'All good', 'verdict.empty': 'No services',
+  'verdict.down': 'Down', 'verdict.attention': 'Needs attention', 'verdict.unread': 'Not read', 'verdict.ok': 'All good', 'verdict.empty': 'No services',
   'idle': 'Idle',
 
   'state.up': 'Up', 'state.down': 'Down', 'state.deploying': 'Deploying', 'state.degraded': 'Degraded', 'state.unknown': 'Not read',

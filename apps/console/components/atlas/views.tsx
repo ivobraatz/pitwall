@@ -1,13 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { byUrgency, verdict, type Atlas, type AtlasService, type AtlasSystem, type SystemFlows, type Verdict } from '@/lib/atlas';
+import { byUrgency, healthReading, verdict, type Atlas, type AtlasService, type AtlasSystem, type SystemFlows, type Verdict } from '@/lib/atlas';
 import { ProductMark } from '@/components/product';
 import { Button, Card, Dot, Pill, cn } from '@/components/ui';
 import { Legend, MarkGlyph, StateGlyph, conditionMark, liveClass, shortSha, useAgo, useLive, useWords } from './parts';
 import type { AtlasWord } from './words';
 
-const VERDICT_TONE: Record<Verdict, string> = { down: 'error', attention: 'warn', ok: 'ok', empty: 'idle' };
+const VERDICT_TONE: Record<Verdict, string> = { down: 'error', attention: 'warn', unread: 'idle', ok: 'ok', empty: 'idle' };
 
 // The columns of the overview; the header and every row share them.
 const OVERVIEW_COLS = 'lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.3fr)]';
@@ -50,9 +50,12 @@ function SystemRow({ system: s, atlas, onOpen }: { system: AtlasSystem; atlas: A
   const t = useWords();
   const v = verdict(s);
   const now = atlas.now.filter((n) => n.productId === s.id && n.kind !== 'down');
-  const health = s.health.total === 0 ? t('health.none')
-    : s.health.down > 0 ? t('health.down', { n: s.health.down })
-    : t('health.up', { up: s.health.up, total: s.health.total });
+  const reading = healthReading(s.health);
+  const health = s.health.down > 0 ? t('health.down', { n: s.health.down })
+    : reading.kind === 'none' ? t('health.none')
+    : reading.kind === 'unread' ? t('health.unread', { n: reading.n })
+    : reading.kind === 'mixed' ? t('health.mixed', { up: reading.up, measured: reading.measured, unread: reading.unread })
+    : t('health.up', { up: reading.up, total: reading.measured });
   const state = s.health.down > 0 ? 'down' : s.health.deploying > 0 ? 'deploying' : s.health.degraded > 0 ? 'degraded' : s.health.up > 0 ? 'up' : 'unknown';
   return (
     <button type="button" onClick={onOpen} data-testid="atlas-system" data-verdict={v}

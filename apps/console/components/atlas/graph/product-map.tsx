@@ -7,7 +7,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useGraph, useDiff, type Engine, type GraphEdge, type GraphNode, type NodeRef } from '@/lib/atlas-graph';
-import { useProcesses, type AtlasEnvironment, type AtlasProcess, type AtlasSystem, type ProcessStep } from '@/lib/atlas';
+import { useProcesses, type AtlasEnvironment, type AtlasProcess, type AtlasSystem, type ProcessStep, type ServiceState } from '@/lib/atlas';
 import { layoutEngines } from '@/lib/atlas-layout';
 import { Button, cn } from '@/components/ui';
 import { ProductMark } from '@/components/product';
@@ -35,7 +35,11 @@ const ENGINES_ORDER: Engine[] = ['code', 'delivery', 'infra', 'app', 'automation
 const hidden = '!size-1 !min-h-0 !min-w-0 !border-0 !bg-transparent';
 const NODE_W = 212;
 const NODE_H = 54;
-const GROUP_LABEL_OFFSET = 24; // how far above its first node a group's name sits (the layout keeps this room)
+const GROUP_LABEL_LINE = 16; // the line a group's name is set on: the layout keeps it free
+// The fill of a node in the minimap, by its state: the same colours as the state dots, read from the theme.
+const MINI_FILL: Record<ServiceState, string> = {
+  up: 'var(--ds-success)', down: 'var(--ds-danger)', deploying: 'var(--ds-running)', degraded: 'var(--ds-warning)', unknown: 'var(--ds-border-loud)',
+};
 
 type CardData = {
   node: GraphNode;
@@ -46,6 +50,10 @@ type CardData = {
   badge: 'added' | 'changed' | 'removed' | null;
   running: boolean;
   ghost: boolean;
+  /** The environment's name, when the map shows all environments of a system that has more than one. */
+  envLabel: string | null;
+  /** The operation mode: the card says when it was last seen instead of what it runs on. */
+  operation: boolean;
 };
 type LaneData = { engine: Engine; count: number; collapsed: boolean; onToggle: (e: Engine) => void };
 type SummaryData = { engine: Engine; count: number; onToggle: (e: Engine) => void };
@@ -55,9 +63,14 @@ function CardNode({ data }: NodeProps<Node<CardData, 'card'>>) {
   const t = useGraphWords();
   const since = useAgo();
   const n = data.node;
-  const stateWord = t(`state.${n.state}` as GraphWord);
-  const sub = n.lastEvent ? `${stateWord} · ${t('op.observed', { when: since(n.lastEvent.at) })}`
-    : `${stateWord} · ${n.provider ?? n.kind}`;
+  // The state is said in words only when it is a problem or in progress; "not read" is shown by the grey dot.
+  const stated = n.state === 'down' || n.state === 'degraded' || n.state === 'deploying';
+  const place = n.provider ?? n.kind;
+  const sub = [
+    stated ? t(`state.${n.state}` as GraphWord) : null,
+    data.envLabel,
+    data.operation ? (n.lastEvent ? t('op.observed', { when: since(n.lastEvent.at) }) : t('op.noEvent')) : place,
+  ].filter(Boolean).join(' · ');
   const chips = (Object.keys(n.attention) as Array<keyof GraphNode['attention']>).filter((k) => n.attention[k] > 0);
   const badgeWord = data.badge ? t(data.badge === 'added' ? 'evo.added' : data.badge === 'changed' ? 'evo.changed' : 'evo.removed') : null;
   const title = [n.name, n.shared ? t('shared') : null, n.codeScope ? t(`codeScope.${n.codeScope}` as GraphWord) : null,
@@ -106,17 +119,23 @@ function LaneNode({ data }: NodeProps<Node<LaneData, 'lane'>>) {
       <div className="flex h-[52px] items-center gap-2 px-3">
         <h3 className="min-w-0 truncate text-[13px] font-semibold text-fg-secondary">{t(`engine.${data.engine}` as GraphWord)}</h3>
         <span className="text-[12px] text-fg-subtle tabular-nums">{data.count}</span>
-        <button type="button" className="nodrag nopan ml-auto h-7 shrink-0 rounded-full px-2 text-[12px] font-medium text-fg-muted hover:bg-surface hover:text-fg"
+        <button type="button" data-testid="atlas-graph-engine-toggle"
+          className="nodrag nopan ml-auto grid size-7 shrink-0 place-items-center rounded-full text-fg-muted transition-colors hover:bg-surface hover:text-fg"
+          aria-label={data.collapsed ? t('engine.expand') : t('engine.collapse')} title={data.collapsed ? t('engine.expand') : t('engine.collapse')}
           aria-expanded={!data.collapsed} onClick={() => data.onToggle(data.engine)}>
-          {data.collapsed ? t('engine.expand') : t('engine.collapse')}
+          {/* A minus while the engine is open (collapse it), a plus while it is closed (expand it). */}
+          <svg viewBox="0 0 16 16" width={12} height={12} aria-hidden>
+            <path d={data.collapsed ? 'M8 3.5v9M3.5 8h9' : 'M3.5 8h9'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+          </svg>
         </button>
       </div>
     </div>
   );
 }
 
-function GroupNode({ data }: NodeProps<Node<GroupData, 'group'>>) {
-  return <p className="pointer-events-none truncate text-[12px] leading-4 font-semibold text-fg-muted" style={{ width: NODE_W }}>{data.label}</p>;
+/** A group's name, on the line the layout keeps for it above the group's first card. */
+function GroupNode({ data }: NodeProps<Node<GroupData, 'groupLabel'>>) {
+  return <p className="pointer-events-none h-4 truncate text-[12px] leading-4 font-semibold text-fg-muted" style={{ width: NODE_W }}>{data.label}</p>;
 }
 
 function SummaryNode({ data }: NodeProps<Node<SummaryData, 'summary'>>) {
@@ -134,7 +153,7 @@ function SummaryNode({ data }: NodeProps<Node<SummaryData, 'summary'>>) {
   );
 }
 
-const NODE_TYPES = { card: CardNode, lane: LaneNode, summary: SummaryNode, group: GroupNode };
+const NODE_TYPES = { card: CardNode, lane: LaneNode, summary: SummaryNode, groupLabel: GroupNode };
 
 /** A removed node, as the diff reports it: it is not in the graph any more, so it is drawn as a ghost. */
 function ghostOf(ref: NodeRef): GraphNode {
@@ -279,29 +298,22 @@ function ProductCanvas({ system, environments, environment, onEnvironment, node,
   const cardNodes: Node[] = [];
   for (const lane of layout.lanes) {
     cardNodes.push({
-      id: `lane:${lane.engine}`, type: 'lane', position: { x: lane.x, y: 0 }, zIndex: -1, style: { pointerEvents: 'all', width: lane.width, height: lane.height },
+      id: `lane:${lane.engine}`, type: 'lane', position: { x: lane.x, y: 0 }, zIndex: -1, width: lane.width, height: lane.height, style: { pointerEvents: 'all', width: lane.width, height: lane.height },
       selectable: false, draggable: false, connectable: false, focusable: false,
       data: { engine: lane.engine, count: lane.count, collapsed: lane.collapsed, onToggle: toggleEngine } satisfies LaneData,
     });
   }
   for (const s of layout.summaries) {
     cardNodes.push({
-      id: s.id, type: 'summary', position: { x: s.x, y: s.y }, draggable: false, style: { pointerEvents: 'all' },
+      id: s.id, type: 'summary', position: { x: s.x, y: s.y }, width: NODE_W, height: NODE_H, draggable: false, style: { pointerEvents: 'all' },
       data: { engine: s.engine, count: s.count, onToggle: toggleEngine } satisfies SummaryData,
     });
   }
-  // A group's name sits above its first node, in the room the layout keeps for it.
-  const groupTops = new Map<string, { x: number; y: number; label: string }>();
-  for (const n of laneNodes) {
-    const pos = layout.positions[n.id];
-    if (!pos || !n.group) continue;
-    const key = `${n.engine}|${n.group}`;
-    const at = groupTops.get(key);
-    if (!at || pos.y < at.y) groupTops.set(key, { x: pos.x, y: pos.y, label: n.group });
-  }
-  for (const [key, g] of groupTops) {
+  // A group's name sits on the line the layout keeps above its first card, so nothing is drawn over it.
+  const showEnvironment = environment === null && environments.length > 1;
+  for (const g of layout.groups) {
     cardNodes.push({
-      id: `group:${key}`, type: 'group', position: { x: g.x, y: g.y - GROUP_LABEL_OFFSET }, selectable: false, draggable: false, focusable: false,
+      id: `group:${g.key}`, type: 'groupLabel', position: { x: g.x, y: g.y }, width: NODE_W, height: GROUP_LABEL_LINE, selectable: false, draggable: false, focusable: false,
       data: { label: g.label } satisfies GroupData,
     });
   }
@@ -317,10 +329,11 @@ function ProductCanvas({ system, environments, environment, onEnvironment, node,
       : diff.data?.nodes.added.some((a) => a.id === n.id) ? 'added'
       : diff.data?.nodes.changed.some((c) => c.node.id === n.id) ? 'changed' : null;
     cardNodes.push({
-      id: n.id, type: 'card', position: pos, draggable: false, selectable: false, style: { pointerEvents: 'all' },
+      id: n.id, type: 'card', position: pos, width: NODE_W, height: NODE_H, draggable: false, selectable: false, style: { pointerEvents: 'all' },
       data: {
         node: n, dim, hit: matchIds.has(n.id), selected: selected === n.id,
         step: stepOf.get(n.id) ?? null, badge, running: n.activity.running, ghost: ghostIds.has(n.id),
+        envLabel: showEnvironment ? n.environment : null, operation: mode === 'operation',
       } satisfies CardData,
     });
   }
@@ -336,7 +349,7 @@ function ProductCanvas({ system, environments, environment, onEnvironment, node,
     const moving = !!sourceNode?.activity.running || !!targetNode?.activity.running;
     const touches = selected !== null && (e.from === selected || e.to === selected);
     edges.push({
-      id: p.id, source: p.source, target: p.target, type: 'smoothstep', selectable: false, focusable: false,
+      id: p.id, source: p.source, target: p.target, type: 'default', selectable: false, focusable: false,
       animated: moving,
       markerEnd: { type: MarkerType.ArrowClosed, color: CATEGORY_COLOR[e.category], width: 14, height: 14 },
       style: {
@@ -396,7 +409,13 @@ function ProductCanvas({ system, environments, environment, onEnvironment, node,
               >
                 <Background gap={24} size={1} color="var(--ds-border-default)" />
                 <Controls showInteractive={false} position="bottom-left" />
-                <MiniMap className="max-lg:hidden" pannable zoomable position="bottom-right" nodeColor={(n) => (n.type === 'card' ? 'var(--ds-border-loud)' : 'transparent')} />
+                {/* The minimap shows the services in their state colours on the surface, and the part out of view under a
+                    tint of the theme's own ink, so it reads in both themes. */}
+                <MiniMap className="max-lg:hidden" pannable zoomable position="bottom-right" ariaLabel={t('product.minimap')}
+                  style={{ background: 'var(--ds-bg-surface)', border: '1px solid var(--ds-border-default)', borderRadius: 8 }}
+                  maskColor="rgb(128 128 128 / 0.22)" maskStrokeColor="var(--ds-border-loud)" maskStrokeWidth={1}
+                  nodeBorderRadius={3} nodeStrokeWidth={0}
+                  nodeColor={(n) => (n.type === 'card' ? MINI_FILL[(n.data as CardData).node.state] : 'transparent')} />
               </ReactFlow>
             )}
           <NodeDrawer inMap nodeId={drawerId} onClose={() => onNode(null)} onNode={onNode} />

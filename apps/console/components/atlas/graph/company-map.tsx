@@ -2,15 +2,16 @@
 
 import * as React from 'react';
 import {
-  Background, BaseEdge, EdgeLabelRenderer, Handle, Position, ReactFlow, ReactFlowProvider, getBezierPath,
+  Background, BaseEdge, EdgeLabelRenderer, Handle, Position, ReactFlow, ReactFlowProvider,
   type Edge, type EdgeProps, type Node, type NodeProps,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useCompanyGraph, type AttentionClass, type CompanyEdge, type CompanyGraph, type GraphNode, type SystemCard } from '@/lib/atlas-graph';
-import { LANE_HEADER, layoutEngines } from '@/lib/atlas-layout';
+import { healthReading } from '@/lib/atlas';
+import { LANE_HEADER, layoutEngines, planCompanyRoutes, type Box, type Route } from '@/lib/atlas-layout';
 import { ProductMark } from '@/components/product';
 import { Card, cn } from '@/components/ui';
-import { StateGlyph } from '@/components/atlas/parts';
+import { StateGlyph, useWords } from '@/components/atlas/parts';
 import { AttentionIcon, attentionLabel } from './legend';
 import { startViewport } from './model';
 import { useBox } from './viewport';
@@ -20,8 +21,8 @@ import type { Engine } from '@/lib/atlas-graph';
 /*
  * Level 1: the company in three bands, read from the top down: the systems, the systems other systems
  * depend on (shared), and the services with no system, one column per engine. Links between a system
- * and a shared service leave the bottom of the card and enter the top of the service. A card opens the
- * system (level 2); nothing here is edited.
+ * and a shared service leave the base of the card and enter the top of the service (see planCompanyRoutes);
+ * a card opens the system (level 2); nothing here is edited.
  */
 
 const CARD_W = 260;
@@ -31,19 +32,28 @@ const SHARED_W = 212;
 const SHARED_H = 54;
 const BAND_H = 28;      // a band's title, and the room above its content
 const ROW_GAP = 40;     // between one band's content and the next band's title
+const LABEL_STRIP = 18; // the line a link's count sits on, between an engine's title and the service under it
 const ATTENTION_ORDER: AttentionClass[] = ['failure', 'security', 'task', 'improvement', 'config', 'unverified'];
 
 type SystemData = { card: SystemCard; onOpen: (slug: string) => void };
 type SharedData = { node: GraphNode };
 type BandData = { title: string };
-type EdgeData = { count: number; relations: string[] };
+type EdgeData = { count: number; relations: string[]; route: Route };
 
 const HANDLE = '!size-1 !min-h-0 !min-w-0 !border-0 !bg-transparent';
 
 function SystemNode({ data }: NodeProps<Node<SystemData, 'system'>>) {
   const t = useGraphWords();
+  const words = useWords();
   const c = data.card;
   const running = c.running.deploys + c.running.ci + c.running.agents + c.running.routines;
+  const reading = healthReading(c.health);
+  // Red only for what was measured as out of order; a service nobody reads is named, not alarmed.
+  const alarm = c.health.down > 0 || c.health.degraded > 0;
+  const healthText = reading.kind === 'none' ? t('company.noHealth')
+    : reading.kind === 'unread' ? words('health.unread', { n: reading.n })
+    : reading.kind === 'mixed' ? words('health.mixed', { up: reading.up, measured: reading.measured, unread: reading.unread })
+    : words('health.up', { up: reading.up, total: reading.measured });
   return (
     <div data-testid="atlas-company-system" data-slug={c.slug} data-state={c.state} data-shared={c.shared || undefined}
       style={{ width: CARD_W, height: CARD_H }}
@@ -55,9 +65,9 @@ function SystemNode({ data }: NodeProps<Node<SystemData, 'system'>>) {
           <ProductMark product={c} size={32} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[15px] font-semibold text-fg">{c.name}</span>
-            <span className="flex items-center gap-1.5 text-[12px] text-fg-muted">
+            <span className={cn('flex items-center gap-1.5 text-[12px]', alarm ? 'font-semibold text-danger' : 'text-fg-muted')} data-testid="atlas-company-health">
               <StateGlyph state={c.state} size={12} />
-              {c.health.total === 0 ? t('company.noHealth') : t('company.health', { up: c.health.up, total: c.health.total })}
+              {healthText}
             </span>
           </span>
         </span>
@@ -94,20 +104,21 @@ function SharedNode({ data }: NodeProps<Node<SharedData, 'shared'>>) {
   );
 }
 
+/** A band's title sits on the canvas colour, so a link that passes under it is hidden there rather than struck through. */
 function BandNode({ data }: NodeProps<Node<BandData, 'band'>>) {
-  return <h3 className="pointer-events-none text-[13px] leading-5 font-semibold whitespace-nowrap text-fg-muted">{data.title}</h3>;
+  return <h3 className="pointer-events-none inline-block rounded bg-well pr-2 text-[13px] leading-5 font-semibold whitespace-nowrap text-fg-muted">{data.title}</h3>;
 }
 
-/** An aggregated link: a smooth curve from the card's bottom to the service's top; its width grows with the count. */
-function AggregatedEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, markerEnd }: EdgeProps<Edge<EdgeData>>) {
-  const count = data?.count ?? 1;
-  const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
+/** An aggregated link: a curve from the base of one card to the top of the other, its width growing with the count. */
+function AggregatedEdge({ id, data }: EdgeProps<Edge<EdgeData>>) {
+  if (!data) return null;
+  const count = data.count;
   return (
     <>
-      <BaseEdge id={id} path={path} markerEnd={markerEnd} style={{ stroke: 'var(--ds-border-loud)', strokeWidth: 1 + Math.min(count, 6) * 0.75 }} />
+      <BaseEdge id={id} path={data.route.d} style={{ stroke: 'var(--ds-border-loud)', strokeWidth: 1 + Math.min(count, 6) * 0.75 }} />
       <EdgeLabelRenderer>
-        <span title={(data?.relations ?? []).join(', ')} data-testid="atlas-company-edge" data-count={count}
-          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+        <span title={data.relations.join(', ')} data-testid="atlas-company-edge" data-count={count}
+          style={{ transform: `translate(-50%, -50%) translate(${data.route.label.x}px, ${data.route.label.y}px)` }}
           className="nodrag nopan pointer-events-auto absolute rounded-full bg-overlay px-1.5 py-px text-[11px] leading-4 font-medium text-fg-secondary shadow-popover">
           {count}
         </span>
@@ -121,11 +132,12 @@ const EDGE_TYPES = { aggregated: AggregatedEdge };
 
 /**
  * The company's picture as React Flow nodes. The rows never overlap: each band's title sits in its own
- * BAND_H strip above its content, and the engine columns of the shared services stand side by side.
+ * BAND_H strip above its content, and the engine columns of the shared services stand side by side. Each
+ * engine's title is followed by a LABEL_STRIP where the links' counts sit, so no count lands on a title.
  */
 export function buildCompanyCanvas(graph: CompanyGraph, onOpen: (slug: string) => void, title: { systems: string; shared: string; engine: (e: Engine) => string }) {
   const nodes: Node[] = [];
-  const edges: Edge[] = [];
+  const boxes = new Map<string, Box>();
   const own = graph.systems.filter((s) => !s.shared);
   const sharedSystems = graph.systems.filter((s) => s.shared);
   let width = 0;
@@ -133,10 +145,12 @@ export function buildCompanyCanvas(graph: CompanyGraph, onOpen: (slug: string) =
 
   // Band 1: the systems.
   nodes.push({ id: 'band:systems', type: 'band', position: { x: 0, y: 0 }, selectable: false, draggable: false, data: { title: title.systems } satisfies BandData });
-  own.forEach((c, i) => nodes.push({
-    id: c.id, type: 'system', position: { x: i * (CARD_W + GAP), y: BAND_H }, draggable: false, selectable: false, style: { pointerEvents: 'all' },
-    data: { card: c, onOpen } satisfies SystemData,
-  }));
+  own.forEach((c, i) => {
+    const x = i * (CARD_W + GAP);
+    const y = BAND_H;
+    boxes.set(c.id, { x, y, w: CARD_W, h: CARD_H });
+    nodes.push({ id: c.id, type: 'system', position: { x, y }, draggable: false, selectable: false, style: { pointerEvents: 'all' }, data: { card: c, onOpen } satisfies SystemData });
+  });
   width = Math.max(width, own.length * (CARD_W + GAP) - GAP);
   let y = BAND_H + CARD_H + ROW_GAP;
   height = Math.max(height, BAND_H + CARD_H);
@@ -147,15 +161,16 @@ export function buildCompanyCanvas(graph: CompanyGraph, onOpen: (slug: string) =
     y += BAND_H;
   }
   if (sharedSystems.length > 0) {
-    sharedSystems.forEach((c, i) => nodes.push({
-      id: c.id, type: 'system', position: { x: i * (CARD_W + GAP), y }, draggable: false, selectable: false, style: { pointerEvents: 'all' },
-      data: { card: c, onOpen } satisfies SystemData,
-    }));
+    sharedSystems.forEach((c, i) => {
+      const x = i * (CARD_W + GAP);
+      boxes.set(c.id, { x, y, w: CARD_W, h: CARD_H });
+      nodes.push({ id: c.id, type: 'system', position: { x, y }, draggable: false, selectable: false, style: { pointerEvents: 'all' }, data: { card: c, onOpen } satisfies SystemData });
+    });
     width = Math.max(width, sharedSystems.length * (CARD_W + GAP) - GAP);
     y += CARD_H + ROW_GAP;
   }
   if (graph.shared.length > 0) {
-    // One column per engine: the engine's title above it, its services below.
+    // One column per engine: the engine's title above it, a strip for the counts, then its services.
     const layout = layoutEngines({
       nodes: graph.shared.map((n) => ({ id: n.id, engine: n.engine, group: n.group, name: n.name })),
       edges: [], collapsed: new Set(),
@@ -164,11 +179,13 @@ export function buildCompanyCanvas(graph: CompanyGraph, onOpen: (slug: string) =
       nodes.push({ id: `band:${lane.engine}`, type: 'band', position: { x: lane.x, y }, selectable: false, draggable: false, data: { title: title.engine(lane.engine) } satisfies BandData });
       width = Math.max(width, lane.x + lane.width);
     }
-    const top = y + BAND_H;
+    const top = y + BAND_H + LABEL_STRIP;
     for (const n of graph.shared) {
       const pos = layout.positions[n.id];
       if (!pos) continue;
-      nodes.push({ id: n.id, type: 'shared', position: { x: pos.x, y: top + (pos.y - LANE_HEADER) }, draggable: false, selectable: false, style: { pointerEvents: 'all' }, data: { node: n } satisfies SharedData });
+      const at = { x: pos.x, y: top + (pos.y - LANE_HEADER) };
+      boxes.set(n.id, { x: at.x, y: at.y, w: SHARED_W, h: SHARED_H });
+      nodes.push({ id: n.id, type: 'shared', position: at, draggable: false, selectable: false, style: { pointerEvents: 'all' }, data: { node: n } satisfies SharedData });
     }
     const bottom = layout.lanes.length > 0 ? top + layout.lanes[0].height - LANE_HEADER : top;
     height = Math.max(height, bottom);
@@ -177,14 +194,20 @@ export function buildCompanyCanvas(graph: CompanyGraph, onOpen: (slug: string) =
   }
   height = Math.max(height, y);
 
-  const ids = new Set(nodes.map((n) => n.id));
-  graph.edges.forEach((e: CompanyEdge, i) => {
-    if (!ids.has(e.from) || !ids.has(e.to) || e.from === e.to) return;
+  // Links: only between the cards drawn here; the route of each is planned on the cards' boxes.
+  const links = graph.edges
+    .map((e: CompanyEdge, i) => ({ e, id: `agg:${i}:${e.from}>${e.to}` }))
+    .filter(({ e }) => boxes.has(e.from) && boxes.has(e.to) && e.from !== e.to);
+  const routes = planCompanyRoutes(boxes, links.map(({ e, id }) => ({ id, from: e.from, to: e.to })));
+  const edges: Edge[] = [];
+  for (const { e, id } of links) {
+    const route = routes.get(id);
+    if (!route) continue;
     edges.push({
-      id: `agg:${i}:${e.from}>${e.to}`, source: e.from, target: e.to, type: 'aggregated', selectable: false, focusable: false,
-      data: { count: e.count, relations: e.relations } satisfies EdgeData,
+      id, source: e.from, target: e.to, type: 'aggregated', selectable: false, focusable: false,
+      data: { count: e.count, relations: e.relations, route } satisfies EdgeData,
     });
-  });
+  }
   return { nodes, edges, size: { w: width, h: height } };
 }
 

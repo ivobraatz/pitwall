@@ -46,7 +46,7 @@ const pt = {
 
   'company.open': 'Abrir sistema',
   'company.systems': 'Sistemas', 'company.shared': 'Compartilhados', 'company.mapa': 'Mapa', 'company.lista': 'Lista',
-  'company.health': '{up} de {total} no ar', 'company.noHealth': 'Sem serviços',
+  'company.noHealth': 'Sem serviços', 'product.minimap': 'Visão geral do mapa',
   'company.running': 'rodando agora', 'company.coverage': 'cobertura {n}%', 'company.none': 'Nenhum sistema no mapa.',
   'company.hint': 'Um cartão por sistema. Clique para ver seus serviços.',
   'company.edgeCount': '{n} ligações', 'company.edgeRelations': 'Relações: {relations}',
@@ -110,7 +110,7 @@ const en: Record<keyof typeof pt, string> = {
 
   'company.open': 'Open system',
   'company.systems': 'Systems', 'company.shared': 'Shared', 'company.mapa': 'Map', 'company.lista': 'List',
-  'company.health': '{up} of {total} up', 'company.noHealth': 'No services',
+  'company.noHealth': 'No services', 'product.minimap': 'Map overview',
   'company.running': 'running now', 'company.coverage': 'coverage {n}%', 'company.none': 'No system on the map.',
   'company.hint': 'One card per system. Click to see its services.',
   'company.edgeCount': '{n} links', 'company.edgeRelations': 'Relations: {relations}',
