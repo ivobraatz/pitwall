@@ -119,6 +119,8 @@ O MCP não envia cabeçalhos de *service token* do Access (`CF-Access-Client-Id`
 4. Em **Policies** → **Add a policy**: *Policy name* `MCP com token`; *Action* **Bypass**;
    *Include* → *Selector* **Everyone**.
    Para as tools do Atlas, acrescente do mesmo jeito os caminhos `v1/staff/atlas` e `v1/staff/atlas/*`; para `list_errors`, `v1/staff/errors/recent`.
+   `v1/staff/atlas/*` já cobre `/v1/staff/atlas/sync` e `/sync/state`, usados pela tool `atlas_sync`, pelo `pitwall-atlas` e pela action de CI.
+   O webhook do GitHub (`v1/hooks/github`) não passa pelo console: chega à API pública, com assinatura própria, e não precisa de bypass.
 5. Salve (**Save application**). Não mexa na aplicação `Pitwall console`.
 
 Confira num terminal (sem cookie, sem token):
