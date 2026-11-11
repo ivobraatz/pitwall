@@ -157,8 +157,8 @@ A chave (`key`) do nó é `{sistema}:{ambiente}:{nome}` em minúsculas, e não m
 | `start_activity`, `finish_activity`, `start_routine_run`, `finish_routine_run` | Atividade e execução de rotina |
 | `list_errors` | Erros recentes do servidor (escopo `errors`) |
 
-`register_service` aceita `kind` pelos tipos antigos. Os tipos novos e o campo `engine` entram pelo arquivo
-de importação e pela API; o MCP ainda não os expõe.
+`register_service` aceita todos os tipos da tabela de motores, além de `engine`, `key` e `signature`. A origem
+não é parâmetro: o que entra pelo MCP fica como declarado.
 
 ## Atlas Agent Sync
 

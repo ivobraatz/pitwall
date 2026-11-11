@@ -17,7 +17,13 @@ const ATLAS = '/v1/staff/atlas';
 const ERRORS = '/v1/staff/errors';
 const SYSTEM = z.string().min(1).describe('Slug do sistema (veja list_products).');
 const RESULT = z.enum(['ok', 'failed']);
-const SERVICE_KINDS = ['site', 'web', 'app', 'api', 'worker', 'database', 'storage', 'domain', 'email', 'monitor', 'backup', 'package', 'integration', 'analytics', 'external', 'other'] as const;
+const SERVICE_KINDS = [
+  'site', 'web', 'app', 'api', 'worker', 'database', 'storage', 'domain', 'email', 'monitor', 'backup', 'package', 'integration',
+  'analytics', 'external', 'other', 'pipeline', 'host', 'dns', 'cdn', 'edge', 'queue', 'cache', 'agent', 'cron', 'webhook', 'payment',
+  'fiscal', 'seo', 'credential', 'vault', 'certificate',
+] as const;
+/** The map's columns, left to right (AtlasEngines on the server). */
+const ENGINES = ['code', 'delivery', 'infra', 'app', 'automation', 'business', 'marketing', 'monitoring', 'security'] as const;
 const LINK_KINDS = ['host', 'dns', 'storage', 'payment', 'email', 'ai', 'login', 'measure', 'monitor', 'support', 'deploy', 'integration', 'business'] as const;
 const CONDITION = z.enum(['ok', 'warn', 'gap', 'planned', 'local']);
 const STEP_STATUS = z.enum(['ok', 'warn', 'gap', 'next', 'idea']);
@@ -198,6 +204,9 @@ export function registerAtlasTools(server: McpServer, client: PitwallClient): vo
       system: z.string().optional().describe('Slug do sistema. Omita para serviço externo compartilhado.'),
       environment: z.string().max(40).optional().describe('staging, production… Criado se não existir.'),
       kind: z.enum(SERVICE_KINDS).optional(),
+      engine: z.enum(ENGINES).optional().describe('Coluna do mapa. Sem ela, vem do kind (pipeline → delivery, payment → business…).'),
+      key: z.string().max(160).optional().describe('Identidade estável ("sistema:ambiente:nome"). Sem ela, o servidor gera uma; mande a mesma ao atualizar.'),
+      signature: z.string().max(60).optional().describe('Assinatura do catálogo de descoberta (ex.: "stripe"): o sync casa o que acha com este serviço em vez de criar outro.'),
       provider: z.string().max(40).optional().describe('railway, vercel, vm, cloudflare, stripe…'),
       externalRef: z.string().max(300).optional(),
       url: z.string().url().max(500).optional(),
