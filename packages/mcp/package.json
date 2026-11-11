@@ -1,7 +1,7 @@
 {
   "name": "pitwall-mcp",
-  "version": "0.3.0",
-  "description": "MCP server for Pitwall: Claude Code works the team's task board and reports to the Atlas (systems, services, routines, activity).",
+  "version": "0.4.0",
+  "description": "MCP server and Atlas Agent Sync for Pitwall: Claude Code works the team's task board, reports to the Atlas, and syncs the repository's services into it (pitwall-atlas).",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ivobraatz/pitwall.git",
@@ -22,7 +22,8 @@
   },
   "type": "module",
   "bin": {
-    "pitwall-mcp": "dist/index.js"
+    "pitwall-mcp": "dist/index.js",
+    "pitwall-atlas": "dist/atlas-cli.js"
   },
   "files": [
     "dist"
