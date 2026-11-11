@@ -175,10 +175,10 @@ public class AtlasCollectorTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
             .On($"/repos/{name}/dependabot/alerts", """[{"number":1},{"number":2}]""")
             .On($"/repos/{locked}/dependabot/alerts", """{"message":"Resource not accessible"}""", HttpStatusCode.Forbidden)
             .On("/user/repos", $$"""
-                [{"full_name":"{{name.ToUpperInvariant()}}","html_url":"https://git.example.com/a","archived":false,"fork":false},
-                 {"full_name":"{{unknown}}","html_url":"https://git.example.com/b","archived":false,"fork":false},
-                 {"full_name":"acme-inc/old","html_url":"https://git.example.com/c","archived":true,"fork":false},
-                 {"full_name":"acme-inc/forked","html_url":"https://git.example.com/d","archived":false,"fork":true}]
+                [{"id":1001,"full_name":"{{name.ToUpperInvariant()}}","html_url":"https://git.example.com/a","archived":false,"fork":false},
+                 {"id":1002,"full_name":"{{unknown}}","html_url":"https://git.example.com/b","archived":false,"fork":false},
+                 {"id":1003,"full_name":"acme-inc/old","html_url":"https://git.example.com/c","archived":true,"fork":false},
+                 {"id":1004,"full_name":"acme-inc/forked","html_url":"https://git.example.com/d","archived":false,"fork":true}]
                 """);
         await CollectAsync(new GitHubCollector(new HttpClient(provider), new PatGitHubAuth(Token)));
 
