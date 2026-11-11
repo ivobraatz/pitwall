@@ -12,6 +12,7 @@ namespace Pitwall.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // The new columns start nullable, so the rows already there keep their place while they are backfilled.
             migrationBuilder.DropIndex(
                 name: "ix_atlas_links_from_service_id_to_service_id",
                 table: "atlas_links");
@@ -20,23 +21,21 @@ namespace Pitwall.Data.Migrations
                 name: "aliases",
                 table: "atlas_services",
                 type: "text[]",
-                nullable: false);
+                nullable: true);
 
             migrationBuilder.AddColumn<string>(
                 name: "engine",
                 table: "atlas_services",
                 type: "character varying(16)",
                 maxLength: 16,
-                nullable: false,
-                defaultValue: "");
+                nullable: true);
 
             migrationBuilder.AddColumn<string>(
                 name: "key",
                 table: "atlas_services",
                 type: "character varying(160)",
                 maxLength: 160,
-                nullable: false,
-                defaultValue: "");
+                nullable: true);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "missing_since",
@@ -49,8 +48,7 @@ namespace Pitwall.Data.Migrations
                 table: "atlas_services",
                 type: "character varying(16)",
                 maxLength: 16,
-                nullable: false,
-                defaultValue: "declared");
+                nullable: true);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "removal_reported_at",
@@ -170,7 +168,7 @@ namespace Pitwall.Data.Migrations
                 name: "service_ids",
                 table: "atlas_repos",
                 type: "uuid[]",
-                nullable: false);
+                nullable: true);
 
             migrationBuilder.AddColumn<string>(
                 name: "stack",
@@ -183,16 +181,14 @@ namespace Pitwall.Data.Migrations
                 table: "atlas_links",
                 type: "character varying(16)",
                 maxLength: 16,
-                nullable: false,
-                defaultValue: "declared");
+                nullable: true);
 
             migrationBuilder.AddColumn<string>(
                 name: "relation",
                 table: "atlas_links",
                 type: "character varying(24)",
                 maxLength: 24,
-                nullable: false,
-                defaultValue: "depends_on");
+                nullable: true);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "retired_at",
@@ -204,8 +200,7 @@ namespace Pitwall.Data.Migrations
                 name: "updated_at",
                 table: "atlas_links",
                 type: "timestamp with time zone",
-                nullable: false,
-                defaultValue: new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified));
+                nullable: true);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "verified_at",
@@ -409,6 +404,161 @@ namespace Pitwall.Data.Migrations
                 {
                     table.PrimaryKey("pk_atlas_sources", x => x.name);
                 });
+
+            // Backfill: every row that existed gets its key, engine, verification, relation and evidence
+            // from what it already said. Nothing is removed or renamed.
+            migrationBuilder.Sql(@"
+                UPDATE atlas_services SET origin = 'declared' WHERE origin IS NULL;
+                UPDATE atlas_services SET aliases = '{}' WHERE aliases IS NULL;
+                UPDATE atlas_repos SET service_ids = '{}' WHERE service_ids IS NULL;
+                UPDATE atlas_repos SET stack = '[]' WHERE stack IS NULL;
+                UPDATE atlas_links SET origin = 'declared' WHERE origin IS NULL;
+            ");
+
+            // Key: system-or-shared : environment-or-any : slug of the name. Accents go, the name's
+            // non a-z0-9 runs become dashes, at most 60; an empty name is 'servico'. Repeats get -2, -3…
+            migrationBuilder.Sql(@"
+                WITH base AS (
+                    SELECT s.id, s.created_at,
+                        coalesce(p.slug, 'shared') || ':' || coalesce(e.slug, 'any') || ':' ||
+                        coalesce(nullif(trim(both '-' from left(trim(both '-' from regexp_replace(
+                            translate(lower(s.name), 'áàâãäéèêëíìîïóòôõöúùûüçñ', 'aaaaaeeeeiiiiooooouuuucn'),
+                            '[^a-z0-9]+', '-', 'g')), 60)), ''), 'servico') AS k
+                    FROM atlas_services s
+                    LEFT JOIN products p ON p.id = s.product_id
+                    LEFT JOIN atlas_environments e ON e.id = s.environment_id
+                ),
+                numbered AS (
+                    SELECT id, k, row_number() OVER (PARTITION BY k ORDER BY created_at, id) AS n FROM base
+                )
+                UPDATE atlas_services s
+                SET key = CASE WHEN n.n > 1 THEN n.k || '-' || n.n ELSE n.k END
+                FROM numbered n
+                WHERE n.id = s.id;
+            ");
+            // A suffix can collide with another service's own name slug; the later row takes its id instead.
+            migrationBuilder.Sql(@"
+                UPDATE atlas_services SET key = key || '-' || left(id::text, 8)
+                WHERE id IN (
+                    SELECT id FROM (SELECT id, row_number() OVER (PARTITION BY key ORDER BY created_at, id) AS n FROM atlas_services) x
+                    WHERE x.n > 1);
+            ");
+
+            // Engine: by kind (table 1.2); anything not listed is an application.
+            migrationBuilder.Sql(@"
+                UPDATE atlas_services SET engine = CASE kind
+                    WHEN 'package' THEN 'code'
+                    WHEN 'pipeline' THEN 'delivery' WHEN 'host' THEN 'delivery'
+                    WHEN 'domain' THEN 'infra' WHEN 'dns' THEN 'infra' WHEN 'cdn' THEN 'infra'
+                    WHEN 'edge' THEN 'infra' WHEN 'certificate' THEN 'infra' WHEN 'external' THEN 'infra'
+                    WHEN 'agent' THEN 'automation' WHEN 'cron' THEN 'automation' WHEN 'webhook' THEN 'automation' WHEN 'integration' THEN 'automation'
+                    WHEN 'payment' THEN 'business' WHEN 'fiscal' THEN 'business'
+                    WHEN 'site' THEN 'marketing' WHEN 'seo' THEN 'marketing' WHEN 'analytics' THEN 'marketing'
+                    WHEN 'monitor' THEN 'monitoring' WHEN 'email' THEN 'monitoring'
+                    WHEN 'credential' THEN 'security' WHEN 'vault' THEN 'security'
+                    ELSE 'app' END
+                WHERE engine IS NULL;
+            ");
+
+            // Verification: a confirmation by Railway or Vercel is theirs; a monitor's is Kuma's.
+            migrationBuilder.Sql(@"
+                UPDATE atlas_services
+                SET verified_at = checked_at,
+                    verified_by = CASE WHEN provider IN ('railway', 'vercel') THEN provider ELSE 'kuma' END
+                WHERE checked_at IS NOT NULL AND (provider IN ('railway', 'vercel') OR monitor_status IS NOT NULL);
+            ");
+
+            // Links: the relation of each old kind; the timestamp that was never there starts at creation.
+            migrationBuilder.Sql(@"
+                UPDATE atlas_links
+                SET relation = CASE kind
+                    WHEN 'host' THEN 'hosted_on' WHEN 'dns' THEN 'resolves_dns' WHEN 'storage' THEN 'writes_to'
+                    WHEN 'payment' THEN 'billed_through' WHEN 'email' THEN 'sends_email_via' WHEN 'ai' THEN 'calls'
+                    WHEN 'login' THEN 'depends_on' WHEN 'measure' THEN 'tracked_by' WHEN 'monitor' THEN 'monitored_by'
+                    WHEN 'support' THEN 'reports_to' WHEN 'deploy' THEN 'deploys_to' WHEN 'integration' THEN 'calls'
+                    WHEN 'business' THEN 'depends_on'
+                    ELSE 'depends_on' END,
+                    updated_at = created_at;
+            ");
+
+            // A task code on a service becomes a reference to that task.
+            migrationBuilder.Sql(@"
+                INSERT INTO atlas_refs (id, service_id, kind, code, note, source, created_by, created_at)
+                SELECT gen_random_uuid(), s.id, 'task', s.task_code, NULL, 'import', 'Sistema', coalesce(s.created_at, now())
+                FROM atlas_services s
+                WHERE s.task_code IS NOT NULL AND s.task_code <> '';
+            ");
+
+            // Evidence: the import itself (declared), and the collector's confirmation when there was one.
+            migrationBuilder.Sql(@"
+                INSERT INTO atlas_evidence (id, subject_type, subject_id, source, method, ref, scope, first_seen_at, last_seen_at)
+                SELECT gen_random_uuid(), 'service', s.id, 'import', 'manual', 'atlas', 'declared', s.created_at, s.created_at
+                FROM atlas_services s;
+
+                INSERT INTO atlas_evidence (id, subject_type, subject_id, source, method, ref, scope, first_seen_at, last_seen_at)
+                SELECT gen_random_uuid(), 'service', s.id, 'collector:' || s.verified_by, 'api',
+                    left(coalesce(s.provider, '') || ':' || coalesce(s.external_ref, s.monitor_ref, s.name), 300),
+                    'runtime', s.checked_at, s.checked_at
+                FROM atlas_services s
+                WHERE s.verified_at IS NOT NULL;
+            ");
+
+            // Now that every row has its values, the columns become required.
+            migrationBuilder.AlterColumn<string>(
+                name: "key",
+                table: "atlas_services",
+                type: "character varying(160)",
+                maxLength: 160,
+                nullable: false);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "engine",
+                table: "atlas_services",
+                type: "character varying(16)",
+                maxLength: 16,
+                nullable: false);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "origin",
+                table: "atlas_services",
+                type: "character varying(16)",
+                maxLength: 16,
+                nullable: false,
+                defaultValue: "declared");
+
+            migrationBuilder.AlterColumn<List<string>>(
+                name: "aliases",
+                table: "atlas_services",
+                type: "text[]",
+                nullable: false);
+
+            migrationBuilder.AlterColumn<List<Guid>>(
+                name: "service_ids",
+                table: "atlas_repos",
+                type: "uuid[]",
+                nullable: false);
+
+            migrationBuilder.AlterColumn<string>(
+                name: "origin",
+                table: "atlas_links",
+                type: "character varying(16)",
+                maxLength: 16,
+                nullable: false,
+                defaultValue: "declared");
+
+            migrationBuilder.AlterColumn<string>(
+                name: "relation",
+                table: "atlas_links",
+                type: "character varying(24)",
+                maxLength: 24,
+                nullable: false,
+                defaultValue: "depends_on");
+
+            migrationBuilder.AlterColumn<DateTime>(
+                name: "updated_at",
+                table: "atlas_links",
+                type: "timestamp with time zone",
+                nullable: false);
 
             migrationBuilder.CreateIndex(
                 name: "ix_atlas_services_key",
