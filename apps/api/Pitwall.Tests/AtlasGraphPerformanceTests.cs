@@ -49,6 +49,8 @@ public class AtlasGraphPerformanceTests(AtlasGraphFixture fx)
 
         var first = await DbAsync(fx, db => db.AtlasServices.Where(s => s.Key.StartsWith(sys + ":")).Select(s => s.Id).FirstAsync());
 
+        // The first request pays for the cold start (JIT, the EF model, the connection); the timed one is the steady state.
+        Assert.Equal(HttpStatusCode.OK, (await c.GetAsync($"/v1/staff/atlas/graph?system={sys}")).StatusCode);
         var watch = Stopwatch.StartNew();
         using var graphResponse = await c.GetAsync($"/v1/staff/atlas/graph?system={sys}");
         watch.Stop();
