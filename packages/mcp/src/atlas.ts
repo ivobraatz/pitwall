@@ -2,6 +2,10 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { PitwallClient } from './client.js';
 import { guarded, ok, query } from './tools.js';
+import { detectRepo } from './sync/git.js';
+import { prepareSync } from './sync/run.js';
+import { RELATIONS, SCOPES, type SyncResponse } from './sync/types.js';
+import { changesText, graphText, insightsText, nodeText, syncText, type ChangeLine, type GraphText, type InsightLine, type NodeDetailText } from './atlas-format.js';
 
 /*
  * The Atlas: what the team runs and what is happening to it. These tools register systems,
@@ -34,6 +38,23 @@ const STEP = {
   impact: IMPACT.optional(),
   services: z.array(z.string().min(1)).max(30).optional().describe('Serviços envolvidos: id, nome externo, "sistema/Nome" ou "sistema/ambiente/Nome".'),
 };
+const SYNC = '/v1/staff/atlas/sync';
+const RELATION = z.enum(RELATIONS).describe('Tipo da ligação (1.3 do Atlas): depends_on, calls, writes_to, billed_through, deploys_to…');
+const OP = z.discriminatedUnion('op', [
+  z.object({
+    op: z.literal('node'), name: z.string().min(1).max(120), kind: z.string().min(1).max(40),
+    key: z.string().max(160).optional(), engine: z.string().max(16).optional(), environment: z.string().max(40).optional(),
+    provider: z.string().max(40).optional(), url: z.string().max(500).optional(), group: z.string().max(60).optional(),
+    signature: z.string().max(60).optional(), facts: z.record(z.string().max(60), z.string().max(500)).optional(),
+    evidence: z.string().max(300).optional(),
+  }),
+  z.object({ op: z.literal('edge'), from: z.string().min(1).max(160), to: z.string().min(1).max(160), relation: RELATION, evidence: z.string().max(300).optional() }),
+  z.object({ op: z.literal('removed'), ref: z.string().min(1).max(160), evidence: z.string().max(300).optional() }),
+  z.object({ op: z.literal('task'), ref: z.string().min(1).max(160), code: z.string().min(1).max(20), note: z.string().max(300).optional() }),
+]);
+/** The working directory the sync reads: PITWALL_REPO_DIR, or where the agent started. */
+const repoDir = () => process.env.PITWALL_REPO_DIR?.trim() || process.cwd();
+const toolName = () => process.env.PITWALL_TOOL?.trim() || 'claude-code';
 
 interface Overview {
   systems: Array<{
@@ -205,9 +226,10 @@ export function registerAtlasTools(server: McpServer, client: PitwallClient): vo
       to: z.string().min(1),
       label: z.string().max(80).optional(),
       kind: z.enum(LINK_KINDS).optional(),
+      relation: RELATION.optional().describe('Prefira a kind: diz exatamente o que a ligação significa no grafo.'),
       planned: z.boolean().optional(),
     },
-  }, guarded(client, async (a: { from: string; to: string; label?: string; kind?: string; planned?: boolean }) => {
+  }, guarded(client, async (a: { from: string; to: string; label?: string; kind?: string; relation?: string; planned?: boolean }) => {
     const l = await client.request('POST', `${ATLAS}/links`, a);
     return ok(`Ligado: ${a.from} → ${a.to}${a.planned ? ' (planejado)' : ''}`, l);
   }));
@@ -314,7 +336,8 @@ export function registerAtlasTools(server: McpServer, client: PitwallClient): vo
       component: z.string().max(120).optional(),
     },
   }, guarded(client, async (a: { description: string; system?: string; component?: string }) => {
-    const r = await client.request<{ id: string }>('POST', `${ATLAS}/activities`, a);
+    // Where the work happens, so the console can tie the activity to a repo, branch and commit.
+    const r = await client.request<{ id: string }>('POST', `${ATLAS}/activities`, { ...a, ...detectRepo(repoDir()), tool: toolName() });
     return ok(`Atividade iniciada. Ao terminar: finish_activity(id="${r.id}").`, r);
   }));
 
@@ -354,5 +377,81 @@ export function registerAtlasTools(server: McpServer, client: PitwallClient): vo
   }, guarded(client, async (a: { id: string; status?: string; result?: string; links?: unknown[] }) => {
     const r = await client.request('POST', `${ATLAS}/runs/${encodeURIComponent(a.id.trim())}/finish`, { status: a.status, result: a.result, links: a.links });
     return ok('Execução encerrada.', r);
+  }));
+
+  server.registerTool('atlas_sync', {
+    title: 'Sincronizar o repositório com o Atlas',
+    description:
+      'Envia o estado do repositório atual (diretório de trabalho ou PITWALL_REPO_DIR) ao Atlas: os manifestos da lista branca, sem segredos, ' +
+      'mais o que você fez (summary, created, changed, removed, attention, tasks) e as ops estruturadas. Chame no fim de um trabalho em código. ' +
+      'scope: local se há mudanças não enviadas; pushed se o HEAD está no remoto; deployed exige environment. ' +
+      'Nada é apagado: removed só marca "remoção relatada", à espera de confirmação no console.',
+    inputSchema: {
+      summary: z.string().min(1).max(4000).describe('O que foi feito, em poucas frases.'),
+      created: z.array(z.string().min(1).max(300)).max(50).optional().describe('Itens criados (serviços, arquivos de configuração).'),
+      changed: z.array(z.string().min(1).max(300)).max(50).optional(),
+      removed: z.array(z.string().min(1).max(300)).max(50).optional(),
+      attention: z.array(z.string().min(1).max(300)).max(50).optional().describe('O que ainda pede atenção.'),
+      tasks: z.array(z.string().max(20)).max(50).optional().describe('Códigos T-XXXXX resolvidos por este trabalho.'),
+      ops: z.array(OP).max(200).optional().describe('Mudanças estruturadas: node (criar/atualizar nó), edge (ligação com relation), removed, task.'),
+      scope: z.enum(SCOPES).optional(),
+      environment: z.string().max(40).optional().describe('Obrigatório com scope deployed.'),
+      system: z.string().max(40).optional().describe('Slug do sistema, só se o repositório ainda não está associado.'),
+      partial: z.boolean().optional().describe('true se você não enviou todos os arquivos: não marca nada como sumido.'),
+    },
+  }, guarded(client, async (a: {
+    summary: string; created?: string[]; changed?: string[]; removed?: string[]; attention?: string[]; tasks?: string[];
+    ops?: Array<Record<string, unknown>>; scope?: 'local' | 'pushed' | 'deployed'; environment?: string; system?: string; partial?: boolean;
+  }) => {
+    const prep = prepareSync(repoDir(), { ...a, source: 'agent', tool: toolName() });
+    const res = await client.request<SyncResponse>('POST', SYNC, prep.request);
+    return ok(syncText(res, prep.request.repo, prep.scope), res);
+  }));
+
+  server.registerTool('atlas_graph', {
+    title: 'Ver o mapa do Atlas',
+    description: 'O mapa de um sistema (ou de toda a operação, sem system): nós por motor, com estado, verificação e o que pede atenção, e as ligações. Use o id de um nó com atlas_node.',
+    inputSchema: {
+      system: SYSTEM.optional(),
+      environment: z.string().max(40).optional().describe('Mantém só o ambiente dado e os nós sem ambiente.'),
+    },
+    annotations: { readOnlyHint: true },
+  }, guarded(client, async (a: { system?: string; environment?: string }) => {
+    const g = await client.request<GraphText & { scope: { system: { name: string } | null } }>('GET', `${ATLAS}/graph` + query({ system: a.system, environment: a.environment }));
+    const label = g.scope?.system ? `Sistema ${g.scope.system.name}` : 'Toda a operação';
+    return ok(graphText(g, label), g);
+  }));
+
+  server.registerTool('atlas_node', {
+    title: 'Ver um nó do Atlas',
+    description: 'Detalhe de um serviço ou repositório: de quem depende, quem depende dele, o impacto se cair, as evidências, tarefas e eventos recentes.',
+    inputSchema: { ref: z.string().min(1).describe('Id do nó (veja atlas_graph).') },
+    annotations: { readOnlyHint: true },
+  }, guarded(client, async (a: { ref: string }) => {
+    const d = await client.request<NodeDetailText>('GET', `${ATLAS}/nodes/${encodeURIComponent(a.ref.trim())}`);
+    return ok(nodeText(d), d);
+  }));
+
+  server.registerTool('atlas_changes', {
+    title: 'Ver mudanças do Atlas',
+    description: 'O que mudou no Atlas: criações, alterações, retiradas, com quem e de onde veio (console, mcp, sync, collector). since é uma data ISO.',
+    inputSchema: {
+      since: z.string().max(40).optional().describe('Data ISO; sem valor, as mais recentes.'),
+      system: SYSTEM.optional(),
+    },
+    annotations: { readOnlyHint: true },
+  }, guarded(client, async (a: { since?: string; system?: string }) => {
+    const list = await client.request<ChangeLine[]>('GET', `${ATLAS}/changes` + query({ since: a.since, system: a.system, limit: 100 }));
+    return ok(changesText(list), list);
+  }));
+
+  server.registerTool('atlas_insights', {
+    title: 'Ver recomendações do Atlas',
+    description: 'Regras determinísticas sobre o mapa: serviço sem monitoramento, banco sem backup, repositório sem sincronia, alertas, nós que sumiram do código.',
+    inputSchema: { system: SYSTEM.optional() },
+    annotations: { readOnlyHint: true },
+  }, guarded(client, async (a: { system?: string }) => {
+    const list = await client.request<InsightLine[]>('GET', `${ATLAS}/insights` + query({ system: a.system }));
+    return ok(insightsText(list), list);
   }));
 }

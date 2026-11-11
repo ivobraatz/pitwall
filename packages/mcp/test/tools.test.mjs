@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../dist/server.js';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+// start_activity reads the working copy; a folder outside any repo keeps these tests independent of this checkout.
+process.env.PITWALL_REPO_DIR = mkdtempSync(join(tmpdir(), 'pitwall-mcp-test-'));
 
 const URL_ = 'https://pitwall.example.com';
 const TOKEN = 'pwt_SEGREDOsegredoSEGREDOsegredoSEGREDOsegr';
@@ -42,7 +48,8 @@ test('lists the board and the atlas tools with schemas', async () => {
   const { client } = await connect();
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map((t) => t.name).sort(), [
-    'atlas_attention', 'atlas_overview', 'atlas_processes', 'board_summary', 'comment_task', 'create_task', 'finish_activity',
+    'atlas_attention', 'atlas_changes', 'atlas_graph', 'atlas_insights', 'atlas_node', 'atlas_overview', 'atlas_processes', 'atlas_sync',
+    'board_summary', 'comment_task', 'create_task', 'finish_activity',
     'finish_routine_run', 'get_task', 'link_services', 'list_errors', 'list_products', 'list_routines', 'list_tasks', 'move_task',
     'register_process', 'register_repo', 'register_routine', 'register_service', 'register_system', 'start_activity',
     'start_routine_run', 'update_process_step', 'update_task',
@@ -166,7 +173,7 @@ test('start_activity posts and tells how to finish; finish posts the result', as
   const started = await client.callTool({ name: 'start_activity', arguments: { system: 'acme', component: 'api', description: 'Corrigindo o frete' } });
   assert.equal(started.isError, undefined);
   assert.equal(calls[0].url, `${URL_}/v1/staff/atlas/activities`);
-  assert.deepEqual(calls[0].body, { system: 'acme', component: 'api', description: 'Corrigindo o frete' });
+  assert.deepEqual(calls[0].body, { system: 'acme', component: 'api', description: 'Corrigindo o frete', tool: 'claude-code' });
   assert.match(text(started), /finish_activity\(id="a1"\)/);
 
   await client.callTool({ name: 'finish_activity', arguments: { id: 'a1', result: 'PR aberto' } });

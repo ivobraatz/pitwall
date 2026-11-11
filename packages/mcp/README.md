@@ -78,6 +78,8 @@ Atlas (escopo `atlas`):
 | `register_routine`, `list_routines` | Rotinas: o que roda sozinho, com a instrução do agente. |
 | `start_activity`, `finish_activity` | Avisam o que a sessão está fazendo, para a faixa "Agora". |
 | `start_routine_run`, `finish_routine_run` | Registram a execução de uma rotina e o que ela gerou. |
+| `atlas_sync` | Envia o repositório atual ao Atlas (manifestos sem segredos) com o que você fez. Chame no fim de um trabalho em código. |
+| `atlas_graph`, `atlas_node`, `atlas_changes`, `atlas_insights` | Leem o mapa: o grafo de um sistema, um nó com dependências e impacto, as mudanças e as recomendações. |
 
 Erros do servidor (escopo `errors`, marcado ao criar o token):
 
@@ -98,6 +100,49 @@ Cada tool devolve primeiro um texto curto, como
 | "A resposta de … não é do Pitwall." | A URL abre outro site, ou uma tela de login de um proxy na frente do console. |
 
 Guias: [`tarefas-mcp.md`](https://github.com/ivobraatz/pitwall/blob/main/docs/operacao/tarefas-mcp.md) e [`atlas.md`](https://github.com/ivobraatz/pitwall/blob/main/docs/operacao/atlas.md).
+
+## Atlas Agent Sync
+
+O comando `pitwall-atlas` envia ao Atlas o que o repositório declara sobre si: `package.json`,
+`Dockerfile`, workflows, `wrangler.toml` e similares, numa lista fixa. Segredos nunca saem: arquivos
+`.env` e chaves são proibidos, e um `.env.example` vai só com os nomes das variáveis. O remoto precisa
+ser do GitHub.
+
+Há três camadas, da mais precisa para a rede de segurança:
+
+1. **Ferramenta MCP `atlas_sync`**, no fim da sessão de trabalho. O agente diz o que fez, e o Atlas
+   recebe o pacote com esse relato.
+2. **Hooks de rede de segurança**: o hook `SessionEnd` do Claude Code, o `notify` do Codex e os hooks
+   do git (`post-commit`, `pre-push`). Eles rodam com `--quiet --if-changed`: sem mudança, nem há
+   rede; sem console no ar, viram um aviso e não travam o commit.
+3. **Action no CI** (`.github/actions/atlas-sync`), fonte independente dos agentes: o que o
+   repositório é no branch principal, sem depender de alguém ter rodado nada.
+
+```sh
+npx -y -p pitwall-mcp pitwall-atlas login --url https://<seu-dominio> --token pwt_xxxxxxxxxxxx
+npx -y -p pitwall-mcp pitwall-atlas sync --dry-run          # mostra o pacote, sem enviar
+npx -y -p pitwall-mcp pitwall-atlas sync --scope pushed --summary "Ajustei o frete"
+npx -y -p pitwall-mcp pitwall-atlas state                   # última sincronização deste repositório
+npx -y -p pitwall-mcp pitwall-atlas install-hooks           # --claude e --git (padrão); --codex imprime o notify
+npx -y -p pitwall-mcp pitwall-atlas print-ci                # workflow de exemplo com a action
+```
+
+`login` grava `~/.config/pitwall/atlas.json` (permissão 600 quando o sistema permite). `PITWALL_URL` e
+`PITWALL_TOKEN` do ambiente têm prioridade. O escopo padrão é `pushed` se a árvore está limpa e o HEAD
+está num branch remoto; senão `local`. `install-hooks` nunca apaga um hook alheio: acrescenta a linha no
+fim e marca com `# pitwall-atlas`.
+
+Exemplo de action (dados fictícios):
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+- uses: acme-inc/pitwall/.github/actions/atlas-sync@main
+  with:
+    pitwall-url: ${{ vars.PITWALL_URL }}
+    token: ${{ secrets.PITWALL_TOKEN }}
+```
 
 ## Desenvolvimento
 
