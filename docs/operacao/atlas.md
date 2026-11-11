@@ -128,7 +128,12 @@ Cada nó tem contadores por **classe**. Só a classe `failure` é vermelha.
 | `config` | Lacuna ou aviso declarado; tarefas ligadas bloqueadas |
 | `unverified` | Verificação `not_found`, `stale` ou `reported` |
 
-Tarefa arquivada ou `done` não conta.
+Tarefa arquivada ou `done` não conta. Um erro ligado (referência `error`) conta como `failure` até a referência sair.
+
+**Impacto** (no detalhe do nó): quem depende dele, seguindo para trás as ligações de infraestrutura, dados,
+negócio e gatilho até seis passos, sem repetir nó. Repositório fica de fora: `deploys_to` é entrega, não
+dependência em execução. **Compartilhado**: um nó de que dependem pelo menos dois outros sistemas, pelas mesmas
+categorias de ligação.
 
 ### Ligar uma tarefa ou um chamado a um componente
 
