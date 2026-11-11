@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Engine } from '../lib/atlas-graph';
 import { layoutEngines } from '../lib/atlas-layout';
 
@@ -101,6 +101,27 @@ const ATLAS = {
   collectors: [{ name: 'railway', connected: true, lastRunAt: ago(4), error: null }],
 };
 
+/** A node as the drawer reads it (the NodeDetail of the contract, section 9), made from the fixtures above. */
+function nodeDetail(nodeId: string) {
+  const n = ACME_NODES.find((x) => x.id === nodeId);
+  if (!n) return null;
+  const ref = (id: string) => {
+    const x = ACME_NODES.find((y) => y.id === id)!;
+    return { id: x.id, key: x.key, name: x.name, kind: x.kind, engine: x.engine, productId: x.productId, state: x.state };
+  };
+  return {
+    node: {
+      ...n, notes: null, facts: [{ key: 'Health', value: '/health' }], items: [], externalRef: null, monitor: null, aliases: [], owner: null,
+      impact: null, deployStatus: null, monitorStatus: null, lastDeployAt: null, commitSha: null, stack: [],
+    },
+    system: { id: ACME, slug: 'acme', name: 'Acme', color: null },
+    incoming: ACME_EDGES.filter((e) => e.to === nodeId).map((e) => ({ edge: e, node: ref(e.from) })),
+    outgoing: ACME_EDGES.filter((e) => e.from === nodeId).map((e) => ({ edge: e, node: ref(e.to) })),
+    impact: { direct: [], indirect: [], systems: [] },
+    evidence: [], refs: [], events: [], changes: [], repos: [], processes: [], changeSets: [], providerUrl: null,
+  };
+}
+
 /** Every /v1 call the map's screens make, answered from the fixtures above. Writes are accepted and ignored. */
 async function serve(page: Page) {
   await page.route('**/v1/**', async (route) => {
@@ -108,6 +129,10 @@ async function serve(page: Page) {
     const url = new URL(request.url());
     const path = url.pathname.replace('/v1/staff', '');
     if (request.method() !== 'GET') return route.fulfill({ json: { ok: true } });
+    if (path.startsWith('/atlas/nodes/')) {
+      const detail = nodeDetail(path.slice('/atlas/nodes/'.length));
+      return detail ? route.fulfill({ json: detail }) : route.fulfill({ status: 404, json: { message: 'not mocked' } });
+    }
     if (path === '/atlas/graph') {
       const body = url.searchParams.get('system') === 'synthetic' ? SYNTHETIC_GRAPH : ACME_GRAPH;
       return route.fulfill({ json: body });
@@ -141,6 +166,24 @@ async function expectNoSidewaysScroll(page: Page) {
 }
 
 const nodeCard = (page: Page, id: string) => page.locator(`[data-testid="atlas-graph-node"][data-node-id="${id}"]`);
+
+/** On a phone the map is wider than the screen: drag it sideways until the card is inside the canvas. */
+async function bringIntoView(page: Page, id: string | Locator) {
+  const card = typeof id === 'string' ? nodeCard(page, id) : id;
+  const canvas = page.getByTestId('atlas-graph-canvas');
+  for (let i = 0; i < 10; i++) {
+    const c = await card.boundingBox();
+    const k = await canvas.boundingBox();
+    if (c && k && c.x >= k.x && c.x + c.width <= k.x + k.width) return;
+    const pane = await page.locator('.react-flow__pane').boundingBox();
+    if (!pane) return;
+    const y = pane.y + pane.height / 2;
+    await page.mouse.move(pane.x + pane.width * 0.9, y);
+    await page.mouse.down();
+    await page.mouse.move(pane.x + pane.width * 0.1, y, { steps: 8 });
+    await page.mouse.up();
+  }
+}
 
 test('the company shows the systems and the shared services, and a system opens its map', async ({ page }) => {
   await serve(page);
@@ -190,7 +233,9 @@ test('turning a link kind off hides its edges and leaves the others', async ({ p
   const writes = page.locator('.react-flow__edge[data-id*="e-writes"]');
   await expect(writes).toHaveCount(1);
   await expect(page.locator('.react-flow__edge[data-id*="e-deploy"]')).toHaveCount(1);
+  await page.getByRole('button', { name: /Ligações/ }).click();
   await page.locator('label', { hasText: 'Dados' }).click();
+  await expect(page.getByRole('button', { name: /Ligações/ })).toContainText('2/6');
   await expect(writes).toHaveCount(0);
   await expect(page.locator('.react-flow__edge[data-id*="e-deploy"]')).toHaveCount(1);
   await expectNoSidewaysScroll(page);
@@ -199,6 +244,7 @@ test('turning a link kind off hides its edges and leaves the others', async ({ p
 test('selecting a node opens its drawer and dims what is not related to it', async ({ page }) => {
   await serve(page);
   await page.goto('/atlas?system=acme');
+  await bringIntoView(page, 'api');
   await nodeCard(page, 'api').click();
   await expect(page.getByTestId('atlas-node-drawer')).toContainText('api');
   // Direct neighbours and the ones two steps away stay; the blog has no link and fades.
@@ -210,11 +256,106 @@ test('selecting a node opens its drawer and dims what is not related to it', asy
   await expect(nodeCard(page, 'blog')).not.toHaveAttribute('data-dim');
 });
 
+test('the product map opens at a readable zoom, with the first card in view and no page scroll', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the 1440 by 900 view');
+  await serve(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/atlas?system=acme');
+  const card = nodeCard(page, 'repo-rockets');
+  await expect(card).toBeVisible();
+  // The zoom the picture opens at, read from the viewport's transform.
+  const zoom = await page.locator('.react-flow__viewport').evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).a);
+  expect(zoom).toBeGreaterThanOrEqual(0.75);
+  const name = card.getByText('acme-inc/rockets', { exact: true });
+  const font = await name.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  expect(font).toBeGreaterThanOrEqual(12);
+  const box = await name.boundingBox();
+  const cardBox = await card.boundingBox();
+  expect(box && box.y >= 0 && box.y + box.height <= 900).toBe(true);
+  expect(cardBox && cardBox.x >= 0 && cardBox.x + cardBox.width <= 1440 && cardBox.y + cardBox.height <= 900).toBe(true);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test('with the drawer open beside the map, another node opens in its place, and nothing is modal', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the drawer is a side panel on a desktop');
+  await serve(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/atlas?system=acme&node=domain');
+  await expect(page.getByTestId('atlas-node-drawer')).toContainText('acme.example');
+  // No scrim: the map's own node takes the click, so nothing covers the map.
+  await expect(page.locator('.bg-scrim:visible')).toHaveCount(0);
+  await nodeCard(page, 'repo-rockets').click();
+  await expect(page.getByTestId('atlas-node-drawer')).toContainText('acme-inc/rockets');
+  await expect(page).toHaveURL(/node=repo-rockets/);
+  await expectNoSidewaysScroll(page);
+});
+
+test('the drawer opens from the link with its node, and selecting replaces the history entry', async ({ page }, testInfo) => {
+  await serve(page);
+  await page.goto('/atlas?system=acme&node=api');
+  await expect(page.getByTestId('atlas-node-drawer')).toContainText('API');
+  const before = await page.evaluate(() => history.length);
+  // On a phone the open sheet covers the map: close it, then pick the next node from the map.
+  if (testInfo.project.name === 'mobile') {
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('atlas-node-drawer')).toHaveCount(0);
+  }
+  await bringIntoView(page, 'domain');
+  await nodeCard(page, 'domain').click();
+  await expect(page).toHaveURL(/node=domain/);
+  await expect(page.getByTestId('atlas-node-drawer')).toContainText('acme.example');
+  expect(await page.evaluate(() => history.length)).toBe(before);
+  await page.keyboard.press('Escape');
+  await expect(page).not.toHaveURL(/node=/);
+});
+
+test('Filtros narrows the nodes and shows how many filters are on', async ({ page }) => {
+  await serve(page);
+  await page.goto('/atlas?system=acme');
+  const filters = page.getByRole('button', { name: /Filtros/ });
+  await expect(filters).not.toContainText('1');
+  await filters.click();
+  await page.getByLabel('Tipo', { exact: true }).selectOption('worker');
+  await expect(filters).toContainText('1');
+  await expect(nodeCard(page, 'api')).toHaveCount(0);
+  await expect(nodeCard(page, 'worker')).toHaveCount(1);
+});
+
+test('Legenda opens the legend of the map', async ({ page }) => {
+  await serve(page);
+  await page.goto('/atlas?system=acme');
+  await page.getByRole('button', { name: 'Legenda', exact: true }).click();
+  await expect(page.getByTestId('atlas-graph-legend')).toContainText('Infraestrutura');
+  await expect(page.getByTestId('atlas-graph-legend')).toContainText('Planejada');
+});
+
+test('the company bands do not overlap: systems, shared, and each engine with its own title', async ({ page }) => {
+  await serve(page);
+  await page.goto('/atlas');
+  const bands = page.locator('.react-flow__node-band');
+  await expect(bands).toHaveCount(3);
+  const boxes = await bands.evaluateAll((els) => els.map((e) => {
+    const r = e.getBoundingClientRect();
+    return { text: e.textContent ?? '', x1: r.left, y1: r.top, x2: r.right, y2: r.bottom };
+  }));
+  expect(boxes.map((b) => b.text)).toEqual(expect.arrayContaining(['Sistemas', 'Compartilhados', 'Financeiro']));
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i];
+      const b = boxes[j];
+      const overlap = a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;
+      expect(overlap, `${a.text} x ${b.text}`).toBe(false);
+    }
+  }
+});
+
 test('a collapsed engine becomes one summary node with its count', async ({ page }) => {
   await serve(page);
   await page.goto('/atlas?system=acme');
   const lane = page.locator('[data-testid="atlas-graph-lane"][data-engine="app"]');
-  await lane.getByRole('button', { name: 'Recolher motor' }).click();
+  const collapse = lane.getByRole('button', { name: 'Recolher motor' });
+  await bringIntoView(page, collapse);
+  await collapse.click();
   const summary = page.locator('[data-testid="atlas-graph-summary"][data-engine="app"]');
   await expect(summary).toContainText('3 itens');
   await expect(page.locator('[data-testid="atlas-graph-node"][data-engine="app"]')).toHaveCount(0);
@@ -262,7 +403,9 @@ test('a map of 400 nodes loads and shows in under five seconds', async ({ page }
   await expect(page.getByTestId('atlas-graph-lane')).toHaveCount(9);
 });
 
-test('the layout is deterministic, orders the columns, and places 600 nodes in under 200 ms', () => {
+test('the layout is deterministic, orders the columns, and places 600 nodes in under 200 ms', async ({}, testInfo) => {
+  // A pure function: one run is enough, and a second browser competing for the CPU would only slow the timing.
+  test.skip(testInfo.project.name !== 'desktop', 'pure layout test, run once');
   const nodes = [
     { id: 'b', engine: 'app' as Engine, group: 'Núcleo', name: 'Banco' },
     { id: 'a', engine: 'code' as Engine, group: null, name: 'repo' },

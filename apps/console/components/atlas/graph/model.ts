@@ -31,12 +31,26 @@ export interface Filters {
   verification: Verification | 'all';
   categories: EdgeCategory[];
   collapsed: Engine[];
-  minimap: boolean;
 }
 
 export const DEFAULT_FILTERS: Filters = {
-  query: '', kind: 'all', state: 'all', verification: 'all', categories: DEFAULT_CATEGORIES, collapsed: [], minimap: true,
+  query: '', kind: 'all', state: 'all', verification: 'all', categories: DEFAULT_CATEGORIES, collapsed: [],
 };
+
+/** The smallest zoom the map opens at: below it the names are too small to read at first glance. */
+export const MIN_START_ZOOM = 0.75;
+
+/**
+ * The viewport a map opens with. The whole content when it fits at a readable zoom (centred); otherwise
+ * the left edge at the top, at the readable zoom, so the first column is read first and the rest is
+ * reached by dragging sideways.
+ */
+export function startViewport(content: { w: number; h: number }, box: { w: number; h: number }) {
+  const pad = 16;
+  const fit = Math.min(1, (box.w - pad * 2) / Math.max(content.w, 1), (box.h - pad * 2) / Math.max(content.h, 1));
+  if (fit >= MIN_START_ZOOM) return { zoom: fit, x: (box.w - content.w * fit) / 2, y: (box.h - content.h * fit) / 2 };
+  return { zoom: MIN_START_ZOOM, x: pad, y: pad };
+}
 
 const STORE_KEY = 'atlas-graph-filters';
 const STATES: Array<ServiceState | 'all'> = ['all', 'up', 'down', 'deploying', 'degraded', 'unknown'];
@@ -55,7 +69,6 @@ export function readFilters(): Filters {
       verification: VERIFICATIONS.includes(p.verification as Verification) ? (p.verification as Filters['verification']) : 'all',
       categories: Array.isArray(p.categories) ? p.categories.filter((c): c is EdgeCategory => EDGE_CATEGORIES.includes(c as EdgeCategory)) : DEFAULT_CATEGORIES,
       collapsed: Array.isArray(p.collapsed) ? p.collapsed.filter((e): e is Engine => ENGINES.includes(e as Engine)) : [],
-      minimap: typeof p.minimap === 'boolean' ? p.minimap : true,
     };
   } catch {
     return DEFAULT_FILTERS;

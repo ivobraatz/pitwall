@@ -23,18 +23,19 @@ export interface LayoutOutput {
   summaries: Array<{ id: string; engine: Engine; count: number; x: number; y: number }>;
 }
 
-const PAD = 16;           // inside a lane, around its nodes
-const LANE_HEADER = 52;   // the engine's name and its collapse button
+const PAD = 10;           // inside a lane, around its nodes (a 232 px lane holds a 212 px card)
+export const LANE_HEADER = 52;   // the engine's name and its collapse button, above the first node
 const GROUP_HEADER = 26;  // a group's heading, when its nodes have one
 const SWEEPS = 4;         // alternating left-to-right and right-to-left passes
 
 /** The id of the summary node that stands for a collapsed engine. */
 export const summaryId = (engine: Engine) => `summary:${engine}`;
 
-export function layoutEngines(input: LayoutInput, opts?: { laneWidth?: number; nodeHeight?: number; gap?: number; groupGap?: number }): LayoutOutput {
-  const laneWidth = opts?.laneWidth ?? 280;
-  const nodeHeight = opts?.nodeHeight ?? 56;
+export function layoutEngines(input: LayoutInput, opts?: { laneWidth?: number; nodeHeight?: number; gap?: number; colGap?: number; groupGap?: number }): LayoutOutput {
+  const laneWidth = opts?.laneWidth ?? 232;
+  const nodeHeight = opts?.nodeHeight ?? 54;
   const gap = opts?.gap ?? 12;
+  const colGap = opts?.colGap ?? 20;
   const groupGap = opts?.groupGap ?? 18;
   const collapsed = input.collapsed;
 
@@ -118,7 +119,7 @@ export function layoutEngines(input: LayoutInput, opts?: { laneWidth?: number; n
   const summaries: LayoutOutput['summaries'] = [];
   const lanes: LayoutOutput['lanes'] = [];
   engines.forEach((engine, col) => {
-    const x = col * (laneWidth + gap * 2);
+    const x = col * (laneWidth + colGap);
     const isCollapsed = collapsed.has(engine);
     const count = columns.get(engine)!.length;
     lanes.push({ engine, x, width: laneWidth, height, count, collapsed: isCollapsed });

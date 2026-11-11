@@ -365,14 +365,22 @@ test('the onboarding walks through the eight steps with GitHub connected', async
 
   // 1 · the system
   await expect(page.getByTestId('onboarding-system')).toHaveCount(2);
-  await page.locator('[data-testid="onboarding-system"][data-slug="acme"]').click();
-  await expect(page).toHaveURL(/system=acme/);
+  // The first click can land before the page is interactive in a busy dev server: click again until it takes.
+  const acme = page.locator('[data-testid="onboarding-system"][data-slug="acme"]');
+  await expect(async () => {
+    await acme.click();
+    await expect(page).toHaveURL(/system=acme/, { timeout: 2000 });
+  }).toPass({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Próximo passo' }).click();
 
   // 2 · the repositories
   await expect(page).toHaveURL(/step=2/);
-  await page.locator('[data-full-name="acme-inc/rockets"]').getByRole('button', { name: 'Associar ao sistema' }).click();
-  await expect.poll(() => writes.find((w) => w.path === '/atlas/repos')?.body).toEqual({ fullName: 'acme-inc/rockets', system: 'acme' });
+  // The repository delivers the API: its services are ticked, and their ids go with the link.
+  const rockets = page.locator('[data-full-name="acme-inc/rockets"]');
+  await rockets.locator('label', { hasText: 'API' }).click();
+  await expect(rockets.getByRole('checkbox', { name: 'API', exact: true })).toBeChecked();
+  await rockets.getByRole('button', { name: 'Associar ao sistema' }).click();
+  await expect.poll(() => writes.find((w) => w.path === '/atlas/repos')?.body).toEqual({ fullName: 'acme-inc/rockets', system: 'acme', services: [API] });
   await expect(page.getByTestId('onboarding-repo').filter({ hasText: 'globex-corp/portal' })).toContainText('Já associado');
   await page.getByRole('button', { name: 'Próximo passo' }).click();
 

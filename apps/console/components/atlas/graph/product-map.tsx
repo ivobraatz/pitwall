@@ -7,31 +7,35 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useGraph, useDiff, type Engine, type GraphEdge, type GraphNode, type NodeRef } from '@/lib/atlas-graph';
-import { useProcesses, type AtlasEnvironment, type AtlasProcess, type ProcessStep } from '@/lib/atlas';
+import { useProcesses, type AtlasEnvironment, type AtlasProcess, type AtlasSystem, type ProcessStep } from '@/lib/atlas';
 import { layoutEngines } from '@/lib/atlas-layout';
-import { Card, cn } from '@/components/ui';
+import { Button, cn } from '@/components/ui';
+import { ProductMark } from '@/components/product';
 import { StateGlyph, useAgo } from '@/components/atlas/parts';
 import { EvolutionPanel } from '@/components/atlas/detail/evolution';
 import { NodeDrawer } from '@/components/atlas/detail/node-drawer';
-import { AttentionIcon, GraphLegend, attentionLabel } from './legend';
+import { AttentionIcon, attentionLabel } from './legend';
 import { MapToolbar } from './toolbar';
 import { AttentionPanel, FlowsPanel, ModeBar, OperationPanel, SincePicker, processesOf, sinceValue, stepNumbers } from './modes';
 import {
-  CATEGORY_COLOR, layoutKey, matchesQuery, passesFilters, readFilters, reach, remapEdges, writeFilters,
+  CATEGORY_COLOR, MIN_START_ZOOM, layoutKey, matchesQuery, passesFilters, readFilters, reach, remapEdges, startViewport, writeFilters,
   type Filters, type Mode,
 } from './model';
+import { useBox } from './viewport';
 import { useGraphWords, type GraphWord } from './words';
 
 /*
  * Level 2: one system as a map. Columns are the engines; each node is a service or a repository.
- * Selecting a node draws its neighbourhood and opens the component drawer (level 3). Everything that
- * is drawn comes from the graph endpoint; the modes only choose what to emphasise.
+ * The header carries the system and the reading modes; the toolbar carries search and the popovers.
+ * Selecting a node draws its neighbourhood and opens the component drawer (level 3), beside the map
+ * on a desktop. The selection lives in the URL (?node=) so that a link opens the same picture.
  */
 
 const ENGINES_ORDER: Engine[] = ['code', 'delivery', 'infra', 'app', 'automation', 'business', 'marketing', 'monitoring', 'security'];
 const hidden = '!size-1 !min-h-0 !min-w-0 !border-0 !bg-transparent';
-const NODE_W = 248;
-const NODE_H = 56;
+const NODE_W = 212;
+const NODE_H = 54;
+const GROUP_LABEL_OFFSET = 24; // how far above its first node a group's name sits (the layout keeps this room)
 
 type CardData = {
   node: GraphNode;
@@ -45,6 +49,7 @@ type CardData = {
 };
 type LaneData = { engine: Engine; count: number; collapsed: boolean; onToggle: (e: Engine) => void };
 type SummaryData = { engine: Engine; count: number; onToggle: (e: Engine) => void };
+type GroupData = { label: string };
 
 function CardNode({ data }: NodeProps<Node<CardData, 'card'>>) {
   const t = useGraphWords();
@@ -62,7 +67,7 @@ function CardNode({ data }: NodeProps<Node<CardData, 'card'>>) {
       data-shared={n.shared || undefined} data-type={n.type} data-dim={data.dim || undefined} data-running={data.running || undefined}
       title={title}
       style={{ width: NODE_W, height: NODE_H }}
-      className={cn('relative flex flex-col justify-center gap-0.5 rounded-tile border bg-surface px-3 transition-opacity duration-150',
+      className={cn('relative flex flex-col justify-center gap-0.5 rounded-tile border bg-surface px-3 py-1.5 transition-opacity duration-150',
         n.shared ? 'border-border-loud' : 'border-border',
         n.verification === 'not_found' && 'atlas-hatch',
         (data.ghost || n.removalReportedAt) && 'border-dashed opacity-70',
@@ -74,11 +79,11 @@ function CardNode({ data }: NodeProps<Node<CardData, 'card'>>) {
       <div className="flex min-w-0 items-center gap-2">
         {n.type === 'repo' ? <span className="shrink-0 rounded-full bg-chip px-1.5 text-[11px] font-semibold text-fg-secondary">repo</span>
           : <StateGlyph state={n.state} size={12} />}
-        <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-fg">{n.name}</span>
+        <span className="min-w-0 flex-1 truncate text-[14px] leading-5 font-medium text-fg">{n.name}</span>
         {data.step !== null && <span className="grid size-5 shrink-0 place-items-center rounded-full bg-btn text-[11px] font-semibold text-btn-fg tabular-nums">{data.step}</span>}
         {badgeWord && <span className="shrink-0 rounded-full bg-accent-bg px-1.5 text-[11px] font-semibold text-accent-fg">{badgeWord}</span>}
       </div>
-      <div className="flex min-w-0 items-center gap-2 text-[12px] text-fg-muted">
+      <div className="flex min-w-0 items-center gap-2 text-[12px] leading-4 text-fg-muted">
         <span className="min-w-0 flex-1 truncate">{sub}</span>
         {chips.map((k) => (
           <span key={k} title={attentionLabel(k, t)}
@@ -98,16 +103,20 @@ function LaneNode({ data }: NodeProps<Node<LaneData, 'lane'>>) {
   return (
     <div data-testid="atlas-graph-lane" data-engine={data.engine} data-collapsed={data.collapsed || undefined}
       className="h-full rounded-panel bg-hover">
-      <div className="flex h-[52px] items-center gap-2 px-4">
+      <div className="flex h-[52px] items-center gap-2 px-3">
         <h3 className="min-w-0 truncate text-[13px] font-semibold text-fg-secondary">{t(`engine.${data.engine}` as GraphWord)}</h3>
         <span className="text-[12px] text-fg-subtle tabular-nums">{data.count}</span>
-        <button type="button" className="nodrag nopan ml-auto h-7 rounded-full px-2.5 text-[12px] font-medium text-fg-muted hover:bg-surface hover:text-fg"
+        <button type="button" className="nodrag nopan ml-auto h-7 shrink-0 rounded-full px-2 text-[12px] font-medium text-fg-muted hover:bg-surface hover:text-fg"
           aria-expanded={!data.collapsed} onClick={() => data.onToggle(data.engine)}>
           {data.collapsed ? t('engine.expand') : t('engine.collapse')}
         </button>
       </div>
     </div>
   );
+}
+
+function GroupNode({ data }: NodeProps<Node<GroupData, 'group'>>) {
+  return <p className="pointer-events-none truncate text-[12px] leading-4 font-semibold text-fg-muted" style={{ width: NODE_W }}>{data.label}</p>;
 }
 
 function SummaryNode({ data }: NodeProps<Node<SummaryData, 'summary'>>) {
@@ -125,7 +134,7 @@ function SummaryNode({ data }: NodeProps<Node<SummaryData, 'summary'>>) {
   );
 }
 
-const NODE_TYPES = { card: CardNode, lane: LaneNode, summary: SummaryNode };
+const NODE_TYPES = { card: CardNode, lane: LaneNode, summary: SummaryNode, group: GroupNode };
 
 /** A removed node, as the diff reports it: it is not in the graph any more, so it is drawn as a ghost. */
 function ghostOf(ref: NodeRef): GraphNode {
@@ -140,37 +149,45 @@ function ghostOf(ref: NodeRef): GraphNode {
   };
 }
 
-export function ProductMap({ system, environments, environment, onEnvironment }: {
-  system: { id: string; slug: string; name: string };
+export function ProductMap({ system, environments, environment, onEnvironment, node, onNode, onBack }: {
+  system: AtlasSystem;
   environments: AtlasEnvironment[];
   environment: string | null;
   onEnvironment: (slug: string | null) => void;
+  /** The selected node's id, from the URL. */
+  node: string | null;
+  onNode: (id: string | null) => void;
+  onBack: () => void;
 }) {
   return (
     <ReactFlowProvider>
-      <ProductCanvas system={system} environments={environments} environment={environment} onEnvironment={onEnvironment} />
+      <ProductCanvas system={system} environments={environments} environment={environment} onEnvironment={onEnvironment} node={node} onNode={onNode} onBack={onBack} />
     </ReactFlowProvider>
   );
 }
 
-function ProductCanvas({ system, environments, environment, onEnvironment }: {
-  system: { id: string; slug: string; name: string };
+function ProductCanvas({ system, environments, environment, onEnvironment, node, onNode, onBack }: {
+  system: AtlasSystem;
   environments: AtlasEnvironment[];
   environment: string | null;
   onEnvironment: (slug: string | null) => void;
+  node: string | null;
+  onNode: (id: string | null) => void;
+  onBack: () => void;
 }) {
   const t = useGraphWords();
   const flow = useReactFlow();
   const graph = useGraph(system.slug, environment);
   const processes = useProcesses();
   const searchRef = React.useRef<HTMLInputElement>(null);
+  const [boxRef, box] = useBox<HTMLDivElement>();
 
   const [filters, setFilters] = React.useState<Filters>(() => readFilters());
   const [mode, setMode] = React.useState<Mode>('architecture');
-  const [selected, setSelected] = React.useState<string | null>(null);
   const [flowId, setFlowId] = React.useState<string | null>(null);
   const [since, setSince] = React.useState<'day' | 'week' | 'month' | 'date'>('week');
   const [sinceDate, setSinceDate] = React.useState('');
+  const selected = node;
 
   const updateFilters = React.useCallback((patch: Partial<Filters>) => {
     setFilters((prev) => { const next = { ...prev, ...patch }; writeFilters(next); return next; });
@@ -191,11 +208,11 @@ function ProductCanvas({ system, environments, environment, onEnvironment }: {
       const target = e.target as HTMLElement | null;
       const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
       if (e.key === '/' && !typing) { e.preventDefault(); searchRef.current?.focus(); }
-      if (e.key === 'Escape' && !typing) setSelected(null);
+      if (e.key === 'Escape' && !typing) onNode(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [onNode]);
 
   // The window of "since" is fixed per choice, so the diff's query does not change on every render.
   const sinceIso = React.useMemo(() => sinceValue(since, sinceDate), [since, sinceDate]);
@@ -223,6 +240,14 @@ function ProductCanvas({ system, environments, environment, onEnvironment }: {
     collapsed,
   }), [structKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The map opens at a readable zoom: all of it when it fits, else the first columns from the left.
+  // React Flow reads this once, when it mounts; later resizes do not move the picture.
+  const opening = React.useMemo(() => {
+    if (!box || layout.lanes.length === 0) return null;
+    const w = Math.max(...layout.lanes.map((l) => l.x + l.width));
+    return startViewport({ w, h: layout.lanes[0].height }, box);
+  }, [layout, box]);
+
   // Edges drawn now: the chosen kinds, plus every edge of the selected node (it shows all its kinds).
   const engineOf = new Map<string, Engine>(laneNodes.map((n) => [n.id, n.engine]));
   const drawable = structural.filter((e) => filters.categories.includes(e.category) || (selected !== null && (e.from === selected || e.to === selected)));
@@ -235,7 +260,7 @@ function ProductCanvas({ system, environments, environment, onEnvironment }: {
   const firstMatchKey = firstMatch ? `${firstMatch.x},${firstMatch.y}` : '';
   React.useEffect(() => {
     if (!firstMatch) return;
-    flow.setCenter(firstMatch.x + NODE_W / 2, firstMatch.y + NODE_H / 2, { zoom: Math.max(flow.getZoom(), 1), duration: 300 });
+    flow.setCenter(firstMatch.x + NODE_W / 2, firstMatch.y + NODE_H / 2, { zoom: Math.max(flow.getZoom(), MIN_START_ZOOM), duration: 300 });
     // Centre only when the match itself changes, not on every refresh.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, firstMatchKey]);
@@ -263,6 +288,21 @@ function ProductCanvas({ system, environments, environment, onEnvironment }: {
     cardNodes.push({
       id: s.id, type: 'summary', position: { x: s.x, y: s.y }, draggable: false, style: { pointerEvents: 'all' },
       data: { engine: s.engine, count: s.count, onToggle: toggleEngine } satisfies SummaryData,
+    });
+  }
+  // A group's name sits above its first node, in the room the layout keeps for it.
+  const groupTops = new Map<string, { x: number; y: number; label: string }>();
+  for (const n of laneNodes) {
+    const pos = layout.positions[n.id];
+    if (!pos || !n.group) continue;
+    const key = `${n.engine}|${n.group}`;
+    const at = groupTops.get(key);
+    if (!at || pos.y < at.y) groupTops.set(key, { x: pos.x, y: pos.y, label: n.group });
+  }
+  for (const [key, g] of groupTops) {
+    cardNodes.push({
+      id: `group:${key}`, type: 'group', position: { x: g.x, y: g.y - GROUP_LABEL_OFFSET }, selectable: false, draggable: false, focusable: false,
+      data: { label: g.label } satisfies GroupData,
     });
   }
   const byId = new Map(laneNodes.map((n) => [n.id, n]));
@@ -310,73 +350,71 @@ function ProductCanvas({ system, environments, environment, onEnvironment }: {
 
   const selectedNode = selected && !ghostIds.has(selected) ? byId.get(selected) ?? null : null;
   const drawerId = selectedNode ? selectedNode.id : null;
-  const onNodeClick = React.useCallback((_: React.MouseEvent, node: Node) => {
-    if (node.type === 'card') setSelected((prev) => (prev === node.id ? null : node.id));
-  }, []);
+  const onNodeClick = React.useCallback((_: React.MouseEvent, n: Node) => {
+    if (n.type === 'card') onNode(selected === n.id ? null : n.id);
+  }, [onNode, selected]);
 
   // A process step picked in the panel selects its first service on the map.
   const onStep = (step: ProcessStep) => {
     const id = step.services.find((s) => byId.has(s));
-    if (id) setSelected(id);
+    if (id) onNode(id);
   };
 
   const noNodes = !graph.isLoading && data && allNodes.length === 0;
+  const side = mode !== 'architecture';
 
   return (
     <div className="flex flex-col gap-3" data-testid="atlas-product-map">
-      <div className="flex flex-wrap items-center gap-3">
-        <ModeBar mode={mode} onMode={setMode} />
-        <span className="text-[13px] text-fg-muted">{t('product.hint')}</span>
-        {selected && (
-          <button type="button" onClick={() => setSelected(null)} className="h-8 rounded-full bg-well px-3 text-[13px] font-medium text-fg-secondary hover:text-fg">
-            {t('toolbar.clearSelection')}
-          </button>
-        )}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Button size="sm" variant="ghost" onClick={onBack}>← {t('product.back')}</Button>
+        <ProductMark product={system} size={32} />
+        <h2 className="text-[22px] leading-[1.2] font-semibold tracking-[-0.02em] text-fg">{system.name}</h2>
+        {system.description && <p className="hidden min-w-0 truncate text-[14px] text-fg-muted xl:block">{system.description}</p>}
+        <div className="ml-auto min-w-0 max-w-full">
+          <ModeBar mode={mode} onMode={setMode} />
+        </div>
       </div>
       <MapToolbar filters={filters} onFilters={updateFilters} kinds={[...new Set(allNodes.map((n) => n.kind))].sort()}
         environments={environments} environment={environment} onEnvironment={onEnvironment} searchRef={searchRef}
-        hidden={hiddenCount} matches={matchIds.size} query={query} />
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <Card className="overflow-hidden p-2">
+        hidden={hiddenCount} matches={matchIds.size} query={query} selected={selected !== null} onClear={() => onNode(null)} />
+      <div className={cn('grid gap-3', side && 'lg:grid-cols-[minmax(0,1fr)_20rem]')}>
+        <div ref={boxRef} className="atlas-flow relative h-[calc(100dvh-17rem)] min-h-[560px] overflow-hidden rounded-panel bg-well"
+          data-testid="atlas-graph-canvas" title={t('product.hint')}>
           {graph.error ? <p className="p-6 text-[14px] text-danger">{t('product.error')}</p>
-            : !data ? <div className="h-[62vh] min-h-[420px] rounded-tile bg-well" aria-label={t('product.loading')} />
+            : !data ? <div className="h-full" aria-label={t('product.loading')} />
             : noNodes ? <p className="p-6 text-[14px] text-fg-muted">{t('product.empty')}</p>
-            : (
-              <div className="atlas-flow h-[62vh] min-h-[420px] overflow-hidden rounded-tile bg-well" data-testid="atlas-graph-canvas">
-                <ReactFlow
-                  key={`${system.slug}|${environment ?? ''}`}
-                  nodes={cardNodes} edges={edges} nodeTypes={NODE_TYPES}
-                  fitView fitViewOptions={{ padding: 0.12, maxZoom: 1 }}
-                  minZoom={0.1} maxZoom={1.8}
-                  nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}
-                  onlyRenderVisibleElements
-                  onNodeClick={onNodeClick}
-                  onPaneClick={() => setSelected(null)}
-                  proOptions={{ hideAttribution: true }}
-                >
-                  <Background gap={24} size={1} color="var(--ds-border-default)" />
-                  <Controls showInteractive={false} position="bottom-right" />
-                  {filters.minimap && <MiniMap pannable zoomable position="bottom-left" nodeColor={(n) => (n.type === 'card' ? 'var(--ds-border-loud)' : 'transparent')} />}
-                </ReactFlow>
-              </div>
+            : opening && (
+              <ReactFlow
+                key={`${system.slug}|${environment ?? ''}`}
+                nodes={cardNodes} edges={edges} nodeTypes={NODE_TYPES}
+                defaultViewport={opening}
+                minZoom={0.3} maxZoom={1.8}
+                nodesDraggable={false} nodesConnectable={false} elementsSelectable={false}
+                onNodeClick={onNodeClick}
+                onPaneClick={() => onNode(null)}
+                proOptions={{ hideAttribution: true }}
+              >
+                <Background gap={24} size={1} color="var(--ds-border-default)" />
+                <Controls showInteractive={false} position="bottom-left" />
+                <MiniMap className="max-lg:hidden" pannable zoomable position="bottom-right" nodeColor={(n) => (n.type === 'card' ? 'var(--ds-border-loud)' : 'transparent')} />
+              </ReactFlow>
             )}
-        </Card>
-        <aside className="flex flex-col gap-3" aria-label={t('mode.label')}>
-          {mode === 'flows' && <FlowsPanel processes={processList} flowId={flowId} onFlow={setFlowId} onStep={onStep} />}
-          {mode === 'operation' && <OperationPanel slug={system.slug} systemId={system.id} />}
-          {mode === 'attention' && <AttentionPanel slug={system.slug} onNode={setSelected} />}
-          {mode === 'evolution' && (
-            <>
-              <SincePicker choice={since} date={sinceDate} onChoice={setSince} onDate={setSinceDate} />
-              <EvolutionPanel system={system.slug} since={sinceIso} onNode={setSelected} />
-            </>
-          )}
-          {mode === 'architecture' && <GraphLegend className="rounded-tile bg-surface p-3" />}
-        </aside>
+          <NodeDrawer inMap nodeId={drawerId} onClose={() => onNode(null)} onNode={onNode} />
+        </div>
+        {side && (
+          <aside className="flex flex-col gap-3" aria-label={t('mode.label')}>
+            {mode === 'flows' && <FlowsPanel processes={processList} flowId={flowId} onFlow={setFlowId} onStep={onStep} />}
+            {mode === 'operation' && <OperationPanel slug={system.slug} systemId={system.id} />}
+            {mode === 'attention' && <AttentionPanel slug={system.slug} onNode={onNode} />}
+            {mode === 'evolution' && (
+              <>
+                <SincePicker choice={since} date={sinceDate} onChoice={setSince} onDate={setSinceDate} />
+                <EvolutionPanel system={system.slug} since={sinceIso} onNode={onNode} />
+              </>
+            )}
+          </aside>
+        )}
       </div>
-      {mode !== 'architecture' && <GraphLegend />}
-      <NodeDrawer nodeId={drawerId} onClose={() => setSelected(null)} onNode={setSelected} />
     </div>
   );
 }
-

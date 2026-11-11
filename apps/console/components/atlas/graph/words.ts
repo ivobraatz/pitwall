@@ -15,7 +15,7 @@ const pt = {
   'toolbar.type': 'Tipo', 'toolbar.allTypes': 'Todos os tipos', 'toolbar.state': 'Estado', 'toolbar.allStates': 'Qualquer estado',
   'toolbar.verification': 'Verificação', 'toolbar.allVerifications': 'Qualquer verificação',
   'toolbar.categories': 'Ligações', 'toolbar.filters': 'Filtros', 'toolbar.zoomIn': 'Aproximar', 'toolbar.zoomOut': 'Afastar',
-  'toolbar.fit': 'Ajustar à tela', 'toolbar.minimap': 'Minimapa', 'toolbar.results': '{n} encontrados',
+  'toolbar.fit': 'Ajustar à tela', 'toolbar.results': '{n} encontrados', 'toolbar.clearFilters': 'Limpar filtros',
   'toolbar.noResults': 'Nada com esse nome.', 'toolbar.hidden': '{n} ocultos pelos filtros',
 
   'cat.infra': 'Infraestrutura', 'cat.data': 'Dados', 'cat.business': 'Negócio', 'cat.trigger': 'Disparos',
@@ -79,7 +79,7 @@ const en: Record<keyof typeof pt, string> = {
   'toolbar.type': 'Type', 'toolbar.allTypes': 'All types', 'toolbar.state': 'State', 'toolbar.allStates': 'Any state',
   'toolbar.verification': 'Verification', 'toolbar.allVerifications': 'Any verification',
   'toolbar.categories': 'Links', 'toolbar.filters': 'Filters', 'toolbar.zoomIn': 'Zoom in', 'toolbar.zoomOut': 'Zoom out',
-  'toolbar.fit': 'Fit to screen', 'toolbar.minimap': 'Minimap', 'toolbar.results': '{n} found',
+  'toolbar.fit': 'Fit to screen', 'toolbar.results': '{n} found', 'toolbar.clearFilters': 'Clear filters',
   'toolbar.noResults': 'Nothing with that name.', 'toolbar.hidden': '{n} hidden by filters',
 
   'cat.infra': 'Infrastructure', 'cat.data': 'Data', 'cat.business': 'Business', 'cat.trigger': 'Triggers',
