@@ -32,6 +32,12 @@ public static class StaffAtlasEndpoints
     public static IEndpointRouteBuilder MapStaffAtlasEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/v1/staff/atlas").RequireAuthorization(Policies.Atlas).WithTags("Staff");
+        // Whoever calls here is the actor of every change the request makes (the history reads it).
+        group.AddEndpointFilter(async (ctx, next) =>
+        {
+            ctx.HttpContext.RequestServices.GetRequiredService<AtlasActor>().FromRequest(ctx.HttpContext);
+            return await next(ctx);
+        });
         group.MapGet("", Overview);
         group.MapGet("/flows", Flows);
         group.MapGet("/processes", Processes);

@@ -52,6 +52,10 @@ public sealed class AtlasCollectorRunner(
                 try
                 {
                     using var scope = scopes.CreateScope();
+                    // What a collector writes is history under the collector's name, not "Sistema".
+                    var actor = scope.ServiceProvider.GetRequiredService<AtlasActor>();
+                    actor.Name = collector.Name;
+                    actor.Source = "collector";
                     await collector.CollectAsync(scope.ServiceProvider.GetRequiredService<PitwallDb>(), ct);
                     status.Set(collector.Name, null);
                 }
@@ -229,16 +233,17 @@ public sealed class RailwayCollector(HttpClient http, string? token, string? wor
 }
 
 /// <summary>GitHub: the last pipeline run, a week of commits and runs, and open dependency alerts of each repository.</summary>
-public sealed class GitHubCollector(HttpClient http, string? token) : IAtlasCollector
+public sealed class GitHubCollector(HttpClient http, IAtlasGitHubAuth auth) : IAtlasCollector
 {
     public const string Api = "https://api.github.com";
     public string Name => "github";
-    public bool Configured => !string.IsNullOrWhiteSpace(token);
+    public bool Configured => auth.Configured;
 
-    private HttpRequestMessage Get(string path)
+    // The token is asked for on every request: whatever the auth holds decides how long it lives.
+    private async Task<HttpRequestMessage> GetAsync(CancellationToken ct, string path)
     {
         var req = new HttpRequestMessage(HttpMethod.Get, Api + path);
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await auth.TokenAsync(ct));
         req.Headers.UserAgent.ParseAdd("Pitwall-Atlas/1.0");
         req.Headers.Accept.ParseAdd("application/vnd.github+json");
         req.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
@@ -263,7 +268,7 @@ public sealed class GitHubCollector(HttpClient http, string? token) : IAtlasColl
         {
             try
             {
-                var runs = await AtlasCollect.GetJsonAsync(http, Get($"/repos/{repo.FullName}/actions/runs?per_page=20"), ct);
+                var runs = await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, $"/repos/{repo.FullName}/actions/runs?per_page=20"), ct);
                 var last = runs.Items("workflow_runs").FirstOrDefault(r => r.Str("event") != "pull_request");
                 if (last.ValueKind == JsonValueKind.Object)
                 {
@@ -274,9 +279,9 @@ public sealed class GitHubCollector(HttpClient http, string? token) : IAtlasColl
                     repo.LastRunSha = Clean.Cut(last.Str("head_sha"), 64);
                 }
                 var week = Uri.EscapeDataString(">=" + since);
-                repo.Runs7d = Total(await AtlasCollect.GetJsonAsync(http, Get($"/repos/{repo.FullName}/actions/runs?per_page=1&created={week}"), ct));
-                repo.FailedRuns7d = Total(await AtlasCollect.GetJsonAsync(http, Get($"/repos/{repo.FullName}/actions/runs?per_page=1&status=failure&created={week}"), ct));
-                var commits = await AtlasCollect.GetJsonAsync(http, Get($"/repos/{repo.FullName}/commits?per_page=100&since={Uri.EscapeDataString(since)}"), ct);
+                repo.Runs7d = Total(await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, $"/repos/{repo.FullName}/actions/runs?per_page=1&created={week}"), ct));
+                repo.FailedRuns7d = Total(await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, $"/repos/{repo.FullName}/actions/runs?per_page=1&status=failure&created={week}"), ct));
+                var commits = await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, $"/repos/{repo.FullName}/commits?per_page=100&since={Uri.EscapeDataString(since)}"), ct);
                 repo.Commits7d = commits.ValueKind == JsonValueKind.Array ? commits.GetArrayLength() : null;
             }
             catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)
@@ -285,7 +290,7 @@ public sealed class GitHubCollector(HttpClient http, string? token) : IAtlasColl
             }
             try
             {
-                var alerts = await AtlasCollect.GetJsonAsync(http, Get($"/repos/{repo.FullName}/dependabot/alerts?state=open&per_page=100"), ct);
+                var alerts = await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, $"/repos/{repo.FullName}/dependabot/alerts?state=open&per_page=100"), ct);
                 repo.OpenAlerts = alerts.ValueKind == JsonValueKind.Array ? alerts.GetArrayLength() : null;
             }
             catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
@@ -295,7 +300,7 @@ public sealed class GitHubCollector(HttpClient http, string? token) : IAtlasColl
             repo.CheckedAt = now;
         }
 
-        var mine = await AtlasCollect.GetJsonAsync(http, Get("/user/repos?affiliation=owner&sort=pushed&per_page=100"), ct);
+        var mine = await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, "/user/repos?affiliation=owner&sort=pushed&per_page=100"), ct);
         var unmatched = (mine.ValueKind == JsonValueKind.Array ? mine.EnumerateArray().ToList() : [])
             .Where(r => r.TryGetProperty("archived", out var a) && a.ValueKind == JsonValueKind.False
                         && r.TryGetProperty("fork", out var f) && f.ValueKind == JsonValueKind.False)

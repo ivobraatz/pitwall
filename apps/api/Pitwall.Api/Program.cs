@@ -19,9 +19,11 @@ using Pitwall.Services.Webhooks;
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
-builder.Services.AddDbContext<PitwallDb>(o => o
+// The change recorder is scoped with the context: the history names whoever is saving in this request.
+builder.Services.AddDbContext<PitwallDb>((sp, o) => o
     .UseNpgsql(config.GetConnectionString("Pitwall") ?? throw new InvalidOperationException("ConnectionStrings:Pitwall is required."))
-    .UseSnakeCaseNamingConvention());
+    .UseSnakeCaseNamingConvention()
+    .AddInterceptors(sp.GetRequiredService<AtlasChangeRecorder>()));
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<Secrets>();
 builder.Services.AddHttpClient("webhooks", c =>
@@ -67,14 +69,22 @@ builder.Services.AddSingleton<WebhookDispatcher>();
 // one without a token is "not connected" and does nothing.
 builder.Services.AddScoped<AtlasWriter>();
 builder.Services.AddScoped<AtlasImporter>();
+builder.Services.AddScoped<AtlasActor>();
+builder.Services.AddScoped<AtlasChangeRecorder>();
 builder.Services.AddHttpClient("atlas", c => c.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddSingleton<AtlasCollectorStatus>();
 static HttpClient AtlasHttp(IServiceProvider sp) => sp.GetRequiredService<IHttpClientFactory>().CreateClient("atlas");
+builder.Services.AddSingleton<IAtlasSnapshotTrigger, NoopAtlasSnapshotTrigger>();
+builder.Services.AddSingleton<IAtlasGitHubAuth>(new PatGitHubAuth(config["Atlas:GitHub:Token"]));
 builder.Services.AddSingleton<IAtlasCollector>(sp => new RailwayCollector(AtlasHttp(sp), config["Atlas:Railway:Token"], config["Atlas:Railway:WorkspaceId"]));
-builder.Services.AddSingleton<IAtlasCollector>(sp => new GitHubCollector(AtlasHttp(sp), config["Atlas:GitHub:Token"]));
+builder.Services.AddSingleton<IAtlasCollector>(sp => new GitHubCollector(AtlasHttp(sp), sp.GetRequiredService<IAtlasGitHubAuth>()));
 builder.Services.AddSingleton<IAtlasCollector>(sp => new KumaCollector(AtlasHttp(sp), config["Atlas:Kuma:Url"], config["Atlas:Kuma:ApiKey"]));
 builder.Services.AddSingleton<IAtlasCollector>(sp => new VercelCollector(AtlasHttp(sp), config["Atlas:Vercel:Token"], config["Atlas:Vercel:TeamId"]));
 builder.Services.AddSingleton<AtlasCollectorRunner>();
+// The modules of the Atlas's next parts register here; each one is empty until it is filled in.
+builder.Services.AddAtlasSync(config);
+builder.Services.AddAtlasGraph(config);
+builder.Services.AddAtlasConnectors(config);
 if (!builder.Environment.IsEnvironment("Testing"))
 {
     builder.Services.AddHostedService(sp => sp.GetRequiredService<WebhookDispatcher>());
@@ -191,6 +201,9 @@ app.MapStaffReleaseEndpoints();
 app.MapStaffTokenEndpoints();
 app.MapStaffTaskEndpoints();
 app.MapStaffAtlasEndpoints();
+app.MapAtlasSync();
+app.MapAtlasGraph();
+app.MapAtlasConnectors();
 
 if (!app.Environment.IsEnvironment("Testing"))
 {

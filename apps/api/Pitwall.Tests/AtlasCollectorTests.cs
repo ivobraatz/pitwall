@@ -88,7 +88,7 @@ public class AtlasCollectorTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
     {
         var http = new HttpClient(new Provider());
         Assert.False(new RailwayCollector(http, null).Configured);
-        Assert.False(new GitHubCollector(http, " ").Configured);
+        Assert.False(new GitHubCollector(http, new PatGitHubAuth(" ")).Configured);
         Assert.False(new KumaCollector(http, "https://status.example.com", null).Configured);
         Assert.False(new KumaCollector(http, null, "chave").Configured);
         Assert.False(new VercelCollector(http, "").Configured);
@@ -180,7 +180,7 @@ public class AtlasCollectorTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
                  {"full_name":"acme-inc/old","html_url":"https://git.example.com/c","archived":true,"fork":false},
                  {"full_name":"acme-inc/forked","html_url":"https://git.example.com/d","archived":false,"fork":true}]
                 """);
-        await CollectAsync(new GitHubCollector(new HttpClient(provider), Token));
+        await CollectAsync(new GitHubCollector(new HttpClient(provider), new PatGitHubAuth(Token)));
 
         var repo = await ReadAsync(db => db.AtlasRepos.SingleAsync(r => r.FullName == name));
         Assert.Equal("CI", repo.LastRunName);
