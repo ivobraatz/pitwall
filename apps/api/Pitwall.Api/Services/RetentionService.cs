@@ -9,12 +9,14 @@ namespace Pitwall.Services;
 /// Keeps only what is still useful. Hourly:
 ///   - server errors older than 30 days (tickets keep their signature; the stack trace goes);
 ///   - recordings of tickets closed more than 90 days ago (the conversation stays);
-///   - expired console sessions and delivered webhooks older than 30 days.
+///   - expired console sessions and delivered webhooks older than 30 days;
+///   - Atlas operational events older than 90 days (the history of changes stays).
 /// </summary>
 public sealed class RetentionService(IServiceScopeFactory scopes, ILogger<RetentionService> logger) : BackgroundService
 {
     public static readonly TimeSpan ServerErrorRetention = TimeSpan.FromDays(30);
     public static readonly TimeSpan WebhookLogRetention = TimeSpan.FromDays(30);
+    public static readonly TimeSpan AtlasEventRetention = TimeSpan.FromDays(90);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -43,6 +45,7 @@ public sealed class RetentionService(IServiceScopeFactory scopes, ILogger<Retent
         var hooks = await db.WebhookDeliveries
             .Where(w => w.Status != WebhookStatuses.Pending && w.CreatedAt < now - WebhookLogRetention)
             .ExecuteDeleteAsync(ct);
+        var atlasEvents = await db.AtlasEvents.Where(e => e.At < now - AtlasEventRetention).ExecuteDeleteAsync(ct);
 
         var cutoff = now - AttachmentStore.RecordingRetentionAfterClose;
         var stale = await db.TicketAttachments
@@ -52,8 +55,8 @@ public sealed class RetentionService(IServiceScopeFactory scopes, ILogger<Retent
         db.TicketAttachments.RemoveRange(stale);
         await db.SaveChangesAsync(ct);
 
-        if (errors + sessions + hooks + stale.Count > 0)
-            logger.LogInformation("Retention: {Errors} server errors, {Recordings} recordings, {Sessions} sessions, {Hooks} webhook logs removed",
-                errors, stale.Count, sessions, hooks);
+        if (errors + sessions + hooks + stale.Count + atlasEvents > 0)
+            logger.LogInformation("Retention: {Errors} server errors, {Recordings} recordings, {Sessions} sessions, {Hooks} webhook logs, {AtlasEvents} Atlas events removed",
+                errors, stale.Count, sessions, hooks, atlasEvents);
     }
 }
