@@ -8,7 +8,6 @@ import { api, ApiError } from '@/lib/api';
 import { setLocale, useLocale } from '@/lib/i18n';
 import { useAtlas, useAttention, useFlows, useProcesses, useRoutines, type Atlas, type AtlasProcess, type AtlasService, type AttentionItem, type ProcessStep, type Routine } from '@/lib/atlas';
 import { useMe } from '@/components/shell';
-import { ProductMark } from '@/components/product';
 import { Button, Card, Empty, ErrorBox, PageHeader, Shimmer, cn, useToast } from '@/components/ui';
 import { AtlasForm, type FormKind, type FormState } from '@/components/atlas/forms';
 import { NowStrip, StateGlyph, useAgo, useWords } from '@/components/atlas/parts';
@@ -55,7 +54,16 @@ function Atlas() {
     const qs = next.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [params, pathname, router]);
-  const openSystem = React.useCallback((slug: string) => go({ system: slug, view: null, environment: null }), [go]);
+  const openSystem = React.useCallback((slug: string) => go({ system: slug, view: null, environment: null, node: null }), [go]);
+  // The selected component is in the URL, so a link opens the same picture. Selecting replaces the entry
+  // rather than adding one to the history: the back button leaves the map, not each click on it.
+  const selectNode = React.useCallback((id: string | null) => {
+    const next = new URLSearchParams(params);
+    if (id) next.set('node', id); else next.delete('node');
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [params, pathname, router]);
+  const nodeParam = params.get('node');
 
   if (atlas.error && !atlas.data) return <ErrorBox error={atlas.error} onRetry={() => atlas.refetch()} />;
   if (!atlas.data) return <div className="flex flex-col gap-3"><Shimmer className="h-24" /><Shimmer className="h-16" /><Shimmer className="h-16" /></div>;
@@ -138,8 +146,8 @@ function Atlas() {
         <>
           <NowStrip atlas={data} onSystem={openSystem} />
           {system ? (
-            <ProductLevel atlas={data} system={system} view={productView} environment={environment}
-              onBack={() => go({ system: null, view: null, environment: null })}
+            <ProductLevel atlas={data} system={system} view={productView} environment={environment} node={nodeParam} onNode={selectNode}
+              onBack={() => go({ system: null, view: null, environment: null, node: null })}
               onEnvironment={(slug) => go({ environment: slug })}
               onTab={(v) => go({ view: v === 'engine' ? null : v })}
               onService={openService} onRemoveService={removeService}
@@ -195,11 +203,13 @@ function Atlas() {
 }
 
 /** One system: its map on top, and below it the tabs that read the same system another way. */
-function ProductLevel({ atlas, system, view, environment, onBack, onEnvironment, onTab, onService, onRemoveService, flows, routines, onEditRoutine, onRemoveRoutine }: {
+function ProductLevel({ atlas, system, view, environment, node, onNode, onBack, onEnvironment, onTab, onService, onRemoveService, flows, routines, onEditRoutine, onRemoveRoutine }: {
   atlas: Atlas;
   system: Atlas['systems'][number];
   view: (typeof PRODUCT_VIEWS)[number];
   environment: string | null;
+  node: string | null;
+  onNode: (id: string | null) => void;
   onBack: () => void;
   onEnvironment: (slug: string | null) => void;
   onTab: (v: (typeof PRODUCT_VIEWS)[number]) => void;
@@ -213,13 +223,8 @@ function ProductLevel({ atlas, system, view, environment, onBack, onEnvironment,
   const g = useGraphWords();
   return (
     <div data-testid="atlas-system-detail" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button size="sm" variant="ghost" onClick={onBack}>← {g('product.back')}</Button>
-        <ProductMark product={system} size={36} />
-        <h2 className="text-[26px] leading-[1.2] font-semibold tracking-[-0.02em] text-fg">{system.name}</h2>
-        {system.description && <p className="text-[14px] text-fg-muted">{system.description}</p>}
-      </div>
-      <ProductMap system={system} environments={atlas.environments} environment={environment} onEnvironment={onEnvironment} />
+      <ProductMap system={system} environments={atlas.environments} environment={environment} onEnvironment={onEnvironment}
+        node={node} onNode={onNode} onBack={onBack} />
       <nav className="flex max-w-full" aria-label={g('tab.label')}>
         <div className="flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-well p-1">
           {PRODUCT_VIEWS.map((v) => {

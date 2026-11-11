@@ -26,13 +26,16 @@ export interface NodeDrawerProps {
   nodeId: string | null;
   onClose: () => void;
   onNode: (id: string) => void;
+  /** Drawn inside the map's box (beside it on a desktop) rather than fixed to the window. */
+  inMap?: boolean;
 }
 
-export function NodeDrawer({ nodeId, onClose, onNode }: NodeDrawerProps) {
+export function NodeDrawer({ nodeId, onClose, onNode, inMap = false }: NodeDrawerProps) {
   const t = useDetailT();
   const queryClient = useQueryClient();
   const toast = useToast();
   const query = useNode(nodeId);
+  const desktop = useDesktop();
   const asideRef = React.useRef<HTMLElement>(null);
   const [modal, setModal] = React.useState<Modal>(null);
   const [busy, setBusy] = React.useState(false);
@@ -40,7 +43,8 @@ export function NodeDrawer({ nodeId, onClose, onNode }: NodeDrawerProps) {
   modalRef.current = modal;
 
   React.useEffect(() => { setModal(null); }, [nodeId]);
-  React.useEffect(() => { if (nodeId) asideRef.current?.focus(); }, [nodeId]);
+  // Focus moves to the sheet on a phone only: on a desktop the person keeps the map and its search.
+  React.useEffect(() => { if (nodeId && !desktop) asideRef.current?.focus(); }, [nodeId, desktop]);
   React.useEffect(() => {
     if (!nodeId) return;
     const onKey = (e: KeyboardEvent) => {
@@ -83,9 +87,13 @@ export function NodeDrawer({ nodeId, onClose, onNode }: NodeDrawerProps) {
   ].filter(Boolean).join(' · ');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-scrim sm:justify-end" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <aside ref={asideRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="atlas-node-title" data-testid="atlas-node-drawer"
-        className="flex max-h-[92dvh] w-full flex-col overflow-y-auto rounded-t-panel bg-overlay shadow-popover outline-none sm:my-3 sm:mr-3 sm:h-[calc(100%-1.5rem)] sm:max-h-none sm:w-[34rem] sm:rounded-panel">
+    <>
+      {/* On a phone the drawer is a modal sheet over a scrim; on a desktop it is a panel beside the map, with no scrim. */}
+      <div aria-hidden className="fixed inset-0 z-50 bg-scrim lg:hidden" onClick={onClose} />
+      <div className={cn('pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center lg:justify-end',
+        inMap ? 'lg:absolute lg:inset-x-auto lg:top-2 lg:right-2 lg:bottom-2 lg:w-[28rem]' : 'lg:fixed lg:inset-x-auto lg:top-3 lg:right-3 lg:bottom-3 lg:w-[28rem]')}>
+      <aside ref={asideRef} tabIndex={-1} role={desktop ? 'region' : 'dialog'} aria-modal={desktop ? undefined : true} aria-labelledby="atlas-node-title" data-testid="atlas-node-drawer"
+        className="pointer-events-auto flex max-h-[92dvh] w-full flex-col overflow-y-auto rounded-t-panel bg-overlay shadow-popover outline-none lg:h-full lg:max-h-none lg:rounded-panel">
         <header className="flex items-start gap-3 px-5 pt-5 pb-3">
           <div className="min-w-0 flex-1">
             <h2 id="atlas-node-title" className="text-[24px] leading-[1.2] font-semibold tracking-[-0.02em] break-words text-fg">{title || '…'}</h2>
@@ -178,6 +186,7 @@ export function NodeDrawer({ nodeId, onClose, onNode }: NodeDrawerProps) {
           )}
         </div>
       </aside>
+      </div>
 
       {modal === 'rename' && node && (
         <Sheet title={t('rename.title')} onClose={() => setModal(null)}>
@@ -201,8 +210,21 @@ export function NodeDrawer({ nodeId, onClose, onNode }: NodeDrawerProps) {
           </div>
         </Sheet>
       )}
-    </div>
+    </>
   );
+}
+
+/** True from the desktop width up (the drawer is a panel there, a sheet below it). */
+function useDesktop() {
+  const [desktop, setDesktop] = React.useState(false);
+  React.useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const update = () => setDesktop(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return desktop;
 }
 
 function formatWhen(iso: string) {
