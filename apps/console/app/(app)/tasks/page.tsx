@@ -86,7 +86,7 @@ function Tasks() {
           createdBy={me?.name ?? ''} meta={meta.data}
         />
       ) : (
-        <div className="flex gap-2">{[0, 1, 2, 3].map((i) => <Shimmer key={i} className="h-96 flex-1" />)}</div>
+        <div className="flex gap-3 overflow-x-auto pb-2">{[0, 1, 2, 3].map((i) => <Shimmer key={i} className="h-96 min-w-[280px] flex-1" />)}</div>
       )}
       {openCode && <TaskDrawer code={openCode} meta={meta.data} onClose={close} />}
       <ShortcutsHelp open={help} onClose={() => setHelp(false)} />

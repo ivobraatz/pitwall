@@ -9,9 +9,9 @@ import { setLocale, useLocale } from '@/lib/i18n';
 import { useAtlas, useAttention, useFlows, useProcesses, useRoutines, type AtlasProcess, type AtlasService, type AttentionItem, type ProcessStep, type Routine } from '@/lib/atlas';
 import { useMe } from '@/components/shell';
 import { ProductMark } from '@/components/product';
-import { Button, Empty, ErrorBox, PageHeader, Shimmer, cn, useToast } from '@/components/ui';
+import { Button, Card, Empty, ErrorBox, PageHeader, Shimmer, cn, useToast } from '@/components/ui';
 import { AtlasForm, type FormKind, type FormState } from '@/components/atlas/forms';
-import { NowStrip, SectionTitle, useWords } from '@/components/atlas/parts';
+import { NowStrip, useWords } from '@/components/atlas/parts';
 import { Routines } from '@/components/atlas/routines';
 import { DiscoveryList, Engine, Flows, Overview } from '@/components/atlas/views';
 import { AttentionList, Processes, ServiceDrawer, StepDrawer, Suppliers } from '@/components/atlas/insight';
@@ -54,7 +54,7 @@ function Atlas() {
   const openSystem = React.useCallback((slug: string) => go({ system: slug, view: null }), [go]);
 
   if (atlas.error && !atlas.data) return <ErrorBox error={atlas.error} onRetry={() => atlas.refetch()} />;
-  if (!atlas.data) return <div className="flex flex-col gap-1"><Shimmer className="h-24" /><Shimmer className="h-16" /><Shimmer className="h-16" /></div>;
+  if (!atlas.data) return <div className="flex flex-col gap-3"><Shimmer className="h-24" /><Shimmer className="h-16" /><Shimmer className="h-16" /></div>;
   const data = atlas.data;
   const system = systemSlug ? data.systems.find((s) => s.slug === systemSlug) : undefined;
   const empty = data.systems.length === 0 && data.services.length === 0;
@@ -88,20 +88,20 @@ function Atlas() {
   const kinds: FormKind[] = ['system', 'service', 'repo', 'link', 'routine', ...(me?.role === 'admin' ? ['import' as const] : [])];
   const actions = (
     <>
-      <div className="flex" role="group" aria-label={t('lang.label')}>
+      <div className="inline-flex items-center gap-0.5 rounded-full bg-well p-1" role="group" aria-label={t('lang.label')}>
         {(['pt', 'en'] as const).map((l) => (
           <button key={l} type="button" onClick={() => setLocale(l)} aria-pressed={locale === l}
-            className={cn('h-10 px-3 text-[13px] font-semibold uppercase', locale === l ? 'bg-active text-fg' : 'bg-chip text-fg-muted hover:text-fg')}>{l}</button>
+            className={cn('h-7 rounded-full px-3 text-[13px] font-medium transition-colors duration-150', locale === l ? 'bg-btn text-btn-fg' : 'text-fg-muted hover:text-fg')}>{l}</button>
         ))}
       </div>
       {!empty && <Button loading={collecting} onClick={collect}>{t('action.refresh')}</Button>}
       <div className="relative">
-        <Button variant={empty ? 'secondary' : 'primary'} aria-expanded={menu} onClick={() => setMenu((v) => !v)}>{t('action.register')}</Button>
+        <Button variant="primary" aria-expanded={menu} onClick={() => setMenu((v) => !v)}>{t('action.register')}</Button>
         {menu && (
-          <div className="absolute right-0 z-30 mt-1 w-52 bg-overlay p-1.5 shadow-popover" onMouseLeave={() => setMenu(false)}>
+          <div className="absolute right-0 z-30 mt-1.5 w-52 rounded-tile bg-overlay p-1.5 shadow-popover" onMouseLeave={() => setMenu(false)}>
             {kinds.map((k) => (
               <button key={k} type="button" onClick={() => { setMenu(false); setForm({ kind: k } as FormState); }}
-                className="flex h-10 w-full items-center px-3 text-left text-[14px] text-fg-secondary hover:bg-hover hover:text-fg">
+                className="flex h-9 w-full items-center rounded-full px-3.5 text-left text-[14px] text-fg-secondary transition-colors duration-150 hover:bg-hover hover:text-fg">
                 {t(k === 'import' ? 'action.import' : (`action.${k}` as AtlasWord))}
               </button>
             ))}
@@ -115,44 +115,51 @@ function Atlas() {
     <>
       <PageHeader title={t('title')} subtitle={t('subtitle')} actions={actions} />
       {empty ? (
-        <div className="bg-surface" data-testid="atlas-empty">
-          <Empty title={t('empty.title')}>
-            <p>{t('empty.body')}</p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Button variant="primary" onClick={() => setForm({ kind: 'system' })}>{t('empty.first')}</Button>
-              {me?.role === 'admin' && <Button onClick={() => setForm({ kind: 'import' })}>{t('action.import')}</Button>}
-            </div>
-          </Empty>
+        <div data-testid="atlas-empty">
+          <Card>
+            <Empty title={t('empty.title')}>
+              <p>{t('empty.body')}</p>
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                <Button variant="primary" onClick={() => setForm({ kind: 'system' })}>{t('empty.first')}</Button>
+                {me?.role === 'admin' && <Button onClick={() => setForm({ kind: 'import' })}>{t('action.import')}</Button>}
+              </div>
+            </Empty>
+          </Card>
         </div>
       ) : (
         <>
           <NowStrip atlas={data} onSystem={openSystem} />
           {system ? (
-            <div data-testid="atlas-system-detail">
-              <div className="mb-5 flex flex-wrap items-center gap-3">
+            <div data-testid="atlas-system-detail" className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Button size="sm" variant="ghost" onClick={() => go({ system: null })}>← {t('action.back')}</Button>
-                <ProductMark product={system} size={32} />
-                <h2 className="display text-[30px] text-fg">{system.name}</h2>
+                <ProductMark product={system} size={36} />
+                <h2 className="text-[26px] leading-[1.2] font-semibold tracking-[-0.02em] text-fg">{system.name}</h2>
                 {system.description && <p className="text-[14px] text-fg-muted">{system.description}</p>}
               </div>
               <Engine atlas={data} systemId={system.id} onRemoveService={removeService} onService={openService} />
-              <SectionTitle>{t('view.flows')}</SectionTitle>
               {flows.data ? <Flows flows={flows.data} systemId={system.id} /> : <Shimmer className="h-40" />}
-              <SectionTitle>{t('view.routines')}</SectionTitle>
               {routines.data ? <Routines routines={routines.data} systemId={system.id} onEdit={(routine) => setForm({ kind: 'routine', routine })} onRemove={removeRoutine} /> : <Shimmer className="h-20" />}
             </div>
           ) : (
             <>
-              <nav className="mb-5 flex gap-1 overflow-x-auto" aria-label={t('title')}>
-                {VIEWS.map((v) => (
-                  <button key={v} type="button" onClick={() => go({ view: v === 'overview' ? null : v })} aria-current={view === v ? 'page' : undefined}
-                    className={cn('flex h-10 shrink-0 items-center gap-2 px-4 text-[14px] whitespace-nowrap transition-colors duration-150',
-                      view === v ? 'bg-active font-semibold text-fg' : 'bg-surface text-fg-muted hover:bg-hover hover:text-fg')}>
-                    {t(`view.${v}` as AtlasWord)}
-                    {v === 'attention' && (attention.data?.length ?? 0) > 0 && <span className="figures bg-warning px-1.5 text-[13px] font-bold text-on-status">{attention.data!.length}</span>}
-                    {v === 'discovery' && data.discoveries.length > 0 && <span className="figures bg-warning px-1.5 text-[13px] font-bold text-on-status">{data.discoveries.length}</span>}
-                  </button>
-                ))}
+              <nav className="mb-3 flex max-w-full" aria-label={t('title')}>
+                <div className="flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-well p-1">
+                  {VIEWS.map((v) => {
+                    const on = view === v;
+                    const count = v === 'attention' ? (attention.data?.length ?? 0) : v === 'discovery' ? data.discoveries.length : 0;
+                    return (
+                      <button key={v} type="button" onClick={() => go({ view: v === 'overview' ? null : v })} aria-current={on ? 'page' : undefined}
+                        className={cn('inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium whitespace-nowrap transition-colors duration-150',
+                          on ? 'bg-btn text-btn-fg' : 'text-fg-muted hover:text-fg')}>
+                        {t(`view.${v}` as AtlasWord)}
+                        {count > 0 && (
+                          <span className={cn('rounded-full px-1.5 text-[12px] font-semibold tabular-nums', on ? 'bg-accent text-on-accent' : 'bg-accent-bg text-accent-fg')}>{count}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </nav>
               {view === 'overview' && <Overview atlas={data} onSystem={openSystem} />}
               {view === 'attention' && (attention.data ? <AttentionList items={attention.data} onOpen={openAttention} /> : <Shimmer className="h-40" />)}

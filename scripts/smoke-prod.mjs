@@ -27,9 +27,9 @@ for (let i = 0; ; i++) {
 }
 check(true, 'API e console no ar');
 
-for (const photo of ['pit-wall', 'pit-board', 'pit-lane', 'pit-building']) {
-  const res = await fetch(`${CONSOLE}/login/${photo}.jpg`);
-  check(res.ok && res.headers.get('content-type')?.startsWith('image/'), `foto do login ${photo}.jpg`);
+{
+  const res = await fetch(`${CONSOLE}/login/pit-building.jpg`);
+  check(res.ok && res.headers.get('content-type')?.startsWith('image/'), 'foto do login pit-building.jpg');
 }
 
 let cookie = '';

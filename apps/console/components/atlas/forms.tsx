@@ -106,7 +106,7 @@ function ServiceForm({ atlas, discovery, onClose }: { atlas: Atlas; discovery?: 
         provider: f.provider || undefined, externalRef: f.externalRef || undefined, url: f.url || undefined, monitor: f.monitor || undefined,
       });
     }}>
-      {discovery && <p className="bg-well px-3 py-2 text-[14px] text-fg-secondary"><span className="font-semibold text-fg">{discovery.source}</span> · {discovery.name}</p>}
+      {discovery && <p className="rounded-tile bg-well px-4 py-3 text-[14px] text-fg-secondary"><span className="font-semibold text-fg">{discovery.source}</span> · {discovery.name}</p>}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('field.system')}><Select value={f.system} onChange={set('system')} options={systems} className="w-full" /></Field>
         {!shared && <Field label={t('field.environment')}><Input code value={f.environment} maxLength={40} required list="atlas-envs" onChange={set('environment')} /></Field>}
@@ -235,9 +235,9 @@ function ImportForm({ onClose }: { onClose: () => void }) {
     <div className="flex flex-col gap-4">
       <p className="text-[14px] leading-[1.5] text-fg-secondary">{t('import.hint')}</p>
       <Field label={t('field.file')}><input type="file" accept="application/json,.json" onChange={pick} className="text-[14px] text-fg-secondary" /></Field>
-      {checked && <p className="bg-well px-3 py-2 text-[14px] text-fg">{t('import.summary', { ...checked })}</p>}
+      {checked && <p className="rounded-tile bg-well px-4 py-3 text-[14px] text-fg">{t('import.summary', { ...checked })}</p>}
       {errors.length > 0 && (
-        <ul className="max-h-48 overflow-y-auto bg-danger/12 px-3 py-2 text-[13px] text-fg">{errors.map((e) => <li key={e}>{e}</li>)}</ul>
+        <ul className="max-h-48 overflow-y-auto rounded-tile bg-danger/10 px-4 py-3 text-[13px] text-fg">{errors.map((e) => <li key={e}>{e}</li>)}</ul>
       )}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>{t('action.cancel')}</Button>

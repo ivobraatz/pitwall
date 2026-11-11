@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type StaffMember } from '@/lib/api';
-import { Button, Card, Dialog, Field, Input, PageHeader, Pill, Select, rel, useToast } from '@/components/ui';
+import { Avatar, Button, Card, Dialog, Field, Input, PageHeader, Pill, Select, rel, useToast } from '@/components/ui';
 import { useMe } from '@/components/shell';
 import { PersonalTokens } from '@/components/settings/tokens';
 
@@ -23,11 +23,13 @@ function Password() {
     } catch (e) { toast('error', e instanceof Error ? e.message : 'Erro.'); } finally { setBusy(false); }
   };
   return (
-    <Card title="Senha" className="rise">
-      <div className="flex flex-col gap-5 px-5 pt-2 pb-6">
+    <Card title="Senha" subtitle="Troque a sua senha. As outras sessões são encerradas.">
+      <div className="flex flex-col gap-4 px-5 pt-1">
         <Field label="Senha atual"><Input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} /></Field>
         <Field label="Nova senha" hint="Pelo menos 12 caracteres."><Input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} /></Field>
-        <div><Button variant="primary" loading={busy} onClick={submit} disabled={!current || next.length < 12}>Trocar senha</Button></div>
+      </div>
+      <div className="flex justify-end gap-2 px-5 pt-5 pb-5">
+        <Button variant="primary" loading={busy} onClick={submit} disabled={!current || next.length < 12}>Trocar senha</Button>
       </div>
     </Card>
   );
@@ -50,8 +52,8 @@ function Totp() {
     catch (e) { toast('error', e instanceof Error ? e.message : 'Erro.'); }
   };
   return (
-    <Card title="Autenticador (2FA)" className="rise" style={{ '--i': 1 } as React.CSSProperties} actions={me?.totpEnabled ? <Pill tone="ok">Ativo</Pill> : <Pill tone="warn">Desligado</Pill>}>
-      <div className="flex flex-col gap-4 px-5 pt-2 pb-6 text-[14px]">
+    <Card title="Autenticador (2FA)" subtitle="Um segundo fator para entrar no console." actions={me?.totpEnabled ? <Pill tone="ok">Ativo</Pill> : <Pill tone="warn">Desligado</Pill>}>
+      <div className="flex flex-col gap-4 px-5 pt-1 pb-5 text-[14px]">
         <p className="max-w-lg leading-[1.5] text-fg-secondary">O console reúne dados de clientes de todos os sistemas. Um segundo fator fecha a porta para uma senha vazada.</p>
         {me?.totpEnabled ? (
           <div className="flex items-end gap-2"><Field label="Senha para desligar" className="flex-1"><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
@@ -87,22 +89,27 @@ function Team() {
     catch (e) { toast('error', e instanceof Error ? e.message : 'Erro.'); }
   };
   return (
-    <Card title="Equipe" className="rise" style={{ '--i': 2 } as React.CSSProperties} actions={admin && <Button size="sm" onClick={() => setOpen(true)}>Adicionar pessoa</Button>}>
-      <div className="flex flex-col gap-1 px-2 pb-2">
-      {team.data?.map((m) => (
-        <div key={m.id} className="flex flex-wrap items-center gap-3 bg-well px-3 py-3 text-[14px]">
-          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-chip text-[13px] font-bold text-fg">{m.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}</span>
-          <div className="min-w-0 flex-1"><div className="flex items-center gap-2 font-semibold text-fg">{m.name} {m.disabled && <Pill tone="error">desativado</Pill>}</div>
-            <div className="mt-0.5 text-[13px] text-fg-muted">{m.email} · último acesso {rel(m.lastLoginAt)}</div></div>
-          {m.totpEnabled ? <Pill tone="ok">2FA</Pill> : <Pill tone="warn">sem 2FA</Pill>}
-          {admin && m.id !== me?.id ? (
-            <>
-              <Select value={m.role} onChange={(e) => update(m.id, { role: e.target.value })} options={[{ value: 'agent', label: 'Atendente' }, { value: 'admin', label: 'Admin' }]} />
-              <Button size="sm" variant={m.disabled ? 'secondary' : 'danger'} onClick={() => update(m.id, { disabled: !m.disabled })}>{m.disabled ? 'Reativar' : 'Desativar'}</Button>
-            </>
-          ) : <Pill>{m.role === 'admin' ? 'Admin' : 'Atendente'}</Pill>}
-        </div>
-      ))}
+    <Card title="Equipe" subtitle="Quem responde chamados e quem gerencia sistemas e equipe." actions={admin && <Button size="sm" onClick={() => setOpen(true)}>Adicionar pessoa</Button>}>
+      <div className="flex flex-col divide-y divide-border-subtle px-3 pb-3">
+        {team.data?.map((m) => (
+          <div key={m.id} className="-mx-2 flex min-h-[56px] items-center gap-3 rounded-tile px-2 py-3 transition-colors duration-150 hover:bg-hover">
+            <Avatar name={m.name} size={32} />
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-2 text-[14px]">
+                <span className="truncate font-medium text-fg">{m.name}</span>
+                {m.disabled && <Pill tone="error">desativado</Pill>}
+              </div>
+              <div className="mt-0.5 truncate text-[13px] text-fg-muted">{m.email} · último acesso {rel(m.lastLoginAt)}</div>
+            </div>
+            {m.totpEnabled ? <Pill tone="ok">2FA</Pill> : <Pill tone="warn">sem 2FA</Pill>}
+            {admin && m.id !== me?.id ? (
+              <>
+                <Select className="w-36" value={m.role} onChange={(e) => update(m.id, { role: e.target.value })} options={[{ value: 'agent', label: 'Atendente' }, { value: 'admin', label: 'Admin' }]} />
+                <Button size="sm" variant={m.disabled ? 'secondary' : 'danger'} onClick={() => update(m.id, { disabled: !m.disabled })}>{m.disabled ? 'Reativar' : 'Desativar'}</Button>
+              </>
+            ) : <Pill tone={m.role === 'admin' ? 'ink' : 'idle'}>{m.role === 'admin' ? 'Admin' : 'Atendente'}</Pill>}
+          </div>
+        ))}
       </div>
       <Dialog open={open} onClose={() => setOpen(false)} title="Adicionar pessoa">
         <div className="flex flex-col gap-4">
@@ -124,9 +131,9 @@ export default function SettingsPage() {
   return (
     <>
       <PageHeader title="Conta e equipe" subtitle="A sua senha, o segundo fator e os tokens do MCP, e quem mais está no muro." />
-      <div className="grid gap-2 xl:grid-cols-2">
-        <div className="flex flex-col gap-2"><Password /><Totp /></div>
-        <div className="flex flex-col gap-2"><Team /><PersonalTokens style={{ '--i': 3 } as React.CSSProperties} /></div>
+      <div className="grid items-start gap-3 xl:grid-cols-2">
+        <div className="flex flex-col gap-3"><Password /><Totp /></div>
+        <div className="flex flex-col gap-3"><Team /><PersonalTokens /></div>
       </div>
     </>
   );

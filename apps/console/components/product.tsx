@@ -34,15 +34,6 @@ export function productColor(p: { slug?: string | null; color?: string | null } 
   return p?.color ?? teamColor(p?.slug);
 }
 
-/** Dark or light text, whichever reads on a chosen #rrggbb (WCAG relative luminance). */
-function inkOn(hex: string): string {
-  const [r, g, b] = [1, 3, 5].map((i) => {
-    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.22 ? '#0b0c0d' : '#ffffff';
-}
-
 export function initials(name: string): string {
   const words = name.trim().split(/[\s._-]+/).filter(Boolean);
   if (words.length === 0) return '?';
@@ -50,9 +41,18 @@ export function initials(name: string): string {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
+/** The pale tint and the deep ink of a system's colour, so a badge reads on either theme. */
+export function productTint(color: string) {
+  return {
+    background: `color-mix(in srgb, ${color} 17%, var(--ds-bg-surface))`,
+    color: `color-mix(in srgb, ${color} 72%, var(--ds-fg-primary))`,
+  };
+}
+
 /**
- * The system's badge: a square with the logo on white (logos are drawn for light paper), or the
- * initials on the system's colour. Decorative next to the name; pass `label` when it stands alone.
+ * The system's badge: a rounded square with the logo on white (logos are drawn for light paper), or
+ * the initials in the system's colour on a pale tint of it. Decorative next to the name; pass
+ * `label` when it stands alone.
  */
 export function ProductMark({ product, size = 20, label, className }: {
   product: (Pick<ProductRef, 'id' | 'slug' | 'name'> & Partial<Pick<Product, 'color' | 'logoUrl'>>) | null | undefined;
@@ -61,13 +61,14 @@ export function ProductMark({ product, size = 20, label, className }: {
   const p = useLook(product);
   const logo = p?.logoUrl;
   const [broken, setBroken] = React.useState<string | null>(null);
-  const box = { width: size, height: size } as React.CSSProperties;
+  const radius = Math.round(size * 0.3);
+  const box = { width: size, height: size, borderRadius: radius } as React.CSSProperties;
   const a11y = label && p ? { role: 'img', 'aria-label': p.name, title: p.name } : { 'aria-hidden': true };
 
   if (logo && broken !== logo) {
     return (
-      <span {...a11y} className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden bg-white', className)}
-        style={{ ...box, padding: size >= 40 ? Math.round(size * 0.1) : size >= 24 ? 2 : 1 }}>
+      <span {...a11y} className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden border border-border bg-white', className)}
+        style={{ ...box, padding: size >= 40 ? Math.round(size * 0.12) : size >= 24 ? 3 : 1 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logo} alt="" width={size} height={size} decoding="async" onError={() => setBroken(logo)} className="size-full object-contain" />
       </span>
@@ -77,9 +78,9 @@ export function ProductMark({ product, size = 20, label, className }: {
   // Two letters only where they can be read; a small badge keeps the first.
   const text = size < 28 ? initials(p?.name ?? '?')[0] : initials(p?.name ?? '?');
   return (
-    <span {...a11y} className={cn('display inline-flex shrink-0 items-center justify-center leading-none', className)}
-      style={{ ...box, background: color, color: color.startsWith('#') ? inkOn(color) : 'var(--ds-on-status)', fontSize: Math.round(size * (text.length > 1 ? 0.42 : 0.6)) }}>
-      <span className="translate-y-[0.06em]">{text}</span>
+    <span {...a11y} className={cn('inline-flex shrink-0 items-center justify-center leading-none font-bold', className)}
+      style={{ ...box, ...productTint(color), fontSize: Math.round(size * (text.length > 1 ? 0.38 : 0.5)) }}>
+      {text}
     </span>
   );
 }
@@ -95,30 +96,30 @@ export function ProductName({ product, size = 18, className }: { product: Produc
   );
 }
 
-/** The thin colour band at the left of a row: the system's colour, chosen or derived. */
+/** A thin rounded band (or a dot, sized by the caller) in the system's colour, chosen or derived. */
 export function ProductStripe({ product, className }: { product: Pick<ProductRef, 'id' | 'slug'> | null | undefined; className?: string }) {
-  return <span aria-hidden className={cn('shrink-0', className)} style={{ background: productColor(useLook(product)) }} />;
+  return <span aria-hidden className={cn('shrink-0 rounded-full', className)} style={{ background: productColor(useLook(product)) }} />;
 }
 
-/** Colours that read on both grounds, beside the yellow of the brand (kept for the brand alone). */
-export const PRODUCT_COLORS = ['#5eb0ff', '#2cc4c9', '#34d08c', '#a3d93b', '#ff9b3d', '#ff5f52', '#ff6fae', '#b9a2ff'];
+/** Mid-tone colours whose tint and ink read on both themes; the yellow stays the brand's alone. */
+export const PRODUCT_COLORS = ['#2f62b5', '#17707c', '#1e7b4f', '#6b8a12', '#b0660f', '#c4242a', '#b03f78', '#5b6b7a'];
 
 /** Swatches, the automatic colour (from the slug) and a free pick. `value` null = automatic. */
 export function ColorPicker({ value, slug, onChange, disabled }: { value: string | null; slug: string; onChange: (c: string | null) => void; disabled?: boolean }) {
-  const swatch = (selected: boolean) => cn('size-9 shrink-0 outline-offset-2 transition-transform duration-150 enabled:hover:-translate-y-0.5 disabled:opacity-60', selected ? 'outline-2 outline-fg' : 'outline-0');
+  const swatch = (selected: boolean) => cn('size-9 shrink-0 rounded-full outline-offset-2 transition-transform duration-150 enabled:hover:scale-105 disabled:opacity-60', selected ? 'outline-2 outline-fg' : 'outline-0');
   const custom = value !== null && !PRODUCT_COLORS.includes(value);
   return (
     <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Cor do sistema">
       <button type="button" role="radio" aria-checked={value === null} disabled={disabled} onClick={() => onChange(null)}
-        className={cn(swatch(value === null), 'w-auto px-3 text-[13px] font-semibold')} style={{ background: teamColor(slug), color: 'var(--ds-on-status)' }}
+        className={cn(swatch(value === null), 'w-auto px-3.5 text-[13px] font-semibold')} style={productTint(teamColor(slug))}
         title="Escolhida a partir do identificador">Automática</button>
       {PRODUCT_COLORS.map((c) => (
         <button key={c} type="button" role="radio" aria-checked={value === c} aria-label={c} disabled={disabled} onClick={() => onChange(c)}
           className={swatch(value === c)} style={{ background: c }} />
       ))}
-      <label className={cn(swatch(custom), 'relative cursor-pointer overflow-hidden bg-chip')} title="Outra cor" style={custom ? { background: value! } : undefined}>
+      <label className={cn(swatch(custom), 'relative cursor-pointer overflow-hidden border border-dashed border-border-strong bg-surface')} title="Outra cor" style={custom ? { background: value! } : undefined}>
         {!custom && <span aria-hidden className="absolute inset-0 flex items-center justify-center text-[18px] leading-none text-fg-muted">+</span>}
-        <input type="color" disabled={disabled} value={value ?? '#5eb0ff'} onChange={(e) => onChange(e.target.value)} aria-label="Outra cor"
+        <input type="color" disabled={disabled} value={value ?? '#2f62b5'} onChange={(e) => onChange(e.target.value)} aria-label="Outra cor"
           className="absolute inset-0 size-full cursor-pointer opacity-0" />
       </label>
     </div>

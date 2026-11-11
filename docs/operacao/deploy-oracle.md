@@ -485,11 +485,11 @@ Confira o primeiro admin:
 $COMPOSE logs api | grep -i "first admin"
 ```
 
-Deve aparecer `Created the first admin, <seu e-mail>.` Confira também o bucket e as fotos do login:
+Deve aparecer `Created the first admin, <seu e-mail>.` Confira também o bucket e a foto do login:
 
 ```bash
 $COMPOSE logs api | grep -i "attachments bucket"
-curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3200/login/pit-wall.jpg
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3200/login/pit-building.jpg
 ```
 
 Deve aparecer `Created the attachments bucket pitwall-anexos.` e `200`.

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useT, useLocale, ago } from '@/lib/i18n';
 import type { Atlas, Condition, Impact, LinkKind, NowItem, Owner, ServiceState, SystemRef } from '@/lib/atlas';
 import { ProductStripe } from '@/components/product';
-import { IconClose, cn } from '@/components/ui';
+import { Dot, IconButton, IconClose, Pill, cn } from '@/components/ui';
 import { WORDS, type AtlasWord } from './words';
 
 export function useWords() { return useT(WORDS); }
@@ -15,42 +15,41 @@ export function useAgo() {
 }
 
 /*
- * State is told twice, by colour and by shape, so it reads without colour too:
- * up = solid square · down = cross · deploying = hollow square (pulsing) · degraded = triangle · unknown = dashed square.
+ * State is told by its colour dot and its word, always next to each other. Conditions (gap, warning,
+ * planned, local) keep their shape too, because a missing thing must not read as a healthy one.
  */
-const STATE_COLOR: Record<ServiceState, string> = {
-  up: 'text-success', down: 'text-danger', deploying: 'text-running', degraded: 'text-warning', unknown: 'text-fg-subtle',
-};
+const STATE_TONE: Record<ServiceState, string> = { up: 'ok', down: 'error', deploying: 'running', degraded: 'warn', unknown: 'idle' };
+const STATE_SWATCH: Record<ServiceState, string> = { up: 'bg-success', down: 'bg-danger', deploying: 'bg-running', degraded: 'bg-warning', unknown: 'bg-border-loud' };
+const STATES: ServiceState[] = ['up', 'down', 'deploying', 'degraded', 'unknown'];
 
 export function StateGlyph({ state, size = 14, className }: { state: ServiceState; size?: number; className?: string }) {
-  const shape = {
-    up: <rect x="3" y="3" width="10" height="10" fill="currentColor" />,
-    down: <path d="M3 3l10 10M13 3 3 13" stroke="currentColor" strokeWidth="3" fill="none" />,
-    deploying: <rect x="3.5" y="3.5" width="9" height="9" stroke="currentColor" strokeWidth="2.5" fill="none" />,
-    degraded: <path d="M8 2.5 14 13.5H2Z" fill="currentColor" />,
-    unknown: <rect x="3.5" y="3.5" width="9" height="9" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2.5 2" fill="none" />,
-  }[state];
   return (
-    <svg viewBox="0 0 16 16" width={size} height={size} aria-hidden data-state={state}
-      className={cn('shrink-0', STATE_COLOR[state], state === 'deploying' && 'atlas-pulse', className)}>{shape}</svg>
+    <span aria-hidden data-state={state} className={cn('inline-grid shrink-0 place-items-center', className)} style={{ width: size, height: size }}>
+      <Dot tone={STATE_TONE[state]} className={state === 'deploying' ? 'atlas-pulse' : undefined} />
+    </span>
   );
 }
 
 export function StateLabel({ state, className }: { state: ServiceState; className?: string }) {
   const t = useWords();
   return (
-    <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap', className)}>
+    <span className={cn('inline-flex items-center gap-2 text-[14px] whitespace-nowrap', className)}>
       <StateGlyph state={state} /><span>{t(`state.${state}` as AtlasWord)}</span>
     </span>
   );
 }
 
+/** A row of small swatches, each with its word, in muted 12px. */
 export function Legend({ className }: { className?: string }) {
   const t = useWords();
   return (
-    <div className={cn('flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-fg-muted', className)} aria-label={t('legend')}>
-      <span className="font-semibold">{t('legend')}</span>
-      {(['up', 'down', 'deploying', 'degraded', 'unknown'] as const).map((s) => <StateLabel key={s} state={s} />)}
+    <div className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] text-fg-muted', className)} aria-label={t('legend')}>
+      <span className="font-medium">{t('legend')}</span>
+      {STATES.map((s) => (
+        <span key={s} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <span aria-hidden className={cn('size-3 rounded-[4px]', STATE_SWATCH[s])} />{t(`state.${s}` as AtlasWord)}
+        </span>
+      ))}
     </div>
   );
 }
@@ -79,9 +78,7 @@ export function liveClass(live: ReturnType<typeof useLive>, serviceId: string): 
   return live.services.has(serviceId) && 'atlas-live atlas-live-down';
 }
 
-const NOW_TONE: Record<NowItem['kind'], string> = {
-  activity: 'bg-running text-on-status', routine: 'bg-info text-on-status', deploy: 'bg-running text-on-status', down: 'bg-danger text-on-status',
-};
+const NOW_TONE: Record<NowItem['kind'], string> = { activity: 'running', routine: 'info', deploy: 'running', down: 'error' };
 
 /** The strip that never scrolls away: what is happening at this moment, the broken things first. */
 export function NowStrip({ atlas, onSystem }: { atlas: Atlas; onSystem: (slug: string) => void }) {
@@ -91,17 +88,18 @@ export function NowStrip({ atlas, onSystem }: { atlas: Atlas; onSystem: (slug: s
   const items = [...atlas.now].sort((a, b) => order[a.kind] - order[b.kind]);
   return (
     <section aria-label={t('now.title')} data-testid="atlas-now"
-      className="sticky top-0 z-20 -mx-4 mb-6 flex items-stretch gap-1 overflow-x-auto bg-bg px-4 py-2 md:-mx-8 md:px-8 lg:-mx-12 lg:px-12">
-      <h2 className="flex shrink-0 items-center bg-surface px-4 text-[14px] font-semibold text-fg">
-        <span className={cn('mr-2 size-2.5', items.length > 0 ? 'atlas-pulse bg-accent' : 'bg-fg-subtle')} />{t('now.title')}
+      className="sticky top-0 z-20 mb-3 flex items-center gap-1.5 overflow-x-auto rounded-panel bg-surface p-2">
+      <h2 className="flex shrink-0 items-center gap-2 px-2 text-[14px] font-semibold text-fg">
+        <Dot tone={items.length > 0 ? 'running' : 'idle'} className={items.length > 0 ? 'atlas-pulse' : undefined} />{t('now.title')}
       </h2>
-      {items.length === 0 && <p className="flex h-11 items-center bg-surface px-4 text-[14px] text-fg-muted">{t('now.idle')}</p>}
+      {items.length === 0 && <p className="shrink-0 px-2 text-[14px] text-fg-muted">{t('now.idle')}</p>}
       {items.map((n) => {
         const system = atlas.systems.find((s) => s.id === n.productId);
         return (
           <button key={`${n.kind}-${n.id}`} type="button" disabled={!system} onClick={() => system && onSystem(system.slug)}
-            className="flex h-11 shrink-0 items-center gap-2.5 bg-surface pr-4 text-left text-[14px] enabled:hover:bg-hover">
-            <span className={cn('flex h-full items-center px-2.5 text-[13px] font-semibold whitespace-nowrap', NOW_TONE[n.kind])}>{t(`now.${n.kind}` as AtlasWord)}</span>
+            className="flex h-10 shrink-0 items-center gap-2.5 rounded-tile bg-well px-3.5 text-left text-[14px] transition-colors duration-150 enabled:hover:bg-hover">
+            <Dot tone={NOW_TONE[n.kind]} className={n.kind !== 'down' ? 'atlas-pulse' : undefined} />
+            <span className="text-[13px] font-medium whitespace-nowrap text-fg-muted">{t(`now.${n.kind}` as AtlasWord)}</span>
             <span className="max-w-64 truncate font-semibold text-fg">{n.title}</span>
             <span className="whitespace-nowrap text-[13px] text-fg-muted">
               {[system?.name, n.actor, n.since ? since(n.since) : null].filter(Boolean).join(' · ')}
@@ -110,15 +108,6 @@ export function NowStrip({ atlas, onSystem }: { atlas: Atlas; onSystem: (slug: s
         );
       })}
     </section>
-  );
-}
-
-export function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: React.ReactNode }) {
-  return (
-    <div className="mt-10 mb-3 flex flex-wrap items-baseline gap-x-3">
-      <h2 className="display text-[26px] text-fg">{children}</h2>
-      {hint && <p className="text-[14px] text-fg-muted">{hint}</p>}
-    </div>
   );
 }
 
@@ -145,16 +134,17 @@ export function MarkGlyph({ mark, size = 14, className }: { mark: Mark; size?: n
 
 export const conditionMark = (c: Condition): Mark => (c === 'planned' ? 'idea' : c);
 
+const IMPACT_TONE: Record<string, string> = { high: 'error', medium: 'warn', low: 'idle', none: 'idle' };
 export function ImpactTag({ impact, className }: { impact: Impact | null; className?: string }) {
   const t = useWords();
-  const tone = impact === 'high' ? 'bg-danger text-on-status' : impact === 'medium' ? 'bg-warning text-on-status' : 'bg-chip text-fg-secondary';
-  return <span className={cn('inline-block px-2 py-0.5 text-[13px] font-semibold whitespace-nowrap', tone, className)}>{t(`impact.${impact ?? 'none'}` as AtlasWord)}</span>;
+  const key = impact ?? 'none';
+  return <Pill tone={IMPACT_TONE[key] ?? 'idle'} className={className}>{t(`impact.${key}` as AtlasWord)}</Pill>;
 }
 
 export function OwnerTag({ owner }: { owner: Owner | null }) {
   const t = useWords();
   if (!owner) return null;
-  return <span className="bg-chip px-2 py-0.5 text-[13px] text-fg-secondary whitespace-nowrap">{t(`owner.${owner}` as AtlasWord)}</span>;
+  return <Pill tone="idle">{t(`owner.${owner}` as AtlasWord)}</Pill>;
 }
 
 /** The task opens in the board's own drawer. */
@@ -163,7 +153,7 @@ export function TaskLink({ code }: { code: string | null }) {
   if (!code) return null;
   return (
     <Link href={`/tasks?task=${encodeURIComponent(code)}`} aria-label={`${t('task.label')} ${code}`}
-      className="figures bg-chip px-2 py-0.5 text-[13px] font-semibold whitespace-nowrap text-fg underline-offset-2 hover:underline">{code}</Link>
+      className="inline-flex h-6 items-center rounded-full bg-chip px-2.5 text-[12px] font-semibold whitespace-nowrap text-fg tabular-nums transition-colors duration-150 hover:bg-active">{code}</Link>
   );
 }
 
@@ -171,8 +161,8 @@ export function SystemChip({ system }: { system: SystemRef | null }) {
   const t = useWords();
   if (!system) return <span className="text-[13px] text-fg-subtle">{t('attention.noSystem')}</span>;
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-fg">
-      <ProductStripe product={system} className="h-4 w-1" /><span className="truncate">{system.name}</span>
+    <span className="inline-flex min-w-0 items-center gap-2 text-[13px] font-medium text-fg">
+      <ProductStripe product={system} className="size-2" /><span className="truncate">{system.name}</span>
     </span>
   );
 }
@@ -198,26 +188,27 @@ export function Drawer({ open, onClose, title, subtitle, children, testId }: {
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fade-in fixed inset-0 z-50 flex justify-end bg-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-scrim" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <aside role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined} data-testid={testId}
-        className="rise flex h-full w-full flex-col overflow-y-auto bg-overlay shadow-popover sm:max-w-[32rem]">
+        className="flex h-full w-full flex-col overflow-y-auto bg-overlay shadow-popover sm:my-3 sm:mr-3 sm:h-[calc(100%-1.5rem)] sm:w-[32rem] sm:rounded-panel">
         <header className="flex items-start gap-3 px-5 pt-5 pb-3">
           <div className="min-w-0 flex-1">
-            <h2 className="display text-[26px] break-words text-fg">{title}</h2>
+            <h2 className="text-[26px] leading-[1.2] font-semibold tracking-[-0.02em] break-words text-fg">{title}</h2>
             {subtitle && <div className="mt-1 text-[13px] text-fg-muted">{subtitle}</div>}
           </div>
-          <button type="button" className="grid size-9 shrink-0 place-items-center text-fg-muted hover:bg-hover hover:text-fg" onClick={onClose} aria-label={t('action.close')}><IconClose /></button>
+          <IconButton size={36} onClick={onClose} aria-label={t('action.close')}><IconClose /></IconButton>
         </header>
-        <div className="flex flex-col gap-5 px-5 pt-2 pb-8">{children}</div>
+        <div className="flex flex-col gap-3 px-5 pt-1 pb-8">{children}</div>
       </aside>
     </div>
   );
 }
 
+/** A label and its content, in a tile inside the drawer. */
 export function DrawerSection({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section>
-      <h3 className="mb-1.5 text-[13px] font-semibold text-fg-muted">{label}</h3>
+    <section className="rounded-tile bg-well px-4 py-3">
+      <h3 className="mb-1 text-[13px] font-medium text-fg-muted">{label}</h3>
       <div className="text-[14px] text-fg">{children}</div>
     </section>
   );

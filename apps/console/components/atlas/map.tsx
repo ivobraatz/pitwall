@@ -8,7 +8,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import type { Atlas, AtlasRepo, AtlasService, AtlasSystem, ServiceState } from '@/lib/atlas';
 import { ProductMark } from '@/components/product';
-import { cn } from '@/components/ui';
+import { Card, cn } from '@/components/ui';
 import { LINK_COLOR, Legend, MarkGlyph, StateGlyph, conditionMark, liveClass, useLive, useWords } from './parts';
 import { LINK_KINDS } from '@/lib/atlas';
 import type { AtlasWord } from './words';
@@ -31,11 +31,11 @@ const hidden = '!size-1 !min-h-0 !min-w-0 !border-0 !bg-transparent';
 
 function SystemNode({ data }: NodeProps<Node<SystemData>>) {
   return (
-    <div data-testid="atlas-node-system" className={cn('flex w-[260px] items-center gap-3 bg-surface px-4', data.open ? 'h-12' : 'h-[76px]', data.live && 'atlas-live')}>
+    <div data-testid="atlas-node-system" className={cn('flex w-[260px] items-center gap-3 rounded-tile border border-border bg-surface px-4', data.open ? 'h-12' : 'h-[76px]', data.live && 'atlas-live')}>
       <Handle type="target" position={Position.Top} className={hidden} />
       <ProductMark product={data.system} size={data.open ? 24 : 36} />
       <span className="min-w-0 flex-1">
-        <span className={cn('block truncate font-semibold text-fg', data.open ? 'text-[14px]' : 'text-[17px]')}>{data.system.name}</span>
+        <span className={cn('block truncate font-medium text-fg', data.open ? 'text-[13px]' : 'text-[15px]')}>{data.system.name}</span>
         {!data.open && <span className="block truncate text-[13px] text-fg-muted">{data.label}</span>}
       </span>
       <StateGlyph state={data.state} size={data.open ? 14 : 18} />
@@ -48,11 +48,11 @@ function ServiceNode({ data }: NodeProps<Node<ServiceData>>) {
   const s = data.service;
   return (
     <div data-testid="atlas-node-service" data-condition={s.condition}
-      className={cn('flex h-[52px] w-[260px] items-center gap-2.5 px-3', s.productId ? 'bg-well' : 'bg-chip', s.condition === 'gap' && 'atlas-hatch-loud', s.condition === 'planned' && 'atlas-dashed', data.live)}>
+      className={cn('flex h-[52px] w-[260px] items-center gap-2.5 rounded-tile border border-border px-3', s.productId ? 'bg-surface' : 'bg-well', s.condition === 'gap' && 'atlas-hatch-loud', s.condition === 'planned' && 'atlas-dashed', data.live)}>
       <Handle type="target" position={Position.Top} className={hidden} />
       {s.condition === 'gap' || s.condition === 'planned' ? <MarkGlyph mark={conditionMark(s.condition)} /> : <StateGlyph state={s.state} />}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-semibold text-fg">{s.name}</span>
+        <span className="block truncate text-[14px] font-medium text-fg">{s.name}</span>
         {s.provider && <span className="block truncate text-[13px] text-fg-muted">{s.provider}</span>}
       </span>
       <Handle type="source" position={Position.Bottom} className={hidden} />
@@ -62,7 +62,7 @@ function ServiceNode({ data }: NodeProps<Node<ServiceData>>) {
 
 function RepoNode({ data }: NodeProps<Node<RepoData>>) {
   return (
-    <div className={cn('flex h-10 w-[260px] items-center gap-2.5 bg-alt px-3', data.state === 'deploying' && 'atlas-live')}>
+    <div className={cn('flex h-10 w-[260px] items-center gap-2.5 rounded-tile border border-border bg-surface px-3', data.state === 'deploying' && 'atlas-live')}>
       <StateGlyph state={data.state} />
       <span className="truncate text-[13px] text-fg-secondary">{data.repo.fullName}</span>
       <Handle type="source" position={Position.Bottom} className={hidden} />
@@ -168,13 +168,13 @@ function Graph({ atlas, onSystem }: { atlas: Atlas; onSystem: (slug: string) => 
 export function AtlasMap({ atlas, onSystem }: { atlas: Atlas; onSystem: (slug: string) => void }) {
   const t = useWords();
   return (
-    <div data-testid="atlas-map">
-      <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+    <div data-testid="atlas-map" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-1">
         <p className="text-[14px] text-fg-muted">{t('map.hint')}</p>
         <Legend className="ml-auto" />
       </div>
-      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-fg-muted" data-testid="atlas-map-legend" aria-label={t('map.legendLinks')}>
-        <span className="font-semibold">{t('map.legendLinks')}</span>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[12px] text-fg-muted" data-testid="atlas-map-legend" aria-label={t('map.legendLinks')}>
+        <span className="font-medium">{t('map.legendLinks')}</span>
         {LINK_KINDS.map((k) => (
           <span key={k} className="inline-flex items-center gap-1.5">
             <span aria-hidden className="h-0 w-5 border-t-[3px]" style={{ borderColor: LINK_COLOR[k] }} />{t(`link.${k}` as AtlasWord)}
@@ -183,9 +183,11 @@ export function AtlasMap({ atlas, onSystem }: { atlas: Atlas; onSystem: (slug: s
         <span className="inline-flex items-center gap-1.5"><span aria-hidden className="h-0 w-5 border-t-[3px] border-dashed" style={{ borderColor: 'var(--ds-fg-secondary)' }} />{t('map.planned')}</span>
         <span className="inline-flex items-center gap-1.5"><span aria-hidden className="atlas-hatch-loud inline-block h-3.5 w-5" />{t('map.gap')}</span>
       </div>
-      <div className="atlas-flow h-[62vh] min-h-[420px] bg-alt">
-        <ReactFlowProvider><Graph atlas={atlas} onSystem={onSystem} /></ReactFlowProvider>
-      </div>
+      <Card className="overflow-hidden p-2">
+        <div className="atlas-flow h-[62vh] min-h-[420px] overflow-hidden rounded-tile bg-well">
+          <ReactFlowProvider><Graph atlas={atlas} onSystem={onSystem} /></ReactFlowProvider>
+        </div>
+      </Card>
     </div>
   );
 }

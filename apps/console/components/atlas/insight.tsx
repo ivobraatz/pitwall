@@ -3,7 +3,7 @@
 import * as React from 'react';
 import type { Atlas, AtlasProcess, AtlasService, AttentionItem, Impact, ProcessStep, StepStatus, SystemRef } from '@/lib/atlas';
 import { ProductMark } from '@/components/product';
-import { Select, cn } from '@/components/ui';
+import { Card, Pill, Select, cn } from '@/components/ui';
 import {
   Drawer, DrawerSection, ImpactTag, MarkGlyph, OwnerTag, StateLabel, SystemChip, TaskLink, conditionMark, useWords, LINK_COLOR,
 } from './parts';
@@ -15,20 +15,25 @@ const IMPACTS: Array<Impact | 'none'> = ['high', 'medium', 'low', 'none'];
 
 export function AttentionList({ items, onOpen }: { items: AttentionItem[]; onOpen: (i: AttentionItem) => void }) {
   const t = useWords();
-  if (items.length === 0) return <p className="bg-surface px-5 py-6 text-[14px] text-fg-muted" data-testid="atlas-attention-empty">{t('attention.none')}</p>;
+  if (items.length === 0) {
+    return (
+      <Card>
+        <p className="px-5 py-6 text-[14px] text-fg-muted" data-testid="atlas-attention-empty">{t('attention.none')}</p>
+      </Card>
+    );
+  }
   return (
-    <div className="flex flex-col gap-6" data-testid="atlas-attention">
+    <div className="flex flex-col gap-3" data-testid="atlas-attention">
       {IMPACTS.map((impact) => {
         const group = items.filter((i) => (i.impact ?? 'none') === impact);
         if (group.length === 0) return null;
         return (
           <section key={impact} data-impact={impact} aria-label={t(`impact.${impact}` as AtlasWord)}>
-            <h3 className="mb-2 flex items-center gap-2 text-[16px] font-semibold text-fg">
-              <ImpactTag impact={impact === 'none' ? null : impact} /><span className="figures text-fg-muted">{group.length}</span>
-            </h3>
-            <ul className="flex flex-col gap-1">
-              {group.map((i) => <AttentionRow key={`${i.source}-${i.id}`} item={i} onOpen={() => onOpen(i)} />)}
-            </ul>
+            <Card title={<span className="inline-flex items-center gap-2.5"><ImpactTag impact={impact === 'none' ? null : impact} /><span className="tabular-nums text-fg-muted">{group.length}</span></span>}>
+              <ul className="flex flex-col divide-y divide-border-subtle px-5 pb-3">
+                {group.map((i) => <AttentionRow key={`${i.source}-${i.id}`} item={i} onOpen={() => onOpen(i)} />)}
+              </ul>
+            </Card>
           </section>
         );
       })}
@@ -38,25 +43,24 @@ export function AttentionList({ items, onOpen }: { items: AttentionItem[]; onOpe
 
 function AttentionRow({ item: i, onOpen }: { item: AttentionItem; onOpen: () => void }) {
   const t = useWords();
+  const gap = i.status === 'gap';
   return (
-    <li data-testid="atlas-attention-item" data-status={i.status} data-source={i.source} className={cn('flex items-stretch bg-surface text-[14px]', i.status === 'gap' && 'atlas-hatch')}>
-      <span className="w-1.5 shrink-0" aria-hidden style={{ background: i.system?.color ?? 'var(--ds-border-strong)' }} />
-      <div className="grid min-w-0 flex-1 grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3 lg:grid-cols-[9rem_minmax(0,1fr)_auto]">
-        <span className={cn('inline-flex w-fit items-center gap-1.5 self-start font-semibold', i.status === 'gap' ? 'text-danger' : 'text-warning')}>
-          <MarkGlyph mark={i.status} />{t(`status.${i.status}` as AtlasWord)}
-        </span>
-        <div className="min-w-0">
-          <button type="button" onClick={onOpen} className="text-left text-[16px] font-semibold text-fg underline-offset-2 hover:underline">{i.title}</button>
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <SystemChip system={i.system} />
-            {i.where && <span className="text-[13px] text-fg-muted">{t(`attention.${i.source}` as AtlasWord)} · {i.where}</span>}
-          </div>
-          {i.detail && <p className="mt-1.5 text-fg-secondary">{i.detail}</p>}
-          {i.next && <p className="mt-1 text-fg-secondary"><span className="font-semibold text-fg">{t('attention.next')}:</span> {i.next}</p>}
+    <li data-testid="atlas-attention-item" data-status={i.status} data-source={i.source}
+      className="-mx-2 grid min-w-0 grid-cols-1 gap-x-4 gap-y-2 rounded-tile px-2 py-3 text-[14px] transition-colors duration-150 hover:bg-hover lg:grid-cols-[8.5rem_minmax(0,1fr)_auto]">
+      <span className="self-start">
+        <Pill tone={gap ? 'error' : 'warn'}><MarkGlyph mark={i.status} size={12} />{t(`status.${i.status}` as AtlasWord)}</Pill>
+      </span>
+      <div className="min-w-0">
+        <button type="button" onClick={onOpen} className="text-left text-[14px] font-medium text-fg underline-offset-2 hover:underline">{i.title}</button>
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <SystemChip system={i.system} />
+          {i.where && <span className="text-[13px] text-fg-muted">{t(`attention.${i.source}` as AtlasWord)} · {i.where}</span>}
         </div>
-        <div className="flex flex-wrap items-start gap-1.5 lg:justify-end">
-          <OwnerTag owner={i.owner} /><TaskLink code={i.task} />
-        </div>
+        {i.detail && <p className="mt-1.5 text-[13px] text-fg-secondary">{i.detail}</p>}
+        {i.next && <p className="mt-1 text-[13px] text-fg-secondary"><span className="font-medium text-fg">{t('attention.next')}:</span> {i.next}</p>}
+      </div>
+      <div className="flex flex-wrap items-start gap-1.5 lg:justify-end">
+        <OwnerTag owner={i.owner} /><TaskLink code={i.task} />
       </div>
     </li>
   );
@@ -64,19 +68,16 @@ function AttentionRow({ item: i, onOpen }: { item: AttentionItem; onOpen: () => 
 
 // ── Processes: a row of steps, or a system × stage matrix ──────────────────────────────
 
-const STATUS_BAR: Record<StepStatus, string> = {
-  ok: 'var(--ds-success)', warn: 'var(--ds-warning)', gap: 'var(--ds-danger)', next: 'var(--ds-info)', idea: 'var(--ds-border-loud)',
-};
+const STATUS_TONE: Partial<Record<StepStatus, string>> = { ok: 'ok', warn: 'warn', gap: 'error', next: 'info', idea: 'idle' };
 
 function StepCard({ step, onOpen, compact }: { step: ProcessStep; onOpen: (s: ProcessStep) => void; compact?: boolean }) {
   const t = useWords();
   return (
     <button type="button" onClick={() => onOpen(step)} data-testid="atlas-process-step" data-status={step.status}
-      className={cn('relative flex w-full flex-col gap-1 bg-surface py-2.5 pr-3 pl-4 text-left text-[14px] transition-colors hover:bg-hover',
+      className={cn('flex w-full flex-col items-start gap-2 rounded-tile bg-well px-3.5 py-3 text-left text-[14px] transition-colors duration-150 hover:bg-hover',
         step.status === 'gap' && 'atlas-hatch', step.status === 'idea' && 'atlas-dashed', !compact && 'min-w-44')}>
-      <span aria-hidden className="absolute inset-y-0 left-0 w-1.5" style={{ background: STATUS_BAR[step.status] }} />
-      <span className="font-semibold text-fg">{step.name}</span>
-      <span className="inline-flex items-center gap-1.5 text-[13px] text-fg-muted"><MarkGlyph mark={step.status} size={13} />{t(`status.${step.status}` as AtlasWord)}</span>
+      <span className="font-medium text-fg">{step.name}</span>
+      <Pill tone={STATUS_TONE[step.status] ?? 'idle'}><MarkGlyph mark={step.status} size={12} />{t(`status.${step.status}` as AtlasWord)}</Pill>
     </button>
   );
 }
@@ -86,25 +87,22 @@ function ProcessBlock({ process, steps, onStep }: { process: AtlasProcess; steps
   const matrix = process.stages.length > 0;
   return (
     <section data-testid="atlas-process" data-layout={matrix ? 'matrix' : 'row'} className="min-w-0">
-      <header className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="display text-[22px] text-fg">{process.name}</h3>
-        {process.system && <SystemChip system={process.system} />}
-        {process.description && <p className="basis-full text-[14px] text-fg-muted">{process.description}</p>}
-      </header>
-      {steps.length === 0 ? <p className="bg-surface px-5 py-4 text-[14px] text-fg-muted">{t('processes.nothing')}</p>
-        : matrix ? <Matrix process={process} steps={steps} onStep={onStep} />
-        : (
-          <div className="relative overflow-x-auto" tabIndex={0} role="region" aria-label={process.name}>
-            <ol className="flex min-w-max gap-1">
-              {steps.map((s, i) => (
-                <li key={s.id} className="relative flex">
-                  {i > 0 && <span aria-hidden className="absolute top-1/2 -left-2.5 z-10 -translate-y-1/2 bg-bg px-0.5 text-[13px] text-fg-subtle">→</span>}
-                  <StepCard step={s} onOpen={onStep} />
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
+      <Card title={process.name} subtitle={process.description ?? undefined} actions={process.system ? <SystemChip system={process.system} /> : undefined}>
+        {steps.length === 0 ? <p className="px-5 pb-5 text-[14px] text-fg-muted">{t('processes.nothing')}</p>
+          : matrix ? <Matrix process={process} steps={steps} onStep={onStep} />
+          : (
+            <div className="relative overflow-x-auto px-5 pb-5" tabIndex={0} role="region" aria-label={process.name}>
+              <ol className="flex min-w-max items-stretch gap-2">
+                {steps.map((s, i) => (
+                  <li key={s.id} className="relative flex">
+                    {i > 0 && <span aria-hidden className="absolute top-1/2 -left-[13px] z-10 -translate-y-1/2 text-[13px] text-fg-subtle">→</span>}
+                    <StepCard step={s} onOpen={onStep} />
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+      </Card>
     </section>
   );
 }
@@ -119,23 +117,23 @@ function Matrix({ process, steps, onStep }: { process: AtlasProcess; steps: Proc
     ...(steps.some((s) => !s.stage || !known.has(s.stage)) ? [{ key: '', name: t('step.nostage') }] : [])];
   const cols = `minmax(8rem, 11rem) repeat(${stages.length}, minmax(12rem, 1fr))`;
   return (
-    <div className="relative overflow-x-auto" tabIndex={0} role="region" aria-label={process.name}>
-      <div role="table" className="grid min-w-max gap-1 text-[14px]" style={{ gridTemplateColumns: cols }}>
+    <div className="relative overflow-x-auto px-5 pb-5" tabIndex={0} role="region" aria-label={process.name}>
+      <div role="table" className="grid min-w-max gap-1.5 text-[14px]" style={{ gridTemplateColumns: cols }}>
         <div role="row" className="contents">
-          <span role="columnheader" className="px-3 py-2 text-[13px] font-semibold text-fg-muted">{t('col.system')}</span>
-          {stages.map((c) => <span key={c.key} role="columnheader" className="px-3 py-2 text-[13px] font-semibold text-fg-muted">{c.name}</span>)}
+          <span role="columnheader" className="px-1.5 py-1 text-[12px] font-normal text-fg-subtle">{t('col.system')}</span>
+          {stages.map((c) => <span key={c.key} role="columnheader" className="px-1.5 py-1 text-[12px] font-normal text-fg-subtle">{c.name}</span>)}
         </div>
         {rows.map((sys) => (
           <div role="row" className="contents" key={sys?.id ?? 'none'}>
-            <div role="rowheader" className="sticky left-0 z-10 flex items-start gap-2 bg-surface px-3 py-3">
-              {sys ? <><ProductMark product={sys} size={22} /><span className="font-semibold text-fg">{sys.name}</span></> : <span className="font-semibold text-fg-muted">{t('processes.shared')}</span>}
+            <div role="rowheader" className="sticky left-0 z-10 flex items-start gap-2 bg-surface px-1.5 py-2">
+              {sys ? <><ProductMark product={sys} size={22} /><span className="font-medium text-fg">{sys.name}</span></> : <span className="font-medium text-fg-muted">{t('processes.shared')}</span>}
             </div>
             {stages.map((c) => {
               const here = steps.filter((s) => systemOf(s)?.id === sys?.id && (c.key === '' ? !s.stage || !known.has(s.stage) : s.stage === c.key));
               return (
                 <div role="cell" key={c.key} data-testid="atlas-process-cell" data-empty={here.length === 0 || undefined}
-                  className={cn('p-1.5', here.length === 0 ? 'atlas-hatch min-h-14' : 'bg-well')}>
-                  <ul className="flex flex-col gap-1">{here.map((s) => <li key={s.id}><StepCard step={s} onOpen={onStep} compact /></li>)}</ul>
+                  className={cn('rounded-tile p-1.5', here.length === 0 ? 'atlas-hatch min-h-14' : 'bg-surface')}>
+                  <ul className="flex flex-col gap-1.5">{here.map((s) => <li key={s.id}><StepCard step={s} onOpen={onStep} compact /></li>)}</ul>
                 </div>
               );
             })}
@@ -151,9 +149,11 @@ export function Processes({ processes, atlas, onStep }: { processes: AtlasProces
   const [system, setSystem] = React.useState('');
   if (processes.length === 0) {
     return (
-      <div className="bg-surface px-5 py-6 text-[14px] text-fg-muted" data-testid="atlas-processes-empty">
-        <p className="font-semibold text-fg">{t('processes.none')}</p><p className="mt-1">{t('processes.noneHint')}</p>
-      </div>
+      <Card>
+        <div className="px-5 py-6 text-[14px] text-fg-muted" data-testid="atlas-processes-empty">
+          <p className="font-medium text-fg">{t('processes.none')}</p><p className="mt-1">{t('processes.noneHint')}</p>
+        </div>
+      </Card>
     );
   }
   const shown = processes.map((p) => ({
@@ -161,15 +161,13 @@ export function Processes({ processes, atlas, onStep }: { processes: AtlasProces
     steps: !system ? p.steps : p.steps.filter((s) => (s.system ?? p.system)?.slug === system),
   })).filter((x) => !system || x.steps.length > 0);
   return (
-    <div data-testid="atlas-processes">
-      <div className="mb-5 max-w-xs">
+    <div data-testid="atlas-processes" className="flex flex-col gap-3">
+      <div className="max-w-xs">
         <Select aria-label={t('processes.filter')} value={system} onChange={(e) => setSystem(e.target.value)}
           options={[{ value: '', label: t('processes.all') }, ...atlas.systems.map((s) => ({ value: s.slug, label: s.name }))]} />
       </div>
-      {shown.length === 0 && <p className="bg-surface px-5 py-4 text-[14px] text-fg-muted">{t('processes.nothing')}</p>}
-      <div className="flex flex-col gap-8">
-        {shown.map(({ process, steps }) => <ProcessBlock key={process.id} process={process} steps={steps} onStep={(s) => onStep(s, process)} />)}
-      </div>
+      {shown.length === 0 && <Card><p className="px-5 py-4 text-[14px] text-fg-muted">{t('processes.nothing')}</p></Card>}
+      {shown.map(({ process, steps }) => <ProcessBlock key={process.id} process={process} steps={steps} onStep={(s) => onStep(s, process)} />)}
     </div>
   );
 }
@@ -186,7 +184,7 @@ export function StepDrawer({ step, process, atlas, onClose, onService }: {
   return (
     <Drawer open onClose={onClose} testId="atlas-step-drawer" title={step.name}
       subtitle={<span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="inline-flex items-center gap-1.5 font-semibold text-fg"><MarkGlyph mark={step.status} />{t(`status.${step.status}` as AtlasWord)}</span>
+        <span className="inline-flex items-center gap-1.5 font-medium text-fg"><MarkGlyph mark={step.status} />{t(`status.${step.status}` as AtlasWord)}</span>
         {process && <span>{process.name}</span>}{stage && <span>{stage.name}</span>}
       </span>}>
       <div className="flex flex-wrap items-center gap-2">
@@ -195,7 +193,7 @@ export function StepDrawer({ step, process, atlas, onClose, onService }: {
       <DrawerSection label={t('step.today')}>{text(step.today)}</DrawerSection>
       <DrawerSection label={t('step.ideal')}>{text(step.ideal)}</DrawerSection>
       <DrawerSection label={t('step.nextStep')}>{text(step.next)}</DrawerSection>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         <DrawerSection label={t('owner.label')}>{step.owner ? <OwnerTag owner={step.owner} /> : <span className="text-fg-subtle">—</span>}</DrawerSection>
         <DrawerSection label={t('impact.label')}>{step.impact ? <ImpactTag impact={step.impact} /> : <span className="text-fg-subtle">—</span>}</DrawerSection>
         <DrawerSection label={t('task.label')}>{step.task ? <TaskLink code={step.task} /> : <span className="text-fg-subtle">—</span>}</DrawerSection>
@@ -204,7 +202,7 @@ export function StepDrawer({ step, process, atlas, onClose, onService }: {
         {services.length === 0 ? <span className="text-fg-subtle">—</span> : (
           <ul className="flex flex-wrap gap-1.5">
             {services.map((s) => (
-              <li key={s.id}><button type="button" onClick={() => onService(s)} className="bg-chip px-2.5 py-1 text-[14px] font-semibold text-fg hover:bg-hover">
+              <li key={s.id}><button type="button" onClick={() => onService(s)} className="inline-flex items-center rounded-full bg-surface px-3 py-1 text-[14px] font-medium text-fg transition-colors hover:bg-hover">
                 {s.name}{s.provider && <span className="ml-1.5 font-normal text-fg-muted">{s.provider}</span>}
               </button></li>
             ))}
@@ -217,6 +215,19 @@ export function StepDrawer({ step, process, atlas, onClose, onService }: {
 
 // ── The service, opened ────────────────────────────────────────────────────────────────
 
+function LinkRow({ id, kind, planned, byId, onService }: { id: string; kind: string | null; planned: boolean; byId: Map<string, AtlasService>; onService: (s: AtlasService) => void }) {
+  const t = useWords();
+  const other = byId.get(id);
+  if (!other) return null;
+  return (
+    <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span aria-hidden className="h-0 w-5 shrink-0 border-t-[3px]" style={{ borderColor: LINK_COLOR[(kind ?? 'none') as keyof typeof LINK_COLOR], borderTopStyle: planned ? 'dashed' : 'solid' }} />
+      <button type="button" onClick={() => onService(other)} className="font-medium text-fg underline-offset-2 hover:underline">{other.name}</button>
+      <span className="text-[13px] text-fg-muted">{t(`link.${kind ?? 'none'}` as AtlasWord)}{planned && ` · ${t('service.planned')}`}</span>
+    </li>
+  );
+}
+
 export function ServiceDrawer({ service, atlas, onClose, onService }: {
   service: AtlasService | null; atlas: Atlas; onClose: () => void; onService: (s: AtlasService) => void;
 }) {
@@ -227,27 +238,18 @@ export function ServiceDrawer({ service, atlas, onClose, onService }: {
   const env = atlas.environments.find((e) => e.id === service.environmentId);
   const out = atlas.links.filter((l) => l.from === service.id);
   const inn = atlas.links.filter((l) => l.to === service.id);
-  const Link = ({ id, kind, planned }: { id: string; kind: string | null; planned: boolean }) => {
-    const other = byId.get(id);
-    if (!other) return null;
-    return (
-      <li className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span aria-hidden className="h-0 w-5 shrink-0 border-t-[3px]" style={{ borderColor: LINK_COLOR[(kind ?? 'none') as keyof typeof LINK_COLOR], borderTopStyle: planned ? 'dashed' : 'solid' }} />
-        <button type="button" onClick={() => onService(other)} className="font-semibold text-fg underline-offset-2 hover:underline">{other.name}</button>
-        <span className="text-[13px] text-fg-muted">{t(`link.${kind ?? 'none'}` as AtlasWord)}{planned && ` · ${t('service.planned')}`}</span>
-      </li>
-    );
-  };
   return (
     <Drawer open onClose={onClose} testId="atlas-service-drawer" title={service.name}
       subtitle={[system?.name ?? t('service.shared'), env?.name, service.provider].filter(Boolean).join(' · ')}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <StateLabel state={service.state} />
-        <span className="inline-flex items-center gap-1.5 font-semibold"><MarkGlyph mark={conditionMark(service.condition)} />{t(`cond.${service.condition}` as AtlasWord)}</span>
-        <span className="bg-chip px-2 py-0.5 text-[13px] text-fg-secondary">{t(`kind.${service.kind}` as AtlasWord) === `kind.${service.kind}` ? service.kind : t(`kind.${service.kind}` as AtlasWord)}</span>
+        <Pill tone={service.condition === 'gap' ? 'error' : service.condition === 'warn' ? 'warn' : 'idle'}>
+          <MarkGlyph mark={conditionMark(service.condition)} size={12} />{t(`cond.${service.condition}` as AtlasWord)}
+        </Pill>
+        <Pill tone="idle">{t(`kind.${service.kind}` as AtlasWord) === `kind.${service.kind}` ? service.kind : t(`kind.${service.kind}` as AtlasWord)}</Pill>
       </div>
       {service.condition !== 'ok' && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid gap-3 sm:grid-cols-3">
           <DrawerSection label={t('impact.label')}>{service.impact ? <ImpactTag impact={service.impact} /> : <span className="text-fg-subtle">—</span>}</DrawerSection>
           <DrawerSection label={t('owner.label')}>{service.owner ? <OwnerTag owner={service.owner} /> : <span className="text-fg-subtle">—</span>}</DrawerSection>
           <DrawerSection label={t('task.label')}>{service.task ? <TaskLink code={service.task} /> : <span className="text-fg-subtle">—</span>}</DrawerSection>
@@ -259,7 +261,7 @@ export function ServiceDrawer({ service, atlas, onClose, onService }: {
       {service.notes && <DrawerSection label={t('service.notes')}><p className="whitespace-pre-wrap">{service.notes}</p></DrawerSection>}
       {service.facts.length > 0 && (
         <DrawerSection label={t('service.facts')}>
-          <dl data-testid="atlas-facts" className="grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] gap-x-4 gap-y-1.5">
+          <dl data-testid="atlas-facts" className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-x-4 gap-y-1.5">
             {service.facts.map((f) => (
               <React.Fragment key={f.key}><dt className="text-fg-muted">{f.key}</dt><dd className="break-words text-fg">{f.value}</dd></React.Fragment>
             ))}
@@ -269,15 +271,15 @@ export function ServiceDrawer({ service, atlas, onClose, onService }: {
       {service.items.length > 0 && (
         <DrawerSection label={t('service.items')}>
           <ul data-testid="atlas-items" className="flex flex-wrap gap-1.5">
-            {service.items.map((i) => <li key={i} className="bg-chip px-2.5 py-1 text-[14px] text-fg-secondary">{i}</li>)}
+            {service.items.map((i) => <li key={i} className="rounded-full bg-surface px-3 py-1 text-[14px] text-fg-secondary">{i}</li>)}
           </ul>
         </DrawerSection>
       )}
       <DrawerSection label={t('service.incoming')}>
-        {inn.length === 0 ? <span className="text-fg-subtle">{t('service.nolinks')}</span> : <ul data-testid="atlas-links-in" className="flex flex-col gap-1.5">{inn.map((l) => <Link key={l.id} id={l.from} kind={l.kind} planned={l.planned} />)}</ul>}
+        {inn.length === 0 ? <span className="text-fg-subtle">{t('service.nolinks')}</span> : <ul data-testid="atlas-links-in" className="flex flex-col gap-1.5">{inn.map((l) => <LinkRow key={l.id} id={l.from} kind={l.kind} planned={l.planned} byId={byId} onService={onService} />)}</ul>}
       </DrawerSection>
       <DrawerSection label={t('service.outgoing')}>
-        {out.length === 0 ? <span className="text-fg-subtle">{t('service.nolinks')}</span> : <ul data-testid="atlas-links-out" className="flex flex-col gap-1.5">{out.map((l) => <Link key={l.id} id={l.to} kind={l.kind} planned={l.planned} />)}</ul>}
+        {out.length === 0 ? <span className="text-fg-subtle">{t('service.nolinks')}</span> : <ul data-testid="atlas-links-out" className="flex flex-col gap-1.5">{out.map((l) => <LinkRow key={l.id} id={l.to} kind={l.kind} planned={l.planned} byId={byId} onService={onService} />)}</ul>}
       </DrawerSection>
     </Drawer>
   );
@@ -288,7 +290,13 @@ export function ServiceDrawer({ service, atlas, onClose, onService }: {
 export function Suppliers({ atlas, onService }: { atlas: Atlas; onService: (s: AtlasService) => void }) {
   const t = useWords();
   const withProvider = atlas.services.filter((s) => s.provider);
-  if (withProvider.length === 0) return <p className="bg-surface px-5 py-6 text-[14px] text-fg-muted" data-testid="atlas-suppliers-empty">{t('suppliers.none')}</p>;
+  if (withProvider.length === 0) {
+    return (
+      <Card>
+        <p className="px-5 py-6 text-[14px] text-fg-muted" data-testid="atlas-suppliers-empty">{t('suppliers.none')}</p>
+      </Card>
+    );
+  }
   const providers = [...new Set(withProvider.map((s) => s.provider!))].sort((a, b) => a.localeCompare(b));
   const usedSystems = atlas.systems.filter((sys) => withProvider.some((s) => s.productId === sys.id));
   const hasShared = withProvider.some((s) => s.productId === null);
@@ -298,43 +306,45 @@ export function Suppliers({ atlas, onService }: { atlas: Atlas; onService: (s: A
   ];
   const grid = `minmax(8rem, 11rem) repeat(${cols.length}, minmax(12rem, 1fr))`;
   return (
-    <div data-testid="atlas-suppliers">
-      <p className="mb-3 text-[14px] text-fg-muted">{t('suppliers.hint')}</p>
-      <div className="relative overflow-x-auto" tabIndex={0} role="region" aria-label={t('view.suppliers')}>
-        <div role="table" className="grid min-w-max gap-1 text-[14px]" style={{ gridTemplateColumns: grid }}>
-          <div role="row" className="contents">
-            <span role="columnheader" className="px-3 py-2 text-[13px] font-semibold text-fg-muted">{t('suppliers.provider')}</span>
-            {cols.map((c) => <span key={c.id ?? 'shared'} role="columnheader" className="px-3 py-2 text-[13px] font-semibold text-fg-muted">{c.label}</span>)}
-          </div>
-          {providers.map((p) => (
-            <div role="row" className="contents" key={p} data-provider={p}>
-              <div role="rowheader" className="sticky left-0 z-10 bg-surface px-3 py-3 font-semibold text-fg">{p}</div>
-              {cols.map((c) => {
-                const here = withProvider.filter((s) => s.provider === p && s.productId === c.id);
-                return (
-                  <div role="cell" key={c.id ?? 'shared'} data-testid="atlas-supplier-cell" data-count={here.length} data-empty={here.length === 0 || undefined}
-                    className={cn('p-2', here.length === 0 ? 'atlas-hatch min-h-14' : 'bg-surface')}>
-                    {here.length > 0 && (
-                      <>
-                        <span className="figures block text-[13px] font-semibold text-fg-muted">{here.length === 1 ? t('suppliers.count1') : t('suppliers.count', { n: here.length })}</span>
-                        <ul className="mt-1 flex flex-wrap gap-1">
-                          {here.map((s) => (
-                            <li key={s.id}><button type="button" onClick={() => onService(s)}
-                              className={cn('inline-flex items-center gap-1.5 bg-chip px-2 py-0.5 text-[13px] font-semibold text-fg hover:bg-hover',
-                                s.condition === 'gap' && 'atlas-hatch-loud', s.condition === 'planned' && 'atlas-dashed')}>
-                              {s.condition !== 'ok' && <MarkGlyph mark={conditionMark(s.condition)} size={12} />}{s.name}
-                            </button></li>
-                          ))}
-                        </ul>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+    <div data-testid="atlas-suppliers" className="flex flex-col gap-3">
+      <p className="px-1 text-[14px] text-fg-muted">{t('suppliers.hint')}</p>
+      <Card>
+        <div className="relative overflow-x-auto px-5 pb-5" tabIndex={0} role="region" aria-label={t('view.suppliers')}>
+          <div role="table" className="grid min-w-max gap-1.5 text-[14px]" style={{ gridTemplateColumns: grid }}>
+            <div role="row" className="contents">
+              <span role="columnheader" className="px-1.5 py-1 text-[12px] font-normal text-fg-subtle">{t('suppliers.provider')}</span>
+              {cols.map((c) => <span key={c.id ?? 'shared'} role="columnheader" className="px-1.5 py-1 text-[12px] font-normal text-fg-subtle">{c.label}</span>)}
             </div>
-          ))}
+            {providers.map((p) => (
+              <div role="row" className="contents" key={p} data-provider={p}>
+                <div role="rowheader" className="sticky left-0 z-10 flex items-center bg-surface px-1.5 py-2 font-medium text-fg">{p}</div>
+                {cols.map((c) => {
+                  const here = withProvider.filter((s) => s.provider === p && s.productId === c.id);
+                  return (
+                    <div role="cell" key={c.id ?? 'shared'} data-testid="atlas-supplier-cell" data-count={here.length} data-empty={here.length === 0 || undefined}
+                      className={cn('rounded-tile p-2', here.length === 0 ? 'atlas-hatch min-h-14' : 'bg-well')}>
+                      {here.length > 0 && (
+                        <>
+                          <span className="block text-[13px] font-medium tabular-nums text-fg-muted">{here.length === 1 ? t('suppliers.count1') : t('suppliers.count', { n: here.length })}</span>
+                          <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                            {here.map((s) => (
+                              <li key={s.id}><button type="button" onClick={() => onService(s)}
+                                className={cn('inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1 text-[13px] font-medium text-fg transition-colors hover:bg-hover',
+                                  s.condition === 'gap' && 'atlas-hatch-loud', s.condition === 'planned' && 'atlas-dashed')}>
+                                {s.condition !== 'ok' && <MarkGlyph mark={conditionMark(s.condition)} size={12} />}{s.name}
+                              </button></li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

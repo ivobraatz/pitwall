@@ -10,15 +10,14 @@ import {
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { TASK_STATUSES, type TaskStatus, type TasksMeta, type TeamTask } from '@/lib/api';
 import { useArchiveDone, useCreateTask, useMoveTask, type BoardData } from '@/lib/tasks';
-import { Button, Icon, cn } from '@/components/ui';
+import { Button, Dot, IconButton, IconPlus, cn } from '@/components/ui';
 import { BlockedPrompt } from './blocked-prompt';
 import { QuickCreate } from './quick-create';
 import { STATUS_NAME, SortableCard, TaskCard } from './card';
 
 type Items = Record<TaskStatus, string[]>;
 
-const COLUMN_TONE: Record<TaskStatus, string> = { todo: 'bg-info', doing: 'bg-running', blocked: 'bg-danger', done: 'bg-success' };
-const IconPlus = () => <Icon size={16} d={<path d="M12 5v14M5 12h14" />} />;
+const COLUMN_TONE: Record<TaskStatus, string> = { todo: 'info', doing: 'running', blocked: 'error', done: 'ok' };
 
 const isStatus = (id: UniqueIdentifier | undefined): id is TaskStatus => TASK_STATUSES.includes(id as TaskStatus);
 
@@ -29,25 +28,24 @@ function Column({ status, ids, tasks, count, onOpen, creating, onCreateOpen, onC
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
-    <section aria-label={STATUS_NAME[status]} className="flex w-[84vw] shrink-0 snap-start flex-col bg-well sm:w-80 xl:w-auto xl:min-w-0 xl:flex-1">
-      <header className="flex h-12 items-center gap-2.5 px-3">
-        <span className={cn('size-2.5 shrink-0', COLUMN_TONE[status])} aria-hidden />
+    <section aria-label={STATUS_NAME[status]} className="flex min-w-[280px] flex-1 flex-col rounded-panel bg-surface p-3 xl:min-w-0">
+      <header className="flex h-9 items-center gap-2 pl-1">
+        <Dot tone={COLUMN_TONE[status]} />
         <h2 className="text-[14px] font-semibold text-fg">{STATUS_NAME[status]}</h2>
-        <span className="text-[13px] font-semibold tabular-nums text-fg-muted">{count}</span>
-        <span className="ml-auto flex items-center gap-1">
+        <span className="text-[13px] tabular-nums text-fg-muted">{count}</span>
+        <span className="ml-auto flex items-center gap-1.5">
           {onArchiveDone && ids.length > 0 && (
             <Button size="sm" variant="ghost" loading={archiving} onClick={onArchiveDone} title="Tira do quadro as concluídas (continuam na busca)">Arquivar concluídas</Button>
           )}
-          <button type="button" onClick={onCreateOpen} aria-label={`Nova tarefa em ${STATUS_NAME[status]}`} title="Nova tarefa"
-            className="grid size-8 place-items-center text-fg-muted transition-colors hover:bg-hover hover:text-fg"><IconPlus /></button>
+          <IconButton size={32} onClick={onCreateOpen} aria-label={`Nova tarefa em ${STATUS_NAME[status]}`} title="Nova tarefa"><IconPlus /></IconButton>
         </span>
       </header>
-      {creating && <div className="px-2 pb-1.5"><QuickCreate onCreate={onCreate} onClose={onCreateClose} /></div>}
+      {creating && <div className="pt-1 pb-2"><QuickCreate onCreate={onCreate} onClose={onCreateClose} /></div>}
       <SortableContext id={status} items={ids} strategy={verticalListSortingStrategy}>
-        <div ref={setNodeRef} className={cn('flex min-h-32 flex-1 flex-col gap-1.5 px-2 pb-2 transition-colors duration-150', isOver && 'bg-hover/60')}>
+        <div ref={setNodeRef} className={cn('flex min-h-32 flex-1 flex-col gap-2 pt-2 transition-colors duration-150', isOver && 'rounded-tile bg-hover')}>
           {ids.map((id) => { const t = tasks.get(id); return t ? <SortableCard key={id} task={t} onOpen={onOpen} /> : null; })}
           {ids.length === 0 && (
-            <div className={cn('grid min-h-24 flex-1 place-items-center border border-dashed text-[13px] text-fg-subtle', isOver ? 'border-focus text-fg' : 'border-border')}>
+            <div className="grid min-h-24 flex-1 place-items-center rounded-tile border-2 border-dashed border-border-strong text-[13px] text-fg-subtle">
               Solte aqui
             </div>
           )}
@@ -241,7 +239,7 @@ export function TaskBoard({ board, visible, product, creating, setCreating, onOp
           screenReaderInstructions: { draggable: 'Para mover uma tarefa, pressione Espaço. Use as setas para escolher a coluna e a posição, Espaço para soltar e Esc para cancelar. Enter abre a tarefa.' },
         }}
       >
-        <div className="-mx-4 flex snap-x snap-mandatory items-stretch gap-2 overflow-x-auto px-4 pb-2 md:mx-0 md:px-0 xl:snap-none">
+        <div className="flex items-stretch gap-3 overflow-x-auto pb-2">
           {TASK_STATUSES.map((s) => (
             <Column
               key={s} status={s} ids={items[s]} tasks={tasks}

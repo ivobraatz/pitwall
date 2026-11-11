@@ -10,17 +10,17 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: dark)', color: '#0b0c0d' },
-    { media: '(prefers-color-scheme: light)', color: '#f7f8f8' },
+    { media: '(prefers-color-scheme: dark)', color: '#121211' },
+    { media: '(prefers-color-scheme: light)', color: '#ecebe6' },
   ],
 };
 
-// Follows the system theme; runs before paint so there is no flash.
-const MODE_SCRIPT = "document.documentElement.dataset.mode=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'";
+// The theme the person chose in the account menu (light, dark), or the system's; runs before paint so there is no flash.
+const MODE_SCRIPT = "try{var t=localStorage.getItem('pitwall-theme')}catch(e){}document.documentElement.dataset.mode=t==='light'||t==='dark'?t:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" data-mode="dark" suppressHydrationWarning>
+    <html lang="pt-BR" data-mode="light" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: MODE_SCRIPT }} /></head>
       <body><Providers>{children}</Providers></body>
     </html>

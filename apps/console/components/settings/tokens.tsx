@@ -34,7 +34,7 @@ function mcpCommand(token: string): string {
  * Personal tokens: what the Pitwall MCP uses to work the task board and report to the Atlas as
  * you. Shown once; listed by prefix; good for those two only (not tickets or the team).
  */
-export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
+export function PersonalTokens() {
   const toast = useToast();
   const tokens = useQuery({ queryKey: ['me', 'tokens'], queryFn: () => api<StaffTokenInfo[]>('/staff/me/tokens') });
   const [name, setName] = React.useState('');
@@ -59,8 +59,8 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
 
   const active = tokens.data?.filter((t) => state(t).label === 'ativo').length ?? 0;
   return (
-    <Card title="Tokens pessoais" className="rise" style={style} actions={<Pill tone="idle">{active}/10 ativos</Pill>}>
-      <div className="flex flex-col gap-4 px-5 pt-2 pb-6 text-[14px]">
+    <Card title="Tokens pessoais" subtitle="Para o Claude Code, pelo MCP do Pitwall." actions={<Pill tone="idle">{active}/10 ativos</Pill>}>
+      <div className="flex flex-col gap-4 px-5 pt-1 pb-5 text-[14px]">
         <p className="max-w-xl leading-[1.5] text-fg-secondary">
           Para o Claude Code ler e atualizar o quadro de <strong className="font-semibold text-fg">Tarefas</strong> em seu nome, pelo MCP do Pitwall.
           Ele também registra sistemas, rotinas e atividade no <strong className="font-semibold text-fg">Atlas</strong>.
@@ -68,11 +68,14 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
         </p>
 
         {created ? (
-          <div className="flex flex-col gap-3 bg-accent-bg p-4">
+          <div className="flex flex-col gap-3 rounded-tile bg-accent-bg p-4">
             <p className="font-semibold text-fg">Copie agora: o token não aparece de novo.</p>
-            <div className="flex gap-2"><Input readOnly code value={created.token} onFocus={(e) => e.target.select()} aria-label="Token" /><CopyButton text={created.token} /></div>
+            <div className="flex flex-wrap items-center gap-2">
+              <code aria-label="Token" className="min-w-0 flex-1 rounded-lg bg-surface px-3 py-2 break-all text-fg">{created.token}</code>
+              <CopyButton text={created.token} />
+            </div>
             <p className="text-[13px] text-fg-secondary">No terminal, conecte o Claude Code a esta instalação:</p>
-            <pre className="overflow-x-auto bg-well p-3 leading-[1.6] text-fg">{mcpCommand(created.token)}</pre>
+            <pre className="overflow-x-auto rounded-tile bg-well p-4 text-[12.5px] leading-[1.6] text-fg">{mcpCommand(created.token)}</pre>
             <div className="flex flex-wrap items-center gap-2">
               <CopyButton text={mcpCommand(created.token)} label="Copiar comando" />
               <span className="text-[13px] text-fg-muted">Depois, no Claude Code, <code>/mcp</code> mostra o pitwall conectado.</span>
@@ -92,13 +95,13 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
         )}
 
         {(tokens.data?.length ?? 0) > 0 && (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col divide-y divide-border-subtle">
             {tokens.data!.map((t) => {
               const s = state(t);
               return (
-                <div key={t.id} className="flex flex-wrap items-center gap-3 bg-well px-3 py-2.5">
+                <div key={t.id} className="-mx-2 flex min-h-[56px] flex-wrap items-center gap-3 rounded-tile px-2 py-3 transition-colors duration-150 hover:bg-hover">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 font-semibold text-fg"><span className="truncate">{t.name}</span><Pill tone={s.tone}>{s.label}</Pill></div>
+                    <div className="flex min-w-0 items-center gap-2 text-[14px]"><span className="truncate font-medium text-fg">{t.name}</span><Pill tone={s.tone}>{s.label}</Pill></div>
                     <div className="mt-0.5 text-[13px] text-fg-muted">
                       <code>{t.prefix}…</code> · criado {rel(t.createdAt)} · último uso {t.lastUsedAt ? rel(t.lastUsedAt) : 'nunca'}
                       {' · '}{t.revokedAt ? `revogado ${rel(t.revokedAt)}` : t.expiresAt ? <span title={dateTime(t.expiresAt)}>expira {rel(t.expiresAt)}</span> : 'sem expiração'}
@@ -111,7 +114,7 @@ export function PersonalTokens({ style }: { style?: React.CSSProperties }) {
                       <Button size="sm" variant="ghost" onClick={() => setConfirming(null)}>Cancelar</Button>
                     </span>
                   ) : (
-                    <Button size="sm" variant="ghost" onClick={() => setConfirming(t.id)}>Revogar</Button>
+                    <Button size="sm" variant="danger" onClick={() => setConfirming(t.id)}>Revogar</Button>
                   ))}
                 </div>
               );

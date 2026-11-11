@@ -1,63 +1,65 @@
 @import "tailwindcss";
 @import "@fontsource-variable/figtree/wght.css";
-@import "@fontsource-variable/league-spartan/wght.css";
 
 /*
- * Pitwall brand (docs/marca/README.md). The pit board is the reference: a carbon board, white letters,
- * one signal yellow. Tokens live only here; components use the Tailwind names below, never
+ * Pitwall brand (docs/marca/README.md). A warm stone ground, white panels with soft corners, ink for
+ * text and the one primary action, and the pit-board yellow as the signal: the figure that asks the
+ * team to act, never a ground. Tokens live only here; components use the Tailwind names below, never
  * literal colors. data-mode on <html> picks the values (see layout.tsx).
  *
- * House rules: flat fills, nothing fades into anything, nothing at rest floats, square corners.
- * Surfaces are told apart by a step in tone, not by a line.
+ * House rules: flat fills, no gradients, nothing at rest casts a shadow (only what floats: menus,
+ * dialogs, toasts). Surfaces are told apart by a step in tone; a 1px line only inside panels.
+ * One family (Figtree). Radii: panel 20, tile 14, control full pill, chip full pill.
  */
 :root {
   --ds-font-sans: "Figtree Variable", "Figtree", ui-sans-serif, system-ui, sans-serif;
-  --ds-font-display: "League Spartan Variable", "League Spartan", "Figtree Variable", ui-sans-serif, system-ui, sans-serif;
-  --ds-font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; /* taste-skill-ignore: the code face, used only by <code>/<pre> */
+  --ds-font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; /* taste-skill-ignore: the code face, used only by <code>/<pre> and ids */
   --ease: cubic-bezier(.2, .7, .2, 1); --ease-out: cubic-bezier(.16, 1, .3, 1);
-  --dur-fast: 140ms; --dur: 240ms;
-  --ds-accent: #ffd400; --ds-accent-hover: #ffe14d; --ds-on-accent: #0b0c0d;
+  --dur-fast: 140ms; --dur: 220ms;
+  --ds-accent: #f4df4f; --ds-accent-hover: #ecd53a; --ds-on-accent: #161616;
 }
 
-/* Dark is the default: the board itself. .opposite turns a tile to the other tone. */
-:root, :root[data-mode="dark"], :root[data-mode="light"] .opposite {
-  color-scheme: dark;
-  --ds-bg-deep: #08090a; --ds-bg: #0f1112; --ds-bg-alt: #0b0c0d;
-  --ds-bg-surface: #181a1c; --ds-bg-overlay: #1f2225; --ds-bg-well: #111314;
-  --ds-bg-chip: #25292c; --ds-bg-hover: #202326; --ds-bg-active: #2d3135;
-  --ds-overlay-scrim: rgb(0 0 0 / .6);
-  --ds-fg-primary: #f5f5f3; --ds-fg-secondary: #d3d6d9; --ds-fg-tertiary: #a6acb1; --ds-fg-quaternary: #8a9197; --ds-fg-disabled: #5d6469;
-  --ds-border-subtle: #212427; --ds-border-default: #2f3337; --ds-border-strong: #464c51; --ds-border-loud: #60676c;
-  --ds-sel: #2d3135; --ds-sel-hover: #34393d; --ds-sel-fg: #ffd400;
-  --ds-accent-bg: rgb(255 212 0 / .14); --ds-accent-fg: #ffd400; --ds-focus: #ffd400;
-  --ds-button-primary: #ffd400; --ds-button-primary-fg: #0b0c0d; --ds-button-primary-hover: #ffe14d;
-  --ds-button-outline: #34393d; --ds-button-outline-hover: #60676c;
-  --ds-danger: #ff5f52; --ds-warning: #ff9b3d; --ds-success: #34d08c; --ds-info: #5eb0ff; --ds-running: #2cc4c9;
-  --ds-on-status: #0b0c0d;
-  --ds-shadow-popover: 0 16px 40px rgb(0 0 0 / .5);
-  --viz-1: #ffd400; --viz-2: #5eb0ff; --viz-3: #ff5f52; --viz-4: #34d08c;
-  --viz-5: #ff9b3d; --viz-6: #2cc4c9; --viz-7: #f27fb2; --viz-8: #c3c8cc;
-  --ds-violet: #b9a2ff;
-}
-
-:root[data-mode="light"], :root[data-mode="dark"] .opposite, :root:not([data-mode="light"]) .opposite {
+/* Light is the reference: stone ground, white panels. */
+:root, :root[data-mode="light"] {
   color-scheme: light;
-  --ds-violet: #6a4bc4;
-  --ds-bg-deep: #e4e6e8; --ds-bg: #eef0f1; --ds-bg-alt: #f7f8f8;
-  --ds-bg-surface: #ffffff; --ds-bg-overlay: #ffffff; --ds-bg-well: #f4f5f6;
-  --ds-bg-chip: #e6e8ea; --ds-bg-hover: #f0f2f3; --ds-bg-active: #dde0e3;
-  --ds-overlay-scrim: rgb(8 9 10 / .4);
-  --ds-fg-primary: #0d0f10; --ds-fg-secondary: #33383d; --ds-fg-tertiary: #535a61; --ds-fg-quaternary: #687077; --ds-fg-disabled: #a3a9ae;
-  --ds-border-subtle: #e8eaec; --ds-border-default: #d4d8db; --ds-border-strong: #b2b8bd; --ds-border-loud: #868d93;
-  --ds-sel: rgb(255 212 0 / .24); --ds-sel-hover: rgb(255 212 0 / .36); --ds-sel-fg: #4d3c00;
-  --ds-accent-bg: rgb(255 212 0 / .26); --ds-accent-fg: #6b5300; --ds-focus: #0d0f10;
-  --ds-button-primary: #ffd400; --ds-button-primary-fg: #0b0c0d; --ds-button-primary-hover: #f0c700;
-  --ds-button-outline: #d4d8db; --ds-button-outline-hover: #868d93;
-  --ds-danger: #cf2a1e; --ds-warning: #b0500e; --ds-success: #0e8554; --ds-info: #1c66c9; --ds-running: #10858a;
+  --ds-bg-deep: #e3e1db; --ds-bg: #ecebe6; --ds-bg-alt: #ffffff;
+  --ds-bg-surface: #ffffff; --ds-bg-overlay: #ffffff; --ds-bg-well: #f4f3ef;
+  --ds-bg-chip: #ecebe6; --ds-bg-hover: #f7f6f3; --ds-bg-active: #e9e7e1;
+  --ds-overlay-scrim: rgb(22 22 22 / .32);
+  --ds-fg-primary: #161616; --ds-fg-secondary: #3b3b39; --ds-fg-tertiary: #62615c; --ds-fg-quaternary: #6f6e69; --ds-fg-disabled: #a9a8a2;
+  --ds-border-subtle: #f0efeb; --ds-border-default: #e5e3dd; --ds-border-strong: #cfcdc6; --ds-border-loud: #9d9b94;
+  --ds-sel: #f1efe9; --ds-sel-hover: #ebe9e2; --ds-sel-fg: #161616;
+  --ds-accent-bg: #fbf4c4; --ds-accent-fg: #665600; --ds-focus: #161616;
+  --ds-button-primary: #161616; --ds-button-primary-fg: #ffffff; --ds-button-primary-hover: #2e2e2c;
+  --ds-button-outline: #e5e3dd; --ds-button-outline-hover: #cfcdc6;
+  --ds-danger: #c4242a; --ds-warning: #a3540d; --ds-success: #1e7b4f; --ds-info: #2f62b5; --ds-running: #17707c;
   --ds-on-status: #ffffff;
-  --ds-shadow-popover: 0 16px 40px rgb(8 9 10 / .14);
-  --viz-1: #d9b300; --viz-2: #1c66c9; --viz-3: #cf2a1e; --viz-4: #0e8554;
-  --viz-5: #d0670f; --viz-6: #10858a; --viz-7: #c2457f; --viz-8: #687077;
+  --ds-shadow-popover: 0 18px 48px rgb(22 22 22 / .14), 0 2px 6px rgb(22 22 22 / .06);
+  --viz-1: #161616; --viz-2: #2f62b5; --viz-3: #c4242a; --viz-4: #1e7b4f;
+  --viz-5: #b0660f; --viz-6: #17707c; --viz-7: #b03f78; --viz-8: #8a8984;
+  --ds-violet: #6a4bc4;
+  --ds-mark-board: #161616; --ds-mark-slot: #f4df4f;
+}
+
+:root[data-mode="dark"] {
+  color-scheme: dark;
+  --ds-bg-deep: #0b0b0a; --ds-bg: #121211; --ds-bg-alt: #1a1a19;
+  --ds-bg-surface: #1a1a19; --ds-bg-overlay: #222221; --ds-bg-well: #232321;
+  --ds-bg-chip: #2a2a28; --ds-bg-hover: #222220; --ds-bg-active: #2f2f2c;
+  --ds-overlay-scrim: rgb(0 0 0 / .6);
+  --ds-fg-primary: #f3f2ee; --ds-fg-secondary: #d2d1cb; --ds-fg-tertiary: #a8a7a0; --ds-fg-quaternary: #95948e; --ds-fg-disabled: #5f5e5a;
+  --ds-border-subtle: #242422; --ds-border-default: #2e2e2b; --ds-border-strong: #464540; --ds-border-loud: #67665f;
+  --ds-sel: #2a2a27; --ds-sel-hover: #33332f; --ds-sel-fg: #f3f2ee;
+  --ds-accent-bg: rgb(244 223 79 / .14); --ds-accent-fg: #f4df4f; --ds-focus: #f3f2ee;
+  --ds-button-primary: #f3f2ee; --ds-button-primary-fg: #141414; --ds-button-primary-hover: #ffffff;
+  --ds-button-outline: #2e2e2b; --ds-button-outline-hover: #464540;
+  --ds-danger: #f0686a; --ds-warning: #e9a04f; --ds-success: #4cc38a; --ds-info: #74a7f2; --ds-running: #4cbfc9;
+  --ds-on-status: #141414;
+  --ds-shadow-popover: 0 18px 48px rgb(0 0 0 / .5);
+  --viz-1: #f3f2ee; --viz-2: #74a7f2; --viz-3: #f0686a; --viz-4: #4cc38a;
+  --viz-5: #e9a04f; --viz-6: #4cbfc9; --viz-7: #ec7fb4; --viz-8: #95948e;
+  --ds-violet: #b9a2ff;
+  --ds-mark-board: #f4df4f; --ds-mark-slot: #161616;
 }
 
 /* Tailwind names → tokens. `inline` keeps utilities reading the mode-dependent variables. */
@@ -102,24 +104,28 @@
   --color-running: var(--ds-running);
   --color-on-status: var(--ds-on-status);
   --font-sans: var(--ds-font-sans);
-  --font-display: var(--ds-font-display);
   --font-mono: var(--ds-font-mono); /* taste-skill-ignore */
   --shadow-popover: var(--ds-shadow-popover);
-  --radius-xs: 0px;
-  --radius-sm: 0px;
-  --radius: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
+  /* Soft corners, chosen once: panels 20, tiles inside them 14, controls and chips full pills. */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-tile: 14px;
+  --radius-panel: 20px;
 }
 
 /* The Pitwall widgets (the player) read the --pw-* tokens, so they match the console. */
 :root {
-  --pw-accent: var(--ds-accent);
-  --pw-accent-fg: var(--ds-on-accent);
+  --pw-accent: var(--ds-button-primary);
+  --pw-accent-fg: var(--ds-button-primary-fg);
   --pw-bg: var(--ds-bg);
   --pw-surface: var(--ds-bg-surface);
-  --pw-muted-bg: var(--ds-bg-chip);
+  --pw-muted-bg: var(--ds-bg-well);
   --pw-fg: var(--ds-fg-primary);
   --pw-fg-muted: var(--ds-fg-secondary);
   --pw-fg-subtle: var(--ds-fg-tertiary);
@@ -129,70 +135,68 @@
   --pw-warning: var(--ds-warning);
   --pw-font: var(--ds-font-sans);
   --pw-mono: var(--ds-font-mono); /* taste-skill-ignore */
-  --pw-radius: 0px;
+  --pw-radius: 14px;
 }
 
-html, body { height: 100%; }
-body {
-  background: var(--ds-bg); color: var(--ds-fg-primary);
-  font-family: var(--ds-font-sans); font-size: 14px; line-height: 20px; font-weight: 400;
-  font-feature-settings: "tnum" 0;
-  -webkit-font-smoothing: antialiased;
+/* Base rules sit in the base layer so Tailwind utilities (focus rings, outlines) can override them. */
+@layer base {
+  html, body { height: 100%; }
+  body {
+    background: var(--ds-bg); color: var(--ds-fg-primary);
+    font-family: var(--ds-font-sans); font-size: 14px; line-height: 20px; font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+  }
+  code, pre, kbd, samp { font-family: var(--ds-font-mono); font-size: 12.5px; }
+  ::selection { background: var(--ds-accent); color: var(--ds-on-accent); }
+  :focus-visible { outline: 2px solid var(--ds-focus); outline-offset: 2px; }
+  input[type="checkbox"], input[type="radio"] { accent-color: var(--ds-button-primary); width: 16px; height: 16px; }
+  * { scrollbar-width: thin; scrollbar-color: var(--ds-border-strong) transparent; }
 }
-code, pre, kbd, samp { font-family: var(--ds-font-mono); font-size: 12.5px; }
-.code-block { font-family: var(--ds-font-mono); font-size: 12.5px; }
-.opposite { background: var(--ds-bg-surface); color: var(--ds-fg-primary); }
-::selection { background: var(--ds-accent); color: var(--ds-on-accent); }
-:focus-visible { outline: 2px solid var(--ds-focus); outline-offset: 2px; }
-input[type="checkbox"], input[type="radio"] { accent-color: var(--ds-accent); width: 16px; height: 16px; }
 
-/* Display type: the board's letters. */
-.display { font-family: var(--ds-font-display); font-weight: 700; letter-spacing: -0.035em; line-height: .92; }
-.figures { font-variant-numeric: tabular-nums; }
+/* Select: a pill with its own chevron (the native arrow is hidden). */
+.select-chevron {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2362615c' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center; background-size: 12px 12px;
+}
 
-/* Motion. Transform and opacity only; content is visible without it. */
-@keyframes rise { from { opacity: 0; transform: translateY(20px); } }
+/* A hatched mark: diagonal 1px lines in the border tone, for volume that is not the selected one. */
+.hatch {
+  background-color: var(--ds-border-loud);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath d='M-1 1 1-1M0 8 8 0M7 9 9 7' stroke='black' stroke-width='1.1'/%3E%3C/svg%3E") repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath d='M-1 1 1-1M0 8 8 0M7 9 9 7' stroke='black' stroke-width='1.1'/%3E%3C/svg%3E") repeat;
+}
+
+/* Motion. Feedback only (press, hover, a menu opening); nothing on a screen performs an entrance. */
+@keyframes pop { from { opacity: 0; transform: translateY(4px) scale(.98); } }
 @keyframes fade { from { opacity: 0; } }
-@keyframes shutter {
-  from { clip-path: inset(0 0 100% 0); }
-  to { clip-path: inset(0 0 0 0); }
-}
-@keyframes settle { from { transform: scale(1.12); } }
-@keyframes drift { from { transform: scale(1.04) translate3d(0, 0, 0); } to { transform: scale(1.1) translate3d(-1.5%, -1%, 0); } }
-@keyframes slot { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
-
-.rise { animation: rise .55s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms); }
-.fade-in { animation: fade .4s var(--ease) both; animation-delay: calc(var(--i, 0) * 70ms); }
-.shutter { animation: shutter 1.1s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 90ms); }
-.shutter > img { animation: settle 1.4s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 90ms); }
-.drift { animation: drift 24s var(--ease) infinite alternate; }
-.blink { animation: slot 2s steps(1) infinite; }
-@keyframes grow-y { from { transform: scaleY(0); } }
-@keyframes grow-x { from { transform: scaleX(0); } }
-.bar { transform-origin: bottom; animation: grow-y .7s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 30ms); }
-.grow-x { transform-origin: left; animation: grow-x .8s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 60ms); }
+@keyframes slot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.pop { animation: pop .18s var(--ease-out) both; }
+.fade-in { animation: fade .18s var(--ease) both; }
+.blink { animation: slot 1.6s var(--ease) infinite; }
 
 /* Atlas. A node something is happening to pulses; a cell that does not exist is hatched, so it
    reads as "missing" and not as "empty". The map takes the board's tokens. */
 @keyframes atlas-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .atlas-pulse { animation: atlas-pulse 1.4s var(--ease) infinite; }
 .atlas-live { position: relative; }
-.atlas-live::after { content: ""; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 2px var(--ds-running); animation: atlas-pulse 1.4s var(--ease) infinite; }
+.atlas-live::after { content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; box-shadow: inset 0 0 0 2px var(--ds-running); animation: atlas-pulse 1.4s var(--ease) infinite; }
 .atlas-live-down::after { box-shadow: inset 0 0 0 2px var(--ds-danger); }
-.atlas-hatch { background-image: repeating-linear-gradient(135deg, var(--ds-border-subtle) 0 1px, transparent 1px 9px); box-shadow: inset 0 0 0 1px var(--ds-border-subtle); }
-.atlas-hatch-loud { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ds-danger) 55%, transparent) 0 1.5px, transparent 1.5px 8px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ds-danger) 45%, transparent); }
+.atlas-hatch { background-image: repeating-linear-gradient(135deg, var(--ds-border-default) 0 1px, transparent 1px 9px); box-shadow: inset 0 0 0 1px var(--ds-border-default); } /* taste-skill-ignore: a data mark (a cell that does not exist), not a fill */
+.atlas-hatch-loud { background-image: repeating-linear-gradient(135deg, color-mix(in srgb, var(--ds-danger) 45%, transparent) 0 1.5px, transparent 1.5px 8px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ds-danger) 40%, transparent); } /* taste-skill-ignore: a data mark (a cell that does not exist), not a fill */
 .atlas-dashed { outline: 1.5px dashed var(--ds-border-loud); outline-offset: -3px; }
 .atlas-flow .react-flow {
-  --xy-background-color: var(--ds-bg-alt);
+  --xy-background-color: var(--ds-bg-well);
   --xy-edge-stroke: var(--ds-border-loud);
-  --xy-controls-button-background-color: var(--ds-bg-chip);
-  --xy-controls-button-background-color-hover: var(--ds-bg-active);
+  --xy-controls-button-background-color: var(--ds-bg-surface);
+  --xy-controls-button-background-color-hover: var(--ds-bg-hover);
   --xy-controls-button-color: var(--ds-fg-primary);
   --xy-controls-button-color-hover: var(--ds-fg-primary);
-  --xy-controls-button-border-color: var(--ds-bg-alt);
+  --xy-controls-button-border-color: var(--ds-border-default);
   --xy-controls-box-shadow: none;
 }
 .atlas-flow .react-flow__node { cursor: pointer; }
+.atlas-flow .react-flow__controls { border-radius: 12px; overflow: hidden; border: 1px solid var(--ds-border-default); }
 .atlas-flow .react-flow__controls-button { width: 36px; height: 36px; }
 
 @media (prefers-reduced-motion: reduce) {

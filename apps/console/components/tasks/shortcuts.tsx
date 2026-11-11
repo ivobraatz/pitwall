@@ -46,11 +46,11 @@ const KEYS: Array<[string, string]> = [
 export function ShortcutsHelp({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
     <Dialog open={open} onClose={onClose} title="Atalhos">
-      <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-2.5 text-[14px]">
+      <dl className="grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-2.5 text-[14px]">
         {KEYS.map(([k, v]) => (
           <React.Fragment key={k}>
-            <dt><kbd className="inline-flex h-7 min-w-7 items-center justify-center bg-chip px-2 font-semibold text-fg">{k}</kbd></dt>
-            <dd className="self-center text-fg-secondary">{v}</dd>
+            <dt><kbd className="rounded-md bg-well px-1.5 py-0.5 text-[12px]">{k}</kbd></dt>
+            <dd className="text-fg-secondary">{v}</dd>
           </React.Fragment>
         ))}
       </dl>

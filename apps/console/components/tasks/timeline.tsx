@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import type { TaskComment, TaskEvent } from '@/lib/api';
-import { Button, Textarea, dateTime, rel, cn } from '@/components/ui';
+import { Button, Dot, Textarea, dateTime, rel, cn } from '@/components/ui';
 import { IconRobot, STATUS_NAME } from './card';
 import { Markdown } from './markdown';
 
@@ -10,6 +10,8 @@ const FIELD_NAME: Record<string, string> = {
   title: 'título', body: 'corpo', priority: 'prioridade', labels: 'etiquetas', product: 'sistema',
   dueDate: 'prazo', assignee: 'responsável', checklist: 'checklist', links: 'links',
 };
+
+const EVENT_TONE: Record<string, string> = { moved: 'info', blocked: 'error', archived: 'warn', unarchived: 'ok' };
 
 function eventText(e: TaskEvent): string {
   const d = e.data ?? {};
@@ -51,25 +53,28 @@ export function Timeline({ comments, events, onComment, sending }: {
 
   return (
     <div>
-      <ol className="flex flex-col gap-1">
+      <ol className="flex flex-col gap-3">
         {rows.map((r) => r.comment ? (
-          <li key={r.key} className={cn('px-3 py-2.5', r.comment.source === 'claude' ? 'bg-accent-bg' : 'bg-well')}>
-            <div className="mb-1 flex items-center gap-2 text-[13px] text-fg-muted">
+          <li key={r.key} className="rounded-tile bg-well px-4 py-3">
+            <div className="mb-1.5 flex items-center gap-2 text-[13px] text-fg-muted">
               <Who name={r.comment.authorName} source={r.comment.source} />
               <span title={dateTime(r.at)}>{rel(r.at)}</span>
             </div>
             <Markdown>{r.comment.body}</Markdown>
           </li>
         ) : (
-          <li key={r.key} className="flex flex-col gap-1 px-3 py-1.5 text-[13px] text-fg-muted">
-            <span><Who name={r.event!.actorName} source={r.event!.source} /> {eventText(r.event!)} · <span title={dateTime(r.at)}>{rel(r.at)}</span></span>
-            {r.event!.kind === 'blocked' && r.event!.data?.note && (
-              <span className="bg-danger/12 px-2 py-1 whitespace-pre-wrap text-fg-secondary">{r.event!.data.note}</span>
-            )}
+          <li key={r.key} className="flex items-start gap-3 text-[13px] text-fg-muted">
+            <span className="mt-[6px] shrink-0"><Dot tone={EVENT_TONE[r.event!.kind] ?? 'idle'} className="size-[7px]" /></span>
+            <div className="flex min-w-0 flex-col gap-1">
+              <span><Who name={r.event!.actorName} source={r.event!.source} /> {eventText(r.event!)} · <span title={dateTime(r.at)}>{rel(r.at)}</span></span>
+              {r.event!.kind === 'blocked' && r.event!.data?.note && (
+                <span className="rounded-lg bg-danger/10 px-2.5 py-1.5 whitespace-pre-wrap text-fg-secondary">{r.event!.data.note}</span>
+              )}
+            </div>
           </li>
         ))}
       </ol>
-      <div className="mt-3">
+      <div className="mt-4">
         <Textarea rows={3} value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000}
           placeholder="Comentar: o que você viu, o que testou (markdown)" aria-label="Comentário"
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void send(); } }} />

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Product, type ProductKey, type ProductSettings, type StaffMember, type WebhookDelivery } from '@/lib/api';
@@ -72,25 +73,28 @@ export default function ProductPage() {
   const p = q.data.product;
   const s = form.settings;
   const setS = (patch: Partial<ProductSettings>) => setForm({ ...form, settings: { ...s, ...patch } });
+  // Every card with fields saves the whole form: one PATCH, the same as before the regrouping.
+  const saveButton = admin && (
+    <div className="flex justify-end gap-2 px-5 pb-5">
+      <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>Salvar</Button>
+    </div>
+  );
 
   return (
     <>
       <PageHeader
-        title={<span className="flex items-center gap-4"><ProductMark product={{ ...p, color: form.color }} size={52} />{p.name}</span>}
+        back={<Link href="/products" className="hover:text-fg">← Sistemas</Link>}
+        title={<span className="inline-flex items-center gap-3"><ProductMark product={{ ...p, color: form.color }} size={32} />{p.name}</span>}
         subtitle={<span><span className="text-fg-secondary">{p.slug}</span>{p.owner && <> · responsável {p.owner.name}</>}{p.disabledAt && ' · desativado'}</span>}
-        actions={admin && (
-          <>
-            <Button variant={p.disabledAt ? 'secondary' : 'danger'} onClick={() => toggle.mutate(!p.disabledAt)}>{p.disabledAt ? 'Reativar' : 'Desativar'}</Button>
-            <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>Salvar</Button>
-          </>
-        )}
       />
-      <div className="grid gap-2 xl:grid-cols-2">
-        <div className="flex flex-col gap-2">
-          <Card title="Identidade" className="rise">
-            <fieldset disabled={!admin} className="flex flex-col gap-5 px-5 pt-2 pb-6">
+      <div className="grid items-start gap-3 lg:grid-cols-2">
+        <div className="flex flex-col gap-3">
+          <Card title="Identidade" subtitle="Como o sistema aparece na fila, nos erros e nas novidades.">
+            <fieldset disabled={!admin} className="flex flex-col gap-4 px-5 pt-1">
+              <Field label="Nome"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+              <Field label="O que é" hint="Contexto para o redator das novidades."><Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
               <div className="flex flex-col gap-1.5">
-                <span className="text-[14px] font-semibold text-fg-secondary">Logo</span>
+                <span className="text-[13px] font-semibold text-fg-secondary">Logo</span>
                 <div className="flex items-center gap-5">
                   <ProductMark product={{ ...p, color: form.color }} size={88} />
                   <div className="flex flex-col gap-2">
@@ -107,79 +111,106 @@ export default function ProductPage() {
                 </div>
               </div>
               <div className="flex flex-col gap-1.5">
-                <span className="text-[14px] font-semibold text-fg-secondary">Cor</span>
+                <span className="text-[13px] font-semibold text-fg-secondary">Cor</span>
                 <ColorPicker value={form.color} slug={p.slug} onChange={(color) => setForm({ ...form, color })} disabled={!admin} />
-                <span className="text-[13px] leading-[1.45] text-fg-muted">A faixa do sistema na fila, nos erros e nas novidades.</span>
+                <span className="text-[13px] leading-[1.45] text-fg-muted">A cor do selo do sistema na fila, nos erros e nas novidades.</span>
               </div>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Endereço do sistema"><Input code type="url" value={form.websiteUrl} placeholder="https://acme.example" onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} /></Field>
-                <Field label="Responsável" hint="Quem a equipe procura primeiro.">
-                  <Select value={form.ownerId} onChange={(e) => setForm({ ...form, ownerId: e.target.value })} className="w-full"
-                    options={[{ value: '', label: 'Ninguém' }, ...(team.data ?? []).filter((m) => !m.disabled || m.id === form.ownerId).map((m) => ({ value: m.id, label: m.name }))]} />
-                </Field>
+              <Field label="Responsável" hint="Quem a equipe procura primeiro.">
+                <Select value={form.ownerId} onChange={(e) => setForm({ ...form, ownerId: e.target.value })} className="w-full"
+                  options={[{ value: '', label: 'Ninguém' }, ...(team.data ?? []).filter((m) => !m.disabled || m.id === form.ownerId).map((m) => ({ value: m.id, label: m.name }))]} />
+              </Field>
+            </fieldset>
+            {saveButton}
+          </Card>
+
+          <Card title="Atendimento e novidades" subtitle="Quem assina as respostas e como as novidades saem.">
+            <fieldset disabled={!admin} className="flex flex-col gap-4 px-5 pt-1">
+              <Field label="Nome da equipe para o cliente" hint="Quem assina as respostas. Padrão: o nome do sistema."><Input value={s.teamName ?? ''} onChange={(e) => setS({ teamName: e.target.value || null })} /></Field>
+              <Field label="Idiomas das novidades"><Input value={s.locales.join(', ')} onChange={(e) => setS({ locales: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></Field>
+              <div className="flex flex-col gap-3 text-[14px]">
+                <label className="flex items-center gap-2"><input type="checkbox" checked={s.autoPublishReleases} onChange={(e) => setS({ autoPublishReleases: e.target.checked })} /> Publicar novidades sozinho</label>
+                <label className="flex items-center gap-2"><input type="checkbox" checked={s.retroactiveRecording} onChange={(e) => setS({ retroactiveRecording: e.target.checked })} /> Gravação retroativa ligada por padrão</label>
               </div>
             </fieldset>
+            {saveButton}
           </Card>
-          <Card title="Geral" className="rise" style={{ '--i': 1 } as React.CSSProperties}>
-            <fieldset disabled={!admin} className="flex flex-col gap-5 px-5 pt-2 pb-6">
-              <Field label="Nome"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-              <Field label="O que é" hint="Contexto para o redator das novidades."><Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
-              <Field label="Nome da equipe para o cliente" hint="Quem assina as respostas. Padrão: o nome do sistema."><Input value={s.teamName ?? ''} onChange={(e) => setS({ teamName: e.target.value || null })} /></Field>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <Card title="Endereços e código" subtitle="Os links do chamado e os marcadores do código próprio nos erros.">
+            <fieldset disabled={!admin} className="flex flex-col gap-4 px-5 pt-1">
+              <Field label="Endereço do sistema"><Input code type="url" value={form.websiteUrl} placeholder="https://acme.example" onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} /></Field>
               <Field label="Tela do chamado no sistema" hint="Para o link “ver no sistema”. Use {id}."><Input code value={s.customerTicketUrl ?? ''} placeholder="https://app.exemplo.com/support/view?id={id}" onChange={(e) => setS({ customerTicketUrl: e.target.value || null })} /></Field>
               <Field label="Marcadores do código próprio (stack trace)" hint="Um por linha. Ex.: Acme. ou /apps/api/src/ — a assinatura do erro usa o primeiro frame que bate.">
                 <Textarea rows={3} code value={s.ownFramePrefixes.join('\n')} onChange={(e) => setS({ ownFramePrefixes: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) })} /></Field>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field label="Idiomas das novidades"><Input value={s.locales.join(', ')} onChange={(e) => setS({ locales: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} /></Field>
-                <div className="flex flex-col justify-end gap-3 text-[14px]">
-                  <label className="flex items-center gap-2"><input type="checkbox" checked={s.autoPublishReleases} onChange={(e) => setS({ autoPublishReleases: e.target.checked })} /> Publicar novidades sozinho</label>
-                  <label className="flex items-center gap-2"><input type="checkbox" checked={s.retroactiveRecording} onChange={(e) => setS({ retroactiveRecording: e.target.checked })} /> Gravação retroativa ligada por padrão</label>
-                </div>
-              </div>
             </fieldset>
+            {saveButton}
           </Card>
-        </div>
 
-        <div className="flex flex-col gap-2">
-          <Card title="Chaves" className="rise" style={{ '--i': 1 } as React.CSSProperties} actions={admin && <Button size="sm" onClick={() => setKeyForm({ name: '', scopes: ['support', 'errors'] })}>Nova chave</Button>}>
+          <Card title="Chaves" subtitle="O backend usa uma com support e errors; o CI, uma com releases."
+            actions={admin && <Button size="sm" onClick={() => setKeyForm({ name: '', scopes: ['support', 'errors'] })}>Nova chave</Button>}>
             {q.data.keys.length === 0 ? <p className="px-5 pb-5 text-[14px] text-fg-muted">Nenhuma chave. O backend precisa de uma com support + errors; o CI, de uma com releases.</p>
-              : q.data.keys.map((k) => (
-                <div key={k.id} className={cn('mx-2 mb-1 flex items-center gap-3 bg-well px-3 py-3 text-[14px] last:mb-2', k.revokedAt && 'opacity-50')}>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-fg">{k.name}</div>
-                    <div className="mt-0.5 text-[13px] text-fg-muted"><code>{k.prefix}…</code> · {k.scopes.join(' + ')} · usada {rel(k.lastUsedAt)}</div>
-                  </div>
-                  {k.revokedAt ? <Pill>revogada</Pill> : admin && <Button size="sm" variant="danger" onClick={() => { if (confirm(`Revogar a chave “${k.name}”? O que usa ela para de funcionar em até um minuto.`)) revoke.mutate(k.id); }}>Revogar</Button>}
+              : (
+                <div className="flex flex-col divide-y divide-border-subtle px-3 pb-3">
+                  {q.data.keys.map((k) => (
+                    <div key={k.id} className={cn('-mx-2 flex min-h-[56px] items-center gap-4 rounded-tile px-2 py-3 transition-colors duration-150 hover:bg-hover', k.revokedAt && 'opacity-50')}>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[14px] font-medium text-fg">{k.name}</div>
+                        <div className="mt-0.5 truncate text-[13px] text-fg-muted"><code>{k.prefix}…</code> · {k.scopes.join(' + ')} · usada {rel(k.lastUsedAt)}</div>
+                      </div>
+                      {k.revokedAt ? <Pill>revogada</Pill> : admin && <Button size="sm" variant="danger" onClick={() => { if (confirm(`Revogar a chave “${k.name}”? O que usa ela para de funcionar em até um minuto.`)) revoke.mutate(k.id); }}>Revogar</Button>}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
           </Card>
 
-          <Card title="Webhook" className="rise" style={{ '--i': 2 } as React.CSSProperties} actions={admin && (
-            <>
-              <Button size="sm" onClick={() => rotate.mutate()}>{p.hasWebhookSecret ? 'Trocar segredo' : 'Gerar segredo'}</Button>
-              <Button size="sm" onClick={() => ping.mutate()} disabled={!p.webhookUrl || !p.hasWebhookSecret}>Testar</Button>
-            </>
-          )}>
-            <div className="flex flex-col gap-3 px-5 pt-2 pb-4">
+          <Card title="Webhook" subtitle="O que o Pitwall envia ao backend do sistema, assinado com HMAC."
+            actions={admin && (
+              <>
+                <Button size="sm" onClick={() => rotate.mutate()}>{p.hasWebhookSecret ? 'Trocar segredo' : 'Gerar segredo'}</Button>
+                <Button size="sm" onClick={() => ping.mutate()} disabled={!p.webhookUrl || !p.hasWebhookSecret}>Testar</Button>
+              </>
+            )}>
+            <fieldset disabled={!admin} className="flex flex-col gap-4 px-5 pt-1">
               <Field label="URL" hint="Para onde vão ticket.created, ticket.replied, ticket.status_changed e release.published, assinados com HMAC.">
-                <Input disabled={!admin} code value={form.webhookUrl} placeholder="https://api.exemplo.com/api/v1/webhooks/pitwall" onChange={(e) => setForm({ ...form, webhookUrl: e.target.value })} />
+                <Input code value={form.webhookUrl} placeholder="https://api.exemplo.com/api/v1/webhooks/pitwall" onChange={(e) => setForm({ ...form, webhookUrl: e.target.value })} />
               </Field>
               <div className="text-[13px] text-fg-muted">Segredo: {p.hasWebhookSecret ? 'configurado' : <span className="text-warning">não gerado</span>}</div>
-            </div>
-            <div className="pb-3">
-              <p className="px-5 pt-2 pb-2 text-[14px] font-semibold text-fg-secondary">Entregas recentes</p>
-              {(deliveries.data ?? []).length === 0 ? <p className="px-5 pb-3 text-[14px] text-fg-muted">Nenhuma ainda.</p> : deliveries.data!.slice(0, 15).map((d) => (
-                <div key={d.id} className="flex items-center gap-3 px-5 py-1.5 text-[13px]">
-                  <Pill tone={d.status === 'delivered' ? 'ok' : d.status === 'failed' ? 'error' : 'warn'}>{d.status === 'delivered' ? 'entregue' : d.status === 'failed' ? 'falhou' : 'pendente'}</Pill>
-                  <code className="text-fg">{d.event}</code>
-                  <span className="truncate text-fg-subtle" title={d.lastError ?? ''}>{d.lastError ?? (d.lastStatusCode ? `HTTP ${d.lastStatusCode}` : '')}</span>
-                  <span className="ml-auto shrink-0 tabular-nums text-fg-subtle">{d.attempts}× · {dateTime(d.createdAt)}</span>
-                  {d.status === 'failed' && admin && <Button size="sm" variant="ghost" onClick={() => retry.mutate(d.id)}>reenviar</Button>}
+            </fieldset>
+            <div className="mt-5 px-5">
+              <p className="mb-1 text-[13px] font-medium text-fg-muted">Entregas recentes</p>
+              {(deliveries.data ?? []).length === 0 ? <p className="py-2 text-[14px] text-fg-muted">Nenhuma ainda.</p> : (
+                <div className="flex flex-col divide-y divide-border-subtle">
+                  {deliveries.data!.slice(0, 15).map((d) => (
+                    <div key={d.id} className="flex flex-wrap items-center gap-3 py-2.5 text-[13px]">
+                      <Pill tone={d.status === 'delivered' ? 'ok' : d.status === 'failed' ? 'error' : 'warn'}>{d.status === 'delivered' ? 'entregue' : d.status === 'failed' ? 'falhou' : 'pendente'}</Pill>
+                      <code className="text-fg">{d.event}</code>
+                      <span className="min-w-0 truncate text-fg-subtle" title={d.lastError ?? ''}>{d.lastError ?? (d.lastStatusCode ? `HTTP ${d.lastStatusCode}` : '')}</span>
+                      <span className="ml-auto shrink-0 tabular-nums text-fg-subtle">{d.attempts}× · {dateTime(d.createdAt)}</span>
+                      {d.status === 'failed' && admin && <Button size="sm" variant="ghost" onClick={() => retry.mutate(d.id)}>reenviar</Button>}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
+            {saveButton}
           </Card>
         </div>
       </div>
+
+      {admin && (
+        <Card className="mt-3" title={p.disabledAt ? 'Reativar o sistema' : 'Desativar o sistema'}>
+          <div className="flex flex-wrap items-center justify-between gap-4 px-5 pt-1 pb-5">
+            <p className="max-w-xl text-[13px] leading-[1.5] text-fg-muted">
+              {p.disabledAt
+                ? 'O sistema deixa de estar marcado como desativado.'
+                : 'O sistema fica marcado como desativado. Dá para reativar depois, nesta mesma tela.'}
+            </p>
+            <Button variant={p.disabledAt ? 'secondary' : 'danger'} onClick={() => toggle.mutate(!p.disabledAt)}>{p.disabledAt ? 'Reativar' : 'Desativar'}</Button>
+          </div>
+        </Card>
+      )}
 
       {keyForm && (
         <Dialog open onClose={() => setKeyForm(null)} title="Nova chave">
@@ -188,7 +219,7 @@ export default function ProductPage() {
             <div className="flex flex-col gap-1">
               <span className="mb-1 text-[13px] font-semibold text-fg-secondary">Escopos</span>
               {SCOPES.map((sc) => (
-                <label key={sc.id} className="flex cursor-pointer items-center gap-3 bg-well px-3 py-2.5 text-[14px] hover:bg-hover">
+                <label key={sc.id} className="flex cursor-pointer items-center gap-3 rounded-tile bg-well px-3 py-2.5 text-[14px] hover:bg-hover">
                   <input type="checkbox" checked={keyForm.scopes.includes(sc.id)} onChange={(e) => setKeyForm({ ...keyForm, scopes: e.target.checked ? [...keyForm.scopes, sc.id] : keyForm.scopes.filter((x) => x !== sc.id) })} />
                   <code className="text-fg">{sc.label}</code><span className="text-fg-muted">{sc.hint}</span>
                 </label>

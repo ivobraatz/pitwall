@@ -19,7 +19,11 @@ function Player({ events, diagnostics }: { events: unknown[]; diagnostics: Diagn
     el.diagnostics = diagnostics;
     el.events = events;
   }, [ready, events, diagnostics]);
-  return React.createElement('pitwall-player', { ref, style: { height: '72vh', display: 'flex' } });
+  return (
+    <div className="overflow-hidden rounded-tile bg-well">
+      {React.createElement('pitwall-player', { ref, style: { height: '72vh', display: 'flex' } })}
+    </div>
+  );
 }
 
 async function unpack(blob: Blob, contentType: string): Promise<unknown[]> {
@@ -45,8 +49,8 @@ export function RecordingCard({ ticketId, attachment, fallback }: { ticketId: st
 
   return (
     <>
-      <div className="flex items-center gap-3 bg-surface py-2 pr-2 pl-3">
-        <span className="grid size-9 shrink-0 place-items-center bg-accent text-on-accent" aria-hidden><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7 4v16l13-8Z" /></svg></span>
+      <div className="flex items-center gap-3 rounded-tile bg-well p-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-btn text-btn-fg" aria-hidden><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7 4v16l13-8Z" /></svg></span>
         <div className="min-w-0 flex-1">
           <div className="text-[14px] font-semibold text-fg">{meta.mode === 'procedure' ? 'Gravação dos passos' : 'Gravação do que aconteceu antes'}</div>
           <div className="text-[13px] tabular-nums text-fg-muted">
@@ -73,7 +77,7 @@ export function ImageThumb({ ticketId, attachment }: { ticketId: string; attachm
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [ticketId, attachment.id]);
   return (
-    <a href={url ?? '#'} target="_blank" rel="noopener" className="block overflow-hidden bg-surface transition-opacity hover:opacity-85" title={attachment.name}>
+    <a href={url ?? '#'} target="_blank" rel="noopener" className="block overflow-hidden rounded-tile bg-well transition-opacity hover:opacity-85" title={attachment.name}>
       {url ? <img src={url} alt={attachment.name} className="h-24 w-36 object-cover" /> : <div className="grid h-24 w-36 place-items-center px-2 text-center text-[13px] text-fg-muted">{attachment.name}</div>}
     </a>
   );
@@ -90,9 +94,9 @@ export function VideoCard({ ticketId, attachment }: { ticketId: string; attachme
       .then(({ blob }) => setUrl(URL.createObjectURL(blob)))
       .catch(() => setState('error'));
   };
-  if (url) return <video src={url} controls autoPlay className="max-h-[60vh] w-full max-w-2xl bg-fg" title={attachment.name} />;
+  if (url) return <video src={url} controls autoPlay className="max-h-[60vh] w-full max-w-2xl overflow-hidden rounded-tile bg-fg" title={attachment.name} />;
   return (
-    <div className="flex items-center gap-3 bg-surface py-2 pr-2 pl-3">
+    <div className="flex items-center gap-3 rounded-tile bg-well p-3">
       <div className="min-w-0 flex-1">
         <div className="truncate text-[14px] font-semibold text-fg">{attachment.name}</div>
         <div className="text-[13px] tabular-nums text-fg-muted">{state === 'error' ? 'Não foi possível carregar o vídeo.' : `Vídeo · ${bytes(attachment.sizeBytes)}`}</div>
@@ -104,7 +108,7 @@ export function VideoCard({ ticketId, attachment }: { ticketId: string; attachme
 
 export function FileChip({ ticketId, attachment }: { ticketId: string; attachment: Attachment }) {
   return (
-    <a href={`/v1/staff/tickets/${ticketId}/attachments/${attachment.id}?download=true`} className="flex h-9 items-center gap-2 bg-surface px-3 text-[13px] transition-colors hover:bg-hover">
+    <a href={`/v1/staff/tickets/${ticketId}/attachments/${attachment.id}?download=true`} className="flex h-9 items-center gap-2 rounded-full bg-well px-3.5 text-[13px] transition-colors duration-150 hover:bg-hover">
       <span className="max-w-48 truncate">{attachment.name}</span><span className="tabular-nums text-fg-muted">{bytes(attachment.sizeBytes)}</span>
     </a>
   );
