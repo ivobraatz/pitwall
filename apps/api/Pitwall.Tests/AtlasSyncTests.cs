@@ -712,7 +712,7 @@ public class AtlasSyncTests(AtlasSyncFixture fx) : IClassFixture<AtlasSyncFixtur
             Assert.All(rows, r =>
             {
                 Assert.Equal("sync", r.Source);
-                Assert.Equal("Ana (Claude)", r.Actor);
+                Assert.Equal("Ana (agente)", r.Actor);
             });
             Assert.Contains(rows, r => r.Op == "created" && r.EntityType == "service");
             return 0;

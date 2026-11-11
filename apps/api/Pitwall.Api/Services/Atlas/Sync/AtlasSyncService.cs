@@ -18,6 +18,24 @@ namespace Pitwall.Services.Atlas.Sync;
 public sealed class AtlasSyncService(PitwallDb db, AtlasWriter writer, AtlasActor actor, IAtlasSnapshotTrigger snapshots)
 {
     public const string GitHubScanSource = "github-scan";
+
+    /// <summary>
+    /// A token reads as "Name (Claude)" elsewhere, but a sync says which tool sent it: the CLI, the CI or a
+    /// git hook also use a token, and the history should not credit them to Claude.
+    /// </summary>
+    public static string ActorName(string name, string source, string? tool)
+    {
+        const string claude = " (Claude)";
+        if (!name.EndsWith(claude, StringComparison.Ordinal) || source == GitHubScanSource) return name;
+        var label = tool is { Length: > 0 } ? tool : source switch
+        {
+            "ci" => "CI",
+            "git-hook" => "git hook",
+            "cli" => "CLI",
+            _ => "agente",
+        };
+        return Clean.Cut($"{name[..^claude.Length]} ({label})", 120) ?? name;
+    }
     public static readonly string[] Sources = ["agent", "ci", "git-hook", "cli", GitHubScanSource];
     public static readonly string[] Scopes = ["local", "pushed", "deployed"];
 
@@ -236,6 +254,7 @@ public sealed class AtlasSyncService(PitwallDb db, AtlasWriter writer, AtlasActo
         // The history names this sync and its change set; the interceptor writes the rows when the unit of work is saved.
         actor.Source = "sync";
         actor.ChangeSetId = changeSetId;
+        actor.Name = ActorName(actor.Name, p.Source, p.Tool);
 
         var reconciler = new AtlasReconciler(db, writer, new SyncContext(product, p.Repo, p.Scope, p.Environment, p.CommitSha, changeSetId, now));
         await reconciler.LoadAsync(ct);

@@ -458,6 +458,8 @@ Se `component` for o nome de um serviço cadastrado do sistema, ele pulsa no map
 
 - **Mudanças** (`atlas_changes`): o que foi criado, alterado, retirado, restaurado, renomeado ou apagado, com
   quem (`Actor`), de onde (`console`, `mcp`, `import`, `collector`, `sync`, `system`) e os campos antes e depois.
+  Pelo MCP, quem aparece como `Nome (Claude)`; num sync, com a ferramenta que enviou: `Nome (CLI)`, `Nome (CI)`,
+  `Nome (git hook)` ou o `tool` informado (`Nome (claude-code)`).
   Não entram campos de observação (estado de monitor, último deploy, commit, horários de verificação, contagens do
   GitHub), para o histórico não virar ruído a cada coleta. Leitura: `GET /v1/staff/atlas/changes`.
 - **Changesets** (`atlas_changesets`): cada envio do sync, com repositório, branch, commit, escopo, ambiente,
