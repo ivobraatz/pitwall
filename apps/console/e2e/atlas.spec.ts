@@ -380,6 +380,7 @@ test('suppliers cross provider and system, shared services in their own column',
 test('the map has a legend for the link kinds', async ({ page }) => {
   await serve(page, FULL);
   await page.goto('/atlas?system=acme');
+  await page.getByRole('button', { name: 'Legenda', exact: true }).click();
   await expect(page.getByTestId('atlas-graph-legend')).toContainText('Infraestrutura');
   await expect(page.getByTestId('atlas-graph-legend')).toContainText('Planejada');
   await expectNoSidewaysScroll(page);

@@ -7,6 +7,9 @@ const PORT = 3211;
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
+  // The dev server compiles on first visit and shares the CPU with the other project; 5 s was too tight for a
+  // long flow like the onboarding (the assertions still fail fast when a screen is really wrong).
+  expect: { timeout: 10_000 },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
