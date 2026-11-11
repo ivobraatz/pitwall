@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -14,13 +15,19 @@ namespace Pitwall.Services.Atlas;
  * token from the environment and writes what it saw onto the services and repositories the team
  * registered. What it sees and nobody registered becomes a discovery. A collector without its
  * token is "not connected" and does nothing.
+ *
+ * A run either lands whole or not at all: the collector saves once, at the end, so a provider that
+ * fails halfway leaves the last good state (and the last verification) in place. Only a complete
+ * listing may say that something is missing.
  */
 
 public interface IAtlasCollector
 {
     string Name { get; }
     bool Configured { get; }
-    Task CollectAsync(PitwallDb db, CancellationToken ct);
+
+    /// <summary>Reads the provider and writes what it saw. Returns how many items it saw. A throw means nothing of this run is saved.</summary>
+    Task<int> CollectAsync(PitwallDb db, CancellationToken ct);
 }
 
 /// <summary>What each collector did last, kept in memory: the next run is at most an hour away.</summary>
@@ -49,25 +56,46 @@ public sealed class AtlasCollectorRunner(
         {
             foreach (var collector in Collectors.Where(c => c.Configured))
             {
+                var at = DateTime.UtcNow;
                 try
                 {
-                    using var scope = scopes.CreateScope();
-                    // What a collector writes is history under the collector's name, not "Sistema".
-                    var actor = scope.ServiceProvider.GetRequiredService<AtlasActor>();
-                    actor.Name = collector.Name;
-                    actor.Source = "collector";
-                    await collector.CollectAsync(scope.ServiceProvider.GetRequiredService<PitwallDb>(), ct);
+                    int seen;
+                    using (var scope = scopes.CreateScope())
+                    {
+                        // What a collector writes is history under the collector's name, not "Sistema".
+                        var actor = scope.ServiceProvider.GetRequiredService<AtlasActor>();
+                        actor.Name = collector.Name;
+                        actor.Source = "collector";
+                        seen = await collector.CollectAsync(scope.ServiceProvider.GetRequiredService<PitwallDb>(), ct);
+                    }
                     status.Set(collector.Name, null);
+                    await MarkRunAsync(collector.Name, at, seen, null, ct);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
                 {
                     // The message of an HTTP failure carries the status, never the token.
                     logger.LogWarning("Atlas collector {Name} failed: {Message}", collector.Name, ex.Message);
-                    status.Set(collector.Name, Clean.Cut(ex.Message, 300) ?? "Falhou.");
+                    var error = Clean.Cut(ex.Message, 300) ?? "Falhou.";
+                    status.Set(collector.Name, error);
+                    await MarkRunAsync(collector.Name, at, null, error, ct);
                 }
             }
         }
         finally { _one.Release(); }
+    }
+
+    /// <summary>The source's row after this run, in a context of its own: a failed run never takes its own record down with it.</summary>
+    private async Task MarkRunAsync(string name, DateTime at, int? seen, string? error, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = scopes.CreateScope();
+            await AtlasCollect.MarkRunAsync(scope.ServiceProvider.GetRequiredService<PitwallDb>(), name, at, seen, error, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogWarning("Could not record the run of Atlas source {Name}: {Message}", name, ex.Message);
+        }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -131,6 +159,18 @@ public static class AtlasCollect
         return e.ValueKind == JsonValueKind.String ? e.GetString() : null;
     }
 
+    /// <summary>A string or a number as text (GitHub's ids are numbers, Vercel's next page can be one).</summary>
+    public static string? Scalar(this JsonElement e, string key)
+    {
+        if (e.ValueKind != JsonValueKind.Object || !e.TryGetProperty(key, out var v)) return null;
+        return v.ValueKind switch
+        {
+            JsonValueKind.String => v.GetString(),
+            JsonValueKind.Number => v.GetRawText(),
+            _ => null,
+        };
+    }
+
     public static IEnumerable<JsonElement> Items(this JsonElement e, params string[] path)
     {
         foreach (var p in path)
@@ -141,8 +181,84 @@ public static class AtlasCollect
     }
 
     public static DateTime? Instant(string? iso) =>
-        DateTimeOffset.TryParse(iso, System.Globalization.CultureInfo.InvariantCulture,
-            System.Globalization.DateTimeStyles.AssumeUniversal, out var d) ? d.UtcDateTime : null;
+        DateTimeOffset.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d) ? d.UtcDateTime : null;
+
+    /// <summary>Writes what a run of a source saw. A failure keeps the last success and what it saw; nothing is deleted.</summary>
+    public static async Task MarkRunAsync(PitwallDb db, string name, DateTime at, int? itemsSeen, string? error, CancellationToken ct)
+    {
+        var row = db.AtlasSources.Local.FirstOrDefault(s => s.Name == name)
+            ?? await db.AtlasSources.FirstOrDefaultAsync(s => s.Name == name, ct);
+        if (row is null)
+        {
+            row = new AtlasSource { Name = name };
+            db.AtlasSources.Add(row);
+        }
+        row.LastRunAt = at;
+        row.UpdatedAt = at;
+        if (error is null)
+        {
+            row.LastOkAt = at;
+            row.ItemsSeen = itemsSeen;
+            row.LastError = null;
+        }
+        else row.LastError = Clean.Cut(error, 300);
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// The collector saw this service now: it is verified (VerifiedAt/VerifiedBy), and its evidence says where
+    /// the proof is. Returns the evidence, so the caller can tell which evidence it still sees.
+    /// </summary>
+    public static Task<AtlasEvidence> VerifyAsync(PitwallDb db, AtlasService s, string collector, string provider, string externalRef, DateTime now, CancellationToken ct)
+    {
+        s.VerifiedAt = now;
+        s.VerifiedBy = collector;
+        s.CheckedAt = now;
+        return AtlasEvidenceWriter.UpsertAsync(db, "service", s.Id, $"collector:{collector}", "api",
+            Clean.Cut($"{provider}:{externalRef}", 300)!, AtlasScopes.Runtime, now, ct: ct);
+    }
+
+    public static AtlasEvent NewEvent(string source, string type, AtlasService? service, string status, string title, DateTime at, string externalId) => new()
+    {
+        Id = Guid.NewGuid(), At = at, Source = source, Type = type, ProductId = service?.ProductId, ServiceId = service?.Id,
+        Status = status, Title = Clean.Cut(title, 300)!, ExternalId = Clean.Cut(externalId, 200),
+    };
+
+    /// <summary>A deploy the collector sees in a state worth a line: started, succeeded or failed. One per deploy and state.</summary>
+    public static async Task DeployEventAsync(PitwallDb db, string source, AtlasService s, string label, string? deployId, string? deployStatus, string? commitSha, DateTime at)
+    {
+        if (string.IsNullOrEmpty(deployId)) return;
+        string? type = deployStatus switch { "building" => "deploy.started", "success" => "deploy.succeeded", "failed" => "deploy.failed", _ => null };
+        if (type is null) return;
+        var status = type switch { "deploy.started" => "started", "deploy.succeeded" => "succeeded", _ => "failed" };
+        var words = type switch { "deploy.started" => "em andamento", "deploy.succeeded" => "concluído", _ => "falhou" };
+        var e = NewEvent(source, type, s, status, $"Deploy de {s.Name} ({label}): {words}", at, $"{deployId}:{status}");
+        e.CommitSha = Clean.Cut(commitSha, 64);
+        await AtlasEvents.RecordAsync(db, e);
+    }
+
+    /// <summary>
+    /// Sets MissingSince on each candidate the complete listing did not show, and clears it on those it shows
+    /// again, with one event for each change. Callers pass it only after a listing that finished.
+    /// </summary>
+    public static async Task ApplyPresenceAsync(PitwallDb db, string source, string label, IEnumerable<AtlasService> candidates, Func<AtlasService, bool> seen, DateTime now)
+    {
+        var minute = now.ToString("yyyyMMddHHmm", CultureInfo.InvariantCulture);
+        foreach (var s in candidates)
+        {
+            if (seen(s))
+            {
+                if (s.MissingSince is null) continue;
+                s.MissingSince = null;
+                await AtlasEvents.RecordAsync(db, NewEvent(source, "resource.found", s, "info", $"{s.Name} voltou a aparecer no {label}", now, $"{s.Id:N}:found:{minute}"));
+            }
+            else if (s.MissingSince is null)
+            {
+                s.MissingSince = now;
+                await AtlasEvents.RecordAsync(db, NewEvent(source, "resource.missing", s, "info", $"{s.Name} não aparece mais no {label}", now, $"{s.Id:N}:missing:{minute}"));
+            }
+        }
+    }
 }
 
 /// <summary>Railway: every service of every project, per environment, with its latest deployment.</summary>
@@ -178,10 +294,15 @@ public sealed class RailwayCollector(HttpClient http, string? token, string? wor
         _ => null,
     };
 
-    public async Task CollectAsync(PitwallDb db, CancellationToken ct)
+    /// <summary>The key of a service in one environment, as the listing names it.</summary>
+    private static string PairKey(string? reference, string? envSlug) => $"{reference}|{envSlug}".ToLowerInvariant();
+
+    public async Task<int> CollectAsync(PitwallDb db, CancellationToken ct)
     {
         var services = await db.AtlasServices.Include(s => s.Environment).Where(s => s.RetiredAt == null && s.Provider == "railway").ToListAsync(ct);
         var unmatched = new List<AtlasCollect.Found>();
+        var evidence = new List<Guid>();
+        var seenPairs = new HashSet<string>(StringComparer.Ordinal);
         var now = DateTime.UtcNow;
 
         var args = string.IsNullOrWhiteSpace(workspaceId) ? "" : $"(workspaceId: {Id(workspaceId)})";
@@ -195,6 +316,8 @@ public sealed class RailwayCollector(HttpClient http, string? token, string? wor
             var pairs = (from s in shape.Items("project", "services", "edges").Select(e => e.GetProperty("node"))
                          from e in shape.Items("project", "environments", "edges").Select(e => e.GetProperty("node"))
                          select (Service: s, Env: e)).ToList();
+            // Every pair the listing shows is seen, deployed or not: a service that exists is not missing.
+            foreach (var p in pairs) seenPairs.Add(PairKey($"{projectName}/{p.Service.Str("name")}", AtlasCollect.EnvSlug(p.Env.Str("name"))));
 
             // The latest deployment of each service in each environment, a batch of aliases per request.
             foreach (var chunk in pairs.Chunk(20))
@@ -209,46 +332,49 @@ public sealed class RailwayCollector(HttpClient http, string? token, string? wor
                     if (deployment.ValueKind != JsonValueKind.Object) continue; // the service does not run in that environment
                     var reference = $"{projectName}/{chunk[i].Service.Str("name")}";
                     var envName = chunk[i].Env.Str("name");
+                    var envSlug = AtlasCollect.EnvSlug(envName);
                     var status = Status(deployment.Str("status"));
                     var mine = services.Where(s => AtlasCollect.Same(s.ExternalRef, reference)
-                                                   && AtlasCollect.Same(s.Environment?.Slug, AtlasCollect.EnvSlug(envName))).ToList();
+                                                   && AtlasCollect.Same(s.Environment?.Slug, envSlug)).ToList();
                     if (mine.Count == 0)
                     {
                         if (status != "removed") unmatched.Add(new($"{reference}@{envName}", reference, envName));
                         continue;
                     }
+                    var deployedAt = AtlasCollect.Instant(deployment.Str("createdAt"));
                     foreach (var s in mine)
                     {
+                        evidence.Add((await AtlasCollect.VerifyAsync(db, s, Name, "railway", $"{reference}@{envSlug}", now, ct)).Id);
                         s.DeployStatus = status;
-                        s.LastDeployAt = AtlasCollect.Instant(deployment.Str("createdAt"));
+                        s.LastDeployAt = deployedAt;
                         s.CommitSha = Clean.Cut(deployment.Str("meta", "commitHash"), 64);
-                        s.CheckedAt = now;
+                        await AtlasCollect.DeployEventAsync(db, Name, s, "Railway", deployment.Str("id"), status, s.CommitSha, deployedAt ?? now);
                     }
                 }
             }
         }
+
         await AtlasCollect.SyncDiscoveriesAsync(db, Name, "service", unmatched, ct);
+        // The listing finished, so a service whose pair did not show is missing.
+        await AtlasCollect.ApplyPresenceAsync(db, Name, "Railway",
+            services.Where(s => s.ExternalRef is not null && s.Environment is not null),
+            s => seenPairs.Contains(PairKey(s.ExternalRef, s.Environment!.Slug)), now);
+        await AtlasEvidenceWriter.MarkGoneAsync(db, $"collector:{Name}", evidence, now, ct);
         await db.SaveChangesAsync(ct);
+        return seenPairs.Count;
     }
 }
 
-/// <summary>GitHub: the last pipeline run, a week of commits and runs, and open dependency alerts of each repository.</summary>
+/// <summary>GitHub: repositories (listed by the App or the token), each one's metadata, last pipeline run, a week of activity and open alerts.</summary>
 public sealed class GitHubCollector(HttpClient http, IAtlasGitHubAuth auth) : IAtlasCollector
 {
     public const string Api = "https://api.github.com";
+    public const string ArchivedFact = "github:archived";
     public string Name => "github";
     public bool Configured => auth.Configured;
 
     // The token is asked for on every request: whatever the auth holds decides how long it lives.
-    private async Task<HttpRequestMessage> GetAsync(CancellationToken ct, string path)
-    {
-        var req = new HttpRequestMessage(HttpMethod.Get, Api + path);
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await auth.TokenAsync(ct));
-        req.Headers.UserAgent.ParseAdd("Pitwall-Atlas/1.0");
-        req.Headers.Accept.ParseAdd("application/vnd.github+json");
-        req.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
-        return req;
-    }
+    private Task<HttpRequestMessage> GetAsync(CancellationToken ct, string path) => GitHubApi.GetAsync(auth, path, ct);
 
     public static string RunStatus(string? status, string? conclusion) => (status, conclusion) switch
     {
@@ -259,24 +385,99 @@ public sealed class GitHubCollector(HttpClient http, IAtlasGitHubAuth auth) : IA
         _ => "running",
     };
 
-    public async Task CollectAsync(PitwallDb db, CancellationToken ct)
+    /// <summary>The event of a pipeline run in one of its states. The id of the run makes it the same event from the poll and from the webhook.</summary>
+    public static AtlasEvent? CiEvent(AtlasRepo repo, string? runId, string runStatus, string? runName, string? url, string? sha, DateTime at)
     {
-        var repos = await db.AtlasRepos.Where(r => r.RetiredAt == null).ToListAsync(ct);
+        if (runId is null) return null;
+        string? type = runStatus switch { "running" => "ci.started", "success" => "ci.succeeded", "failure" => "ci.failed", _ => null };
+        if (type is null) return null;
+        var status = type switch { "ci.started" => "started", "ci.succeeded" => "succeeded", _ => "failed" };
+        var words = type switch { "ci.started" => "em andamento", "ci.succeeded" => "passou", _ => "falhou" };
+        var e = AtlasCollect.NewEvent("github", type, null, status, $"CI {runName ?? "pipeline"} em {repo.FullName}: {words}", at, $"run:{runId}:{runStatus}");
+        e.ProductId = repo.ProductId;
+        e.RepoId = repo.Id;
+        e.Url = Clean.Cut(url, 500);
+        e.CommitSha = Clean.Cut(sha, 64);
+        return e;
+    }
+
+    /// <summary>
+    /// The repository's stack after a read: languages (their share of the code) and the archived flag replace
+    /// the old ones; every other fact (the ones the scan wrote) stays as it is.
+    /// </summary>
+    public static List<AtlasFact> MergeStack(IEnumerable<AtlasFact> current, JsonElement languages, bool archived)
+    {
+        var kept = current.Where(f => !f.Key.StartsWith("language:", StringComparison.Ordinal) && f.Key != ArchivedFact).ToList();
+        if (languages.ValueKind == JsonValueKind.Object)
+        {
+            var sizes = languages.EnumerateObject()
+                .Select(p => (Name: p.Name, Bytes: p.Value.ValueKind == JsonValueKind.Number && p.Value.TryGetInt64(out var b) ? b : 0L))
+                .Where(x => x.Bytes > 0).OrderByDescending(x => x.Bytes).Take(8).ToList();
+            var total = sizes.Sum(x => x.Bytes);
+            foreach (var l in sizes)
+            {
+                var share = Math.Round(l.Bytes * 100.0 / total).ToString(CultureInfo.InvariantCulture);
+                kept.Add(new AtlasFact { Key = Clean.Cut("language:" + l.Name, 80)!, Value = share + "%" });
+            }
+        }
+        if (archived) kept.Add(new AtlasFact { Key = ArchivedFact, Value = "sim" });
+        return kept;
+    }
+
+    public async Task<int> CollectAsync(PitwallDb db, CancellationToken ct)
+    {
         var now = DateTime.UtcNow;
-        var since = now.AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ssZ");
+        var since = now.AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ssZ", CultureInfo.InvariantCulture);
+
+        // The listing comes first: a repository renamed on GitHub is found by its id, and its name is brought up
+        // to date before anything is read by name.
+        var listing = await GitHubRepoList.FetchAsync(http, auth, ct);
+        var repos = await db.AtlasRepos.Where(r => r.RetiredAt == null).ToListAsync(ct);
+        var evidence = new List<Guid>();
+        foreach (var item in listing)
+        {
+            var repo = repos.FirstOrDefault(r => r.ExternalId == item.Id)
+                ?? repos.FirstOrDefault(r => r.ExternalId == null && r.FullName == item.FullName);
+            if (repo is null) continue;
+            repo.ExternalId = item.Id;
+            repo.FullName = item.FullName;
+            evidence.Add((await AtlasEvidenceWriter.UpsertAsync(db, "repo", repo.Id, "collector:github", "api",
+                $"github:{repo.FullName}", AtlasScopes.Runtime, now, ct: ct)).Id);
+        }
+        await AtlasEvidenceWriter.MarkGoneAsync(db, "collector:github", evidence, now, ct);
+
         foreach (var repo in repos)
         {
+            try
+            {
+                var meta = await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, $"/repos/{repo.FullName}"), ct);
+                repo.DefaultBranch = Clean.Cut(meta.Str("default_branch"), 100) ?? repo.DefaultBranch;
+                repo.ExternalId = meta.Scalar("id") ?? repo.ExternalId;
+                var archived = meta.TryGetProperty("archived", out var a) && a.ValueKind == JsonValueKind.True;
+                var languages = await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, $"/repos/{repo.FullName}/languages"), ct);
+                repo.Stack = MergeStack(repo.Stack, languages, archived);
+                var pulls = await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, $"/repos/{repo.FullName}/pulls?state=open&per_page=100"), ct);
+                repo.OpenPullRequests = pulls.ValueKind == JsonValueKind.Array ? pulls.GetArrayLength() : null;
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)
+            {
+                // Gone, renamed, empty, or out of the token's reach: the row keeps what it had.
+            }
             try
             {
                 var runs = await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, $"/repos/{repo.FullName}/actions/runs?per_page=20"), ct);
                 var last = runs.Items("workflow_runs").FirstOrDefault(r => r.Str("event") != "pull_request");
                 if (last.ValueKind == JsonValueKind.Object)
                 {
+                    var runStatus = RunStatus(last.Str("status"), last.Str("conclusion"));
+                    var at = AtlasCollect.Instant(last.Str("created_at")) ?? now;
                     repo.LastRunName = Clean.Cut(last.Str("name"), 200);
-                    repo.LastRunStatus = RunStatus(last.Str("status"), last.Str("conclusion"));
-                    repo.LastRunAt = AtlasCollect.Instant(last.Str("created_at"));
+                    repo.LastRunStatus = runStatus;
+                    repo.LastRunAt = at;
                     repo.LastRunUrl = Clean.Cut(last.Str("html_url"), 500);
                     repo.LastRunSha = Clean.Cut(last.Str("head_sha"), 64);
+                    var ci = CiEvent(repo, last.Scalar("id"), runStatus, repo.LastRunName, repo.LastRunUrl, repo.LastRunSha, at);
+                    if (ci is not null) await AtlasEvents.RecordAsync(db, ci);
                 }
                 var week = Uri.EscapeDataString(">=" + since);
                 repo.Runs7d = Total(await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, $"/repos/{repo.FullName}/actions/runs?per_page=1&created={week}"), ct));
@@ -300,15 +501,12 @@ public sealed class GitHubCollector(HttpClient http, IAtlasGitHubAuth auth) : IA
             repo.CheckedAt = now;
         }
 
-        var mine = await AtlasCollect.GetJsonAsync(http, await GetAsync(ct, "/user/repos?affiliation=owner&sort=pushed&per_page=100"), ct);
-        var unmatched = (mine.ValueKind == JsonValueKind.Array ? mine.EnumerateArray().ToList() : [])
-            .Where(r => r.TryGetProperty("archived", out var a) && a.ValueKind == JsonValueKind.False
-                        && r.TryGetProperty("fork", out var f) && f.ValueKind == JsonValueKind.False)
-            .Select(r => (FullName: r.Str("full_name")?.ToLowerInvariant(), Url: r.Str("html_url")))
-            .Where(r => r.FullName is not null && repos.All(x => x.FullName != r.FullName))
-            .Select(r => new AtlasCollect.Found(r.FullName!, r.FullName!, null, r.Url)).ToList();
+        var unmatched = listing
+            .Where(r => !r.Archived && !r.Fork && repos.All(x => x.ExternalId != r.Id) && repos.All(x => x.FullName != r.FullName))
+            .Select(r => new AtlasCollect.Found(r.FullName, r.FullName, null, r.Url)).ToList();
         await AtlasCollect.SyncDiscoveriesAsync(db, Name, "repo", unmatched, ct);
         await db.SaveChangesAsync(ct);
+        return listing.Count;
     }
 
     private static int? Total(JsonElement e) => e.ValueKind == JsonValueKind.Object && e.TryGetProperty("total_count", out var n) && n.TryGetInt32(out var v) ? v : null;
@@ -336,7 +534,7 @@ public sealed partial class KumaCollector(HttpClient http, string? url, string? 
         return new Monitor(labels.GetValueOrDefault("monitor_name") ?? "", status, monitorUrl is null or "null" or "https://" ? null : monitorUrl);
     }).Where(m => m.Name.Length > 0).ToList();
 
-    public async Task CollectAsync(PitwallDb db, CancellationToken ct)
+    public async Task<int> CollectAsync(PitwallDb db, CancellationToken ct)
     {
         using var req = new HttpRequestMessage(HttpMethod.Get, url!.TrimEnd('/') + "/metrics");
         req.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes(":" + apiKey)));
@@ -347,16 +545,34 @@ public sealed partial class KumaCollector(HttpClient http, string? url, string? 
         var services = await db.AtlasServices.Where(s => s.RetiredAt == null && s.MonitorRef != null).ToListAsync(ct);
         var now = DateTime.UtcNow;
         var unmatched = new List<AtlasCollect.Found>();
+        var evidence = new List<Guid>();
         foreach (var m in monitors)
         {
             var mine = services.Where(s => AtlasCollect.Same(s.MonitorRef, m.Name)).ToList();
             if (mine.Count == 0) { unmatched.Add(new(m.Name, m.Name, null, m.Url)); continue; }
-            foreach (var s in mine) { s.MonitorStatus = m.Status; s.CheckedAt = now; }
+            foreach (var s in mine)
+            {
+                var previous = s.MonitorStatus;
+                s.MonitorStatus = m.Status;
+                evidence.Add((await AtlasCollect.VerifyAsync(db, s, Name, "kuma", m.Name, now, ct)).Id);
+                await MonitorEventAsync(db, s, m, previous, now);
+            }
         }
         // A monitor that was removed stops vouching for its service.
         foreach (var s in services.Where(s => monitors.All(m => !AtlasCollect.Same(s.MonitorRef, m.Name)))) s.MonitorStatus = null;
         await AtlasCollect.SyncDiscoveriesAsync(db, Name, "monitor", unmatched, ct);
+        await AtlasEvidenceWriter.MarkGoneAsync(db, $"collector:{Name}", evidence, now, ct);
         await db.SaveChangesAsync(ct);
+        return monitors.Count;
+    }
+
+    /// <summary>Only a change between up and down is news; the first sight of a healthy monitor is not.</summary>
+    private static async Task MonitorEventAsync(PitwallDb db, AtlasService s, Monitor m, string? previous, DateTime now)
+    {
+        if (m.Status is not ("up" or "down") || previous == m.Status) return;
+        if (previous is null && m.Status == "up") return;
+        var (type, status, words) = m.Status == "down" ? ("monitor.down", "failed", "fora do ar") : ("monitor.up", "succeeded", "no ar");
+        await AtlasEvents.RecordAsync(db, AtlasCollect.NewEvent("kuma", type, s, status, $"{s.Name}: monitor {words}", now, $"{m.Name}:{m.Status}:{now:yyyyMMddHHmm}"));
     }
 }
 
@@ -383,16 +599,34 @@ public sealed class VercelCollector(HttpClient http, string? token, string? team
         _ => null,
     };
 
-    public async Task CollectAsync(PitwallDb db, CancellationToken ct)
+    /// <summary>Every project, page by page. A listing that stops early is not complete, and missing is not decided from it.</summary>
+    private async Task<List<JsonElement>> ProjectsAsync(CancellationToken ct)
+    {
+        var all = new List<JsonElement>();
+        string? until = null;
+        for (var page = 0; page < 50; page++)
+        {
+            var body = await AtlasCollect.GetJsonAsync(http, Get("/v10/projects?limit=100" + (until is null ? "" : "&until=" + Uri.EscapeDataString(until))), ct);
+            all.AddRange(body.ValueKind == JsonValueKind.Array ? body.EnumerateArray() : body.Items("projects"));
+            var pagination = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("pagination", out var pg) ? pg : default;
+            until = pagination.Scalar("next");
+            if (until is null) break;
+        }
+        return all;
+    }
+
+    public async Task<int> CollectAsync(PitwallDb db, CancellationToken ct)
     {
         var services = await db.AtlasServices.Where(s => s.RetiredAt == null && s.Provider == "vercel").ToListAsync(ct);
         var now = DateTime.UtcNow;
         var unmatched = new List<AtlasCollect.Found>();
-        var list = await AtlasCollect.GetJsonAsync(http, Get("/v10/projects?limit=100"), ct);
-        var projects = list.ValueKind == JsonValueKind.Array ? list.EnumerateArray().ToList() : list.Items("projects").ToList();
+        var evidence = new List<Guid>();
+        var seenProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var projects = await ProjectsAsync(ct);
         foreach (var project in projects)
         {
             var name = project.Str("name") ?? "";
+            seenProjects.Add(name);
             var mine = services.Where(s => AtlasCollect.Same(s.ExternalRef, name)).ToList();
             if (mine.Count == 0) { unmatched.Add(new(name, name, "production")); continue; }
             var deployments = await AtlasCollect.GetJsonAsync(http,
@@ -400,15 +634,21 @@ public sealed class VercelCollector(HttpClient http, string? token, string? team
             var last = deployments.Items("deployments").FirstOrDefault();
             foreach (var s in mine)
             {
-                s.CheckedAt = now;
+                evidence.Add((await AtlasCollect.VerifyAsync(db, s, Name, "vercel", name, now, ct)).Id);
                 if (last.ValueKind != JsonValueKind.Object) continue;
                 s.DeployStatus = Status(last.Str("state") ?? last.Str("readyState"));
-                if (last.TryGetProperty("created", out var created) && created.TryGetInt64(out var ms))
-                    s.LastDeployAt = DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime;
+                var deployedAt = last.TryGetProperty("created", out var created) && created.TryGetInt64(out var ms)
+                    ? DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime : (DateTime?)null;
+                if (deployedAt is not null) s.LastDeployAt = deployedAt;
                 s.CommitSha = Clean.Cut(last.Str("meta", "githubCommitSha"), 64);
+                await AtlasCollect.DeployEventAsync(db, Name, s, "Vercel", last.Str("uid") ?? last.Str("id"), s.DeployStatus, s.CommitSha, deployedAt ?? now);
             }
         }
         await AtlasCollect.SyncDiscoveriesAsync(db, Name, "service", unmatched, ct);
+        await AtlasCollect.ApplyPresenceAsync(db, Name, "Vercel",
+            services.Where(s => s.ExternalRef is not null), s => seenProjects.Contains(s.ExternalRef!), now);
+        await AtlasEvidenceWriter.MarkGoneAsync(db, $"collector:{Name}", evidence, now, ct);
         await db.SaveChangesAsync(ct);
+        return projects.Count;
     }
 }

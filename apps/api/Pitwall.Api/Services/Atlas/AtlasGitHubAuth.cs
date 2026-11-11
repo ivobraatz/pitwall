@@ -8,6 +8,9 @@ public interface IAtlasGitHubAuth
 {
     bool Configured { get; }
     Task<string?> TokenAsync(CancellationToken ct);
+
+    /// <summary>The API path that lists the repositories this credential can see (a page size and page number are added).</summary>
+    string RepositoriesPath => "/user/repos?affiliation=owner&sort=pushed";
 }
 
 /// <summary>A personal access token from the environment. Never logged, never returned to a caller.</summary>

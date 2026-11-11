@@ -79,6 +79,12 @@ services:
       Atlas__Kuma__ApiKey: ${ATLAS_KUMA_API_KEY:-}
       Atlas__Vercel__Token: ${ATLAS_VERCEL_TOKEN:-}
       Atlas__Vercel__TeamId: ${ATLAS_VERCEL_TEAM_ID:-}
+      Atlas__Cloudflare__Token: ${ATLAS_CLOUDFLARE_TOKEN:-}
+      Atlas__Cloudflare__AccountId: ${ATLAS_CLOUDFLARE_ACCOUNT_ID:-}
+      Atlas__GitHub__AppId: ${ATLAS_GITHUB_APP_ID:-}
+      Atlas__GitHub__PrivateKey: ${ATLAS_GITHUB_APP_PRIVATE_KEY:-}
+      Atlas__GitHub__InstallationId: ${ATLAS_GITHUB_APP_INSTALLATION_ID:-}
+      Atlas__GitHub__WebhookSecret: ${ATLAS_GITHUB_WEBHOOK_SECRET:-}
       # By default, the SeaweedFS above. To use another bucket, set the STORAGE_* in .env and
       # STORAGE_CREATE_BUCKET=false.
       Storage__Provider: ${STORAGE_PROVIDER:-s3}
