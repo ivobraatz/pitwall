@@ -2,8 +2,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createClient, type ClientOptions } from './client.js';
 import { registerAtlasTools } from './atlas.js';
 import { registerTools } from './tools.js';
+import { VERSION } from './version.js';
 
-export const VERSION = '0.3.0';
+export { VERSION };
 
 /** The MCP server with its tools (the task board and the Atlas), before any transport is attached (the tests use an in-memory one). */
 export function createServer(options: ClientOptions): { server: McpServer; configured: boolean } {
