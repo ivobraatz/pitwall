@@ -99,6 +99,8 @@ Na interface, as palavras têm sentidos fixos:
 - **não encontrado**: estado `not_found`.
 - **não verificado**: `declared`, `reported` ou `found_in_code`.
 - **não está operacional**: estado operacional `down` (o monitor ou o último deploy dizem que está fora do ar).
+- **sem leitura**: o serviço não tem estado lido (`unknown`). Não quer dizer fora do ar. O cartão do sistema conta só os serviços com estado medido (no ar, com problema, em deploy ou fora do ar) e diz quantos ficaram sem leitura; um sistema sem nenhuma leitura diz "sem leitura", sem ser dado como saudável nem como fora do ar.
+- **condição**: só `atenção`, `falta`, `planejado` e `só local` aparecem como selo. Um nó em ordem não mostra selo nenhum.
 
 ## Nada é apagado sozinho
 

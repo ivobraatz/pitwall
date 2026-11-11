@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Engine } from '../lib/atlas-graph';
-import { layoutEngines } from '../lib/atlas-layout';
+import { GROUP_LABEL_H, layoutEngines, planCompanyRoutes } from '../lib/atlas-layout';
 
 /*
  * The Atlas map in a real browser, desktop and phone: company, product, filters, selection, modes and
@@ -42,7 +42,7 @@ const ACME_NODES = [
   gnode('pay', 'Pagamentos', 'business', { kind: 'payment' }),
   gnode('stripe', 'Stripe', 'business', { kind: 'payment', shared: true, productId: null, provider: 'stripe' }),
   gnode('monitor', 'Monitor', 'monitoring', { kind: 'monitor' }),
-  gnode('vault', 'Cofre', 'security', { kind: 'vault', state: 'unknown', verification: 'not_found' }),
+  gnode('vault', 'Cofre', 'security', { kind: 'vault', state: 'unknown', verification: 'not_found', condition: 'gap' }),
   gnode('blog', 'Blog', 'marketing', { kind: 'site' }),
 ];
 const ACME_EDGES = [
@@ -122,8 +122,11 @@ function nodeDetail(nodeId: string) {
   };
 }
 
+/** What a test can replace in the fixtures: the company, the Atlas, or the Acme map. */
+type Over = { company?: unknown; atlas?: unknown; graph?: unknown };
+
 /** Every /v1 call the map's screens make, answered from the fixtures above. Writes are accepted and ignored. */
-async function serve(page: Page) {
+async function serve(page: Page, over: Over = {}) {
   await page.route('**/v1/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -134,10 +137,10 @@ async function serve(page: Page) {
       return detail ? route.fulfill({ json: detail }) : route.fulfill({ status: 404, json: { message: 'not mocked' } });
     }
     if (path === '/atlas/graph') {
-      const body = url.searchParams.get('system') === 'synthetic' ? SYNTHETIC_GRAPH : ACME_GRAPH;
+      const body = url.searchParams.get('system') === 'synthetic' ? SYNTHETIC_GRAPH : (over.graph ?? ACME_GRAPH);
       return route.fulfill({ json: body });
     }
-    if (path === '/atlas/graph/company') return route.fulfill({ json: COMPANY });
+    if (path === '/atlas/graph/company') return route.fulfill({ json: over.company ?? COMPANY });
     if (path === '/atlas/events') return route.fulfill({ json: EVENTS });
     if (path === '/atlas/insights') return route.fulfill({ json: INSIGHTS });
     if (path === '/atlas/changes') return route.fulfill({ json: [] });
@@ -147,7 +150,7 @@ async function serve(page: Page) {
     if (path === '/atlas/attention') return route.fulfill({ json: [] });
     if (path === '/atlas/flows') return route.fulfill({ json: [] });
     if (path === '/atlas/routines') return route.fulfill({ json: [] });
-    if (path === '/atlas') return route.fulfill({ json: ATLAS });
+    if (path === '/atlas') return route.fulfill({ json: over.atlas ?? ATLAS });
     if (path === '/auth/me') return route.fulfill({ json: { id: 's1', name: 'Ana Souza', email: 'ana@pitwall.test', role: 'admin', totpEnabled: true, mustChangePassword: false, totpRequired: false } });
     if (path === '/products') return route.fulfill({ json: [] });
     if (path === '/summary') return route.fulfill({ json: { byStatus: {}, open: 0, unanswered: 0, openedThisWeek: 0, medianFirstResponseMinutes: null, topSignatures: [], products: [], series: [] } });
@@ -379,12 +382,96 @@ test('the operation mode shows when each node was last seen, and an unread node 
   await page.goto('/atlas?system=acme');
   await page.getByRole('tab', { name: 'Operação', exact: true }).click();
   await expect(nodeCard(page, 'api')).toContainText('observado');
-  await expect(nodeCard(page, 'api')).toContainText('No ar');
+  // A node that was never read says so in its own words, without the state word repeated on every card.
   const agent = nodeCard(page, 'agent');
-  await expect(agent).toContainText('Sem leitura');
-  await expect(agent).not.toContainText('No ar');
+  await expect(agent).toContainText('sem evento lido');
+  await expect(agent).not.toContainText('Sem leitura');
   await expect(page.getByTestId('atlas-graph-operation')).toContainText('Deploy da API');
   await expectNoSidewaysScroll(page);
+});
+
+test('a system whose services are not read says so, and is not called down', async ({ page }) => {
+  const unread = { ...card(ACME, 'acme', 'Acme', 'unknown', 0, 15), health: { total: 15, up: 0, down: 0, degraded: 0, deploying: 0, unknown: 15 } };
+  await serve(page, { company: { ...COMPANY, systems: [unread, card(GLOBEX, 'globex', 'Globex', 'up', 3, 3)] } });
+  await page.goto('/atlas');
+  const acme = page.getByTestId('atlas-company-system').filter({ hasText: 'Acme' });
+  await expect(acme.getByTestId('atlas-company-health')).toHaveText('15 serviços · sem leitura');
+  await expect(acme.getByTestId('atlas-company-health')).not.toHaveClass(/text-danger/);
+  await expectNoSidewaysScroll(page);
+});
+
+test('a system with some services read counts only those, and the unread ones are named apart', async ({ page }) => {
+  // Three up, two down, ten never read: "3 de 5 no ar", the two down in red, the ten named as not read.
+  const mixed = { ...card(ACME, 'acme', 'Acme', 'down', 3, 5), health: { total: 15, up: 3, down: 2, degraded: 0, deploying: 0, unknown: 10 } };
+  await serve(page, { company: { ...COMPANY, systems: [mixed, card(GLOBEX, 'globex', 'Globex', 'up', 3, 3)] } });
+  await page.goto('/atlas');
+  const health = page.getByTestId('atlas-company-system').filter({ hasText: 'Acme' }).getByTestId('atlas-company-health');
+  await expect(health).toHaveText('3 de 5 no ar · 10 sem leitura');
+  await expect(health).toHaveClass(/text-danger/);
+});
+
+test('a card names its environment when all environments show and the system has more than one', async ({ page }) => {
+  const twoEnvs = { ...ATLAS, environments: [{ id: 'e1', slug: 'production', name: 'Produção' }, { id: 'e2', slug: 'staging', name: 'Homologação' }] };
+  const graph = {
+    ...ACME_GRAPH,
+    nodes: ACME_NODES.map((n) => (n.id === 'api' ? { ...n, environment: 'Produção' } : n.id === 'db' ? { ...n, environment: 'Homologação' } : n)),
+  };
+  await serve(page, { atlas: twoEnvs, graph });
+  await page.goto('/atlas?system=acme');
+  await expect(nodeCard(page, 'api')).toContainText('Produção · railway');
+  await expect(nodeCard(page, 'db')).toContainText('Homologação · database');
+  // The state word is not repeated on a card that is only unread.
+  await expect(nodeCard(page, 'api')).not.toContainText('Sem leitura');
+  await expectNoSidewaysScroll(page);
+});
+
+test('with one environment, or one picked, a card does not repeat its environment', async ({ page }) => {
+  const graph = { ...ACME_GRAPH, nodes: ACME_NODES.map((n) => (n.id === 'api' ? { ...n, environment: 'Produção' } : n)) };
+  await serve(page, { graph });
+  await page.goto('/atlas?system=acme');
+  await expect(nodeCard(page, 'api')).toContainText('railway');
+  await expect(nodeCard(page, 'api')).not.toContainText('Produção');
+});
+
+test('the drawer gives no "All good" to a node that was not read, and shows a condition only when it is one', async ({ page }) => {
+  await serve(page);
+  await page.goto('/atlas?system=acme&node=agent');
+  const drawer = page.getByTestId('atlas-node-drawer');
+  await expect(drawer).toContainText('Relatado por agente; não verificado');
+  await expect(drawer).toContainText('Sem leitura');
+  await expect(drawer).not.toContainText('Em ordem');
+});
+
+test('the drawer names a condition that is a gap', async ({ page }) => {
+  await serve(page);
+  await page.goto('/atlas?system=acme&node=vault');
+  await expect(page.getByTestId('atlas-node-drawer')).toContainText('Falta');
+});
+
+test('the minimap shows the services, in their state colours', async ({ page }) => {
+  await serve(page);
+  await page.goto('/atlas?system=acme');
+  await expect(nodeCard(page, 'api')).toBeVisible();
+  // Every service is a small rectangle in the minimap (the lanes and group names are drawn there too, in no colour).
+  const drawn = await page.locator('.react-flow__minimap .react-flow__minimap-node').count();
+  expect(drawn).toBeGreaterThanOrEqual(ACME_NODES.length);
+  const filled = await page.locator('.react-flow__minimap .react-flow__minimap-node').evaluateAll((els) => els.filter((e) => (e as SVGElement).style.fill !== '' && (e as SVGElement).style.fill !== 'transparent').length);
+  expect(filled).toBeGreaterThanOrEqual(ACME_NODES.length);
+});
+
+test('the group names sit above their cards, with no card under them', async ({ page }) => {
+  await serve(page);
+  await page.goto('/atlas?system=acme');
+  const labels = page.locator('.react-flow__node-groupLabel p');
+  await expect(labels).toHaveCount(2);
+  const boxes = await labels.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()));
+  const cards = await page.locator('[data-testid="atlas-graph-node"]').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().toJSON()));
+  for (const b of boxes) {
+    for (const c of cards) {
+      const overlap = b.left < c.right && c.left < b.right && b.top < c.bottom && c.top < b.bottom;
+      expect(overlap).toBe(false);
+    }
+  }
 });
 
 test('a map of 400 nodes loads and shows in under five seconds', async ({ page }) => {
@@ -437,4 +524,73 @@ test('the layout is deterministic, orders the columns, and places 600 nodes in u
   expect(Object.keys(out.positions)).toHaveLength(600);
   expect(ms).toBeLessThan(200);
   expect(layoutEngines(bigInput)).toEqual(out);
+});
+
+test('a group name never sits on a card: its line is kept free above the first card', async ({}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'pure layout test, run once');
+  // Groups of every size, in every engine, with the cards of each group above and below the others.
+  const nodes = Array.from({ length: 240 }, (_, i) => ({
+    id: `n${i}`, engine: ENGINES[i % 9] as Engine, group: i % 4 === 0 ? null : `grupo ${i % 7}`, name: `nó ${String(i).padStart(3, '0')}`,
+  }));
+  const edges = nodes.map((_, i) => ({ from: `n${i}`, to: `n${(i * 5 + 1) % 240}` }));
+  const out = layoutEngines({ nodes, edges, collapsed: new Set<Engine>() });
+  expect(out.groups.length).toBeGreaterThan(0);
+
+  // The cards as the map draws them: 212 px wide, 54 px tall, at the positions the layout gives.
+  const cards = Object.values(out.positions).map((p) => ({ x: p.x, y: p.y, w: 212, h: 54 }));
+  for (const g of out.groups) {
+    expect(g.height).toBe(GROUP_LABEL_H);
+    for (const c of cards) {
+      const hit = g.x < c.x + c.w && c.x < g.x + g.width && g.y < c.y + c.h && c.y < g.y + g.height;
+      expect(hit, `${g.label} x card at ${c.x},${c.y}`).toBe(false);
+    }
+    // And the label is above its own group's first card, with a gap before it.
+    const first = Math.min(...nodes.filter((n) => n.group === g.label && n.engine === g.engine).map((n) => out.positions[n.id].y));
+    expect(first).toBeGreaterThanOrEqual(g.y + g.height);
+  }
+});
+
+test('the company links leave the base of the higher card and enter the top of the lower one, with no loop over a card', async ({}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'pure geometry test, run once');
+  const boxes = new Map([
+    ['acme', { x: 0, y: 28, w: 260, h: 124 }],
+    ['globex', { x: 284, y: 28, w: 260, h: 124 }],
+    ['stripe', { x: 40, y: 230, w: 212, h: 54 }],
+    ['sentry', { x: 40, y: 330, w: 212, h: 54 }],
+  ]);
+  const routes = planCompanyRoutes(boxes, [
+    { id: 'down', from: 'acme', to: 'stripe' },
+    { id: 'up', from: 'sentry', to: 'acme' },     // a shared service that is used by a system: the link still starts at the system's base
+    { id: 'row', from: 'acme', to: 'globex' },
+  ]);
+  const down = routes.get('down')!;
+  expect(down.start.y).toBe(28 + 124);     // base of Acme
+  expect(down.end.y).toBe(230);            // top of Stripe
+  expect(down.toAtEnd).toBe(true);
+  expect(down.label.y).toBeLessThan(230);  // the count sits in the gap above the destination, not on a title below
+
+  const up = routes.get('up')!;
+  expect(up.start.y).toBe(28 + 124);       // base of Acme, not the top
+  expect(up.end.y).toBe(330);              // top of Sentry
+  expect(up.toAtEnd).toBe(false);          // the arrow points at Acme, which is the start
+
+  const row = routes.get('row')!;
+  expect(row.start.y).toBe(28 + 124);
+  expect(row.end.y).toBe(28 + 124);        // both cards in one row: a shallow U under both, from base to base
+  expect(row.label.y).toBeGreaterThan(28 + 124);
+});
+
+test('two links that leave the same side of a card do not share a point', async ({}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'pure geometry test, run once');
+  const boxes = new Map([
+    ['acme', { x: 0, y: 28, w: 260, h: 124 }],
+    ['a', { x: 0, y: 230, w: 212, h: 54 }],
+    ['b', { x: 240, y: 230, w: 212, h: 54 }],
+    ['c', { x: 480, y: 230, w: 212, h: 54 }],
+  ]);
+  const routes = planCompanyRoutes(boxes, [
+    { id: 'l1', from: 'acme', to: 'a' }, { id: 'l2', from: 'acme', to: 'b' }, { id: 'l3', from: 'acme', to: 'c' },
+  ]);
+  const xs = ['l1', 'l2', 'l3'].map((id) => routes.get(id)!.start.x);
+  expect(new Set(xs).size).toBe(3);
 });

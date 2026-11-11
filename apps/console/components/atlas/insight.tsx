@@ -243,9 +243,11 @@ export function ServiceDrawer({ service, atlas, onClose, onService }: {
       subtitle={[system?.name ?? t('service.shared'), env?.name, service.provider].filter(Boolean).join(' · ')}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <StateLabel state={service.state} />
-        <Pill tone={service.condition === 'gap' ? 'error' : service.condition === 'warn' ? 'warn' : 'idle'}>
-          <MarkGlyph mark={conditionMark(service.condition)} size={12} />{t(`cond.${service.condition}` as AtlasWord)}
-        </Pill>
+        {service.condition !== 'ok' && (
+          <Pill tone={service.condition === 'gap' ? 'error' : service.condition === 'warn' ? 'warn' : 'idle'}>
+            <MarkGlyph mark={conditionMark(service.condition)} size={12} />{t(`cond.${service.condition}` as AtlasWord)}
+          </Pill>
+        )}
         <Pill tone="idle">{t(`kind.${service.kind}` as AtlasWord) === `kind.${service.kind}` ? service.kind : t(`kind.${service.kind}` as AtlasWord)}</Pill>
       </div>
       {service.condition !== 'ok' && (

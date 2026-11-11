@@ -246,7 +246,8 @@ function StatusRow({ node }: { node: GraphNode }) {
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="atlas-node-status">
       <StateLabel state={node.state} />
-      <Pill tone={CONDITION_TONE[node.condition]}>{words(`cond.${node.condition}` as AtlasWord)}</Pill>
+      {/* "All good" is said only by a reading that found something to be good about: an ok condition shows no pill. */}
+      {node.condition !== 'ok' && <Pill tone={CONDITION_TONE[node.condition]}>{words(`cond.${node.condition}` as AtlasWord)}</Pill>}
       <Pill tone="idle">{t(`origin.${node.origin}` as DetailWord)}</Pill>
       {counts.map((c) => (
         <span key={c} className="inline-flex items-center gap-1.5" data-attention={c}>

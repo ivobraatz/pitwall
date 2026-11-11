@@ -100,14 +100,36 @@ export function useAttention() {
 }
 
 /** What a system asks of the person looking: something is down, something waits, or nothing. */
-export type Verdict = 'down' | 'attention' | 'ok' | 'empty';
+export type Verdict = 'down' | 'attention' | 'unread' | 'ok' | 'empty';
 export function verdict(s: AtlasSystem): Verdict {
   if (s.health.down > 0) return 'down';
   if (s.health.degraded > 0 || s.pending.tickets > 0 || s.pending.errors > 0 || (s.pending.alerts ?? 0) > 0) return 'attention';
   if (s.health.total === 0) return 'empty';
+  // No service has a state read: that is not a healthy system, it is one nobody has looked at.
+  if (healthReading(s.health).kind === 'unread') return 'unread';
   return 'ok';
 }
-const ORDER: Record<Verdict, number> = { down: 0, attention: 1, ok: 2, empty: 3 };
+const ORDER: Record<Verdict, number> = { down: 0, attention: 1, unread: 2, ok: 3, empty: 4 };
+
+export interface Health { total: number; up: number; down: number; degraded: number; deploying: number; unknown: number }
+export type HealthReading =
+  | { kind: 'none' }
+  | { kind: 'unread'; n: number }
+  | { kind: 'mixed'; up: number; measured: number; unread: number }
+  | { kind: 'all'; up: number; measured: number };
+
+/**
+ * What the states of a system say, counting only the services that have a state read (up, degraded, down,
+ * deploying). "Not read" is not "down": a system with nothing read says so, and never counts as out of order.
+ */
+export function healthReading(h: Health): HealthReading {
+  if (h.total === 0) return { kind: 'none' };
+  const measured = h.up + h.down + h.degraded + h.deploying;
+  if (measured === 0) return { kind: 'unread', n: h.total };
+  const unread = Math.max(0, h.total - measured);
+  if (unread > 0) return { kind: 'mixed', up: h.up, measured, unread };
+  return { kind: 'all', up: h.up, measured };
+}
 export function byUrgency(a: AtlasSystem, b: AtlasSystem): number {
   return ORDER[verdict(a)] - ORDER[verdict(b)] || a.name.localeCompare(b.name);
 }

@@ -52,6 +52,45 @@ function useWrite() {
   }, [t, toast, invalidate]);
 }
 
+/**
+ * The systems to pick from, as a radio group: one is chosen and shows it (a ring, a dot and a word), the arrow keys
+ * move through them and choose as they go, and Tab goes to the chosen one only.
+ */
+function SystemOptions({ systems, picked, onPick }: { systems: AtlasSystem[]; picked: string; onPick: (slug: string) => void }) {
+  const t = useDetailT();
+  const refs = React.useRef<Array<HTMLButtonElement | null>>([]);
+  const tabStop = Math.max(0, systems.findIndex((s) => s.slug === picked));
+  const move = (from: number, delta: number) => {
+    const next = (from + delta + systems.length) % systems.length;
+    onPick(systems[next].slug);
+    refs.current[next]?.focus();
+  };
+  return (
+    <div role="radiogroup" aria-label={t('ob.s1')} className="grid gap-2 sm:grid-cols-2" data-testid="onboarding-systems">
+      {systems.map((s, i) => {
+        const on = s.slug === picked;
+        return (
+          <button key={s.id} ref={(el) => { refs.current[i] = el; }} type="button" role="radio" aria-checked={on}
+            tabIndex={i === tabStop ? 0 : -1} data-testid="onboarding-system" data-slug={s.slug} data-selected={on || undefined}
+            onClick={() => onPick(s.slug)}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); move(i, 1); }
+              else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); move(i, -1); }
+            }}
+            className={cn('flex w-full items-center gap-3 rounded-tile border px-4 py-3 text-left transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-focus',
+              on ? 'border-accent bg-accent-bg' : 'border-border bg-well hover:bg-hover')}>
+            <span aria-hidden className={cn('grid size-4 shrink-0 place-items-center rounded-full border-2', on ? 'border-accent' : 'border-border-loud')}>
+              {on && <span className="size-2 rounded-full bg-accent" />}
+            </span>
+            <span className="min-w-0 flex-1 truncate font-medium text-fg">{s.name}</span>
+            {on && <Pill tone="ok">{t('sys.selected')}</Pill>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── 1 · Sistema ─────────────────────────────────────────────────────────────────────────
 
 export function StepSystem({ system, onSystem }: Props) {
@@ -74,20 +113,7 @@ export function StepSystem({ system, onSystem }: Props) {
   return (
     <Frame step={1} title={t('ob.s1')} hint={t('sys.pick')}>
       {atlas.isLoading ? <Shimmer className="h-24" /> : systems.length === 0 ? <Notice>{t('sys.none')}</Notice> : (
-        <ul className="flex flex-col gap-1.5" data-testid="onboarding-systems">
-          {systems.map((s) => {
-            const picked = s.slug === system;
-            return (
-              <li key={s.id}>
-                <button type="button" onClick={() => onSystem(s.slug)} aria-pressed={picked} data-testid="onboarding-system" data-slug={s.slug}
-                  className={cn('flex w-full items-center gap-3 rounded-tile px-4 py-3 text-left transition-colors duration-150', picked ? 'bg-well' : 'hover:bg-hover')}>
-                  <span className="min-w-0 flex-1 font-medium text-fg">{s.name}</span>
-                  {picked && <Pill tone="ok">{t('sys.selected')}</Pill>}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <SystemOptions systems={systems} picked={system} onPick={onSystem} />
       )}
       <Card title={t('sys.create')}>
         <form className="flex flex-col gap-4 px-5 pb-5" onSubmit={create}>
