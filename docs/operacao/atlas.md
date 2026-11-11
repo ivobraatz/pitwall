@@ -254,6 +254,13 @@ mesmas regras do CLI. Precisa do GitHub conectado; sem isso a resposta é 409.
 O resultado é um `SyncResponse` (`created`, `updated`, `gone`, `removalsReported`, `rejected`, `attention`).
 O que o scan acha vira nó `discovered`, com evidência `repo:{nome}`.
 
+Antes de criar, o scan procura um nó que já serve, nesta ordem: pela assinatura; pelo nome, no sistema e sem
+ambiente; pela adoção, quando o sistema tem serviços declarados do mesmo tipo e sem assinatura e nenhum ambiente
+tem dois deles; senão, cria. A adoção grava só a assinatura e a evidência. Nome, tipo, provedor e fatos ficam como
+a pessoa escreveu. Compartilhados seguem a mesma ideia: assinatura, nome e, se houver um só, o declarado do mesmo
+tipo e provedor. Se a adoção é ambígua, o scan cria um nó `discovered`. Para resolver, dê `signature` ao serviço
+certo (`register_service` aceita o campo) e retire o duplicado.
+
 Catálogo de detecção (dependências e variáveis de ambiente): Stripe, Mercado Pago, Asaas, Pagar.me, Resend,
 SendGrid, Postmark, SMTP, Anthropic, OpenAI, Gemini, Postgres, MySQL, MongoDB, Redis, BullMQ, Hangfire, RabbitMQ,
 S3, R2, Sentry, Pitwall, Google Analytics, PostHog, Clarity, Plausible, Search Console, Bing Webmaster, Clerk,

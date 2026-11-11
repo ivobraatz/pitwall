@@ -53,41 +53,59 @@ internal sealed class AtlasReconciler
     {
         var services = await _db.AtlasServices.ToListAsync(ct);
         _before = services.ToDictionary(s => s.Id, Fingerprint);
+        // Environments are loaded too, so the order of the nodes can name them.
+        await _db.AtlasEnvironments.ToListAsync(ct);
     }
 
     // ---- Findings (the scan) ------------------------------------------------------------------
 
     public async Task ApplyFindingsAsync(IReadOnlyList<Finding> findings, CancellationToken ct)
     {
-        var nodes = new AtlasService?[findings.Count];
-        var bySignature = new Dictionary<string, AtlasService>(StringComparer.Ordinal);
+        var nodes = new List<AtlasService>?[findings.Count];
+        var bySignature = new Dictionary<string, List<AtlasService>>(StringComparer.Ordinal);
 
         for (var i = 0; i < findings.Count; i++)
         {
             var f = findings[i];
-            var node = await NodeForAsync(f, ct);
-            if (node is null) continue;
-            nodes[i] = node;
-            bySignature.TryAdd(f.Signature, node);
-            _tally.Touched.Add(node.Id);
+            var found = await NodeForAsync(f, ct);
+            if (found.Count == 0) continue;
+            nodes[i] = found;
+            if (!bySignature.TryGetValue(f.Signature, out var same)) bySignature[f.Signature] = same = [];
 
             var detail = _ctx.Scope == AtlasScopes.Deployed ? $"ambiente: {_ctx.Environment}" : null;
-            var (_, changed) = await EvidenceAsync(AtlasSubjects.Service, node.Id, _ctx.RepoSource, f.Method, f.Reference, f.Relation,
-                _ctx.Scope, detail, _ctx.CommitSha, ct);
-            if (changed) _tally.Explicit.Add(node.Id);
+            foreach (var node in found)
+            {
+                if (!same.Contains(node)) same.Add(node);
+                _tally.Touched.Add(node.Id);
+                var (_, changed) = await EvidenceAsync(AtlasSubjects.Service, node.Id, _ctx.RepoSource, f.Method, f.Reference, f.Relation,
+                    _ctx.Scope, detail, _ctx.CommitSha, ct);
+                if (changed) _tally.Explicit.Add(node.Id);
+            }
         }
 
         // Edges between findings are links of the map, with the same evidence as the nodes.
         for (var i = 0; i < findings.Count; i++)
         {
             var f = findings[i];
-            if (nodes[i] is not { } node) continue;
-            if (f.FromSignature is { } from && bySignature.TryGetValue(from, out var source) && source.Id != node.Id)
-                await LinkAsync(source, node, f, ct);
-            if (f.ToSignature is { } to && bySignature.TryGetValue(to, out var target) && target.Id != node.Id)
-                await LinkAsync(node, target, f, ct);
+            if (nodes[i] is not { } own) continue;
+            if (f.FromSignature is { } from && bySignature.TryGetValue(from, out var sources))
+            {
+                foreach (var source in sources)
+                    foreach (var node in own)
+                        if (Linkable(source, node)) await LinkAsync(source, node, f, ct);
+            }
+            if (f.ToSignature is { } to && bySignature.TryGetValue(to, out var targets))
+            {
+                foreach (var node in own)
+                    foreach (var target in targets)
+                        if (Linkable(node, target)) await LinkAsync(node, target, f, ct);
+            }
         }
     }
+
+    /// <summary>Two different nodes, and not split by environment: a shared node or a node without environment links to any.</summary>
+    private static bool Linkable(AtlasService a, AtlasService b) =>
+        a.Id != b.Id && (a.EnvironmentId is null || b.EnvironmentId is null || a.EnvironmentId == b.EnvironmentId);
 
     /// <summary>Code evidence not seen in this scan goes away, for pushed and deployed scans of a complete package only.</summary>
     public async Task MarkGoneAsync(CancellationToken ct)
@@ -216,19 +234,23 @@ internal sealed class AtlasReconciler
     // ---- Nodes ---------------------------------------------------------------------------------
 
     /// <summary>
-    /// The node a finding is about. A shared finding (a payment provider, a mail service) is one node for the whole
-    /// operation, found by signature, then by name; a finding named like a system goes to that system's main service.
-    /// Any other finding is the system's own node with the same name, created when there is none.
+    /// The nodes a finding is about; an empty list means the finding was rejected. A finding that is not shared
+    /// (a database, a queue, a pipeline) is, in order: the system's active nodes with its signature (in any
+    /// environment); the system's node without environment with its name; the declared nodes of its kind that
+    /// have no signature yet, when each environment has at most one of them (they are adopted); or a new node.
+    /// A shared finding (a payment provider, a mail service) is one node for the whole operation: by signature,
+    /// by name, by adoption of the one declared shared node of its provider, then the main node of a system with
+    /// its name, and a new node. Nodes come back without environment first, then by environment slug.
     /// </summary>
-    private async Task<AtlasService?> NodeForAsync(Finding f, CancellationToken ct)
+    private async Task<List<AtlasService>> NodeForAsync(Finding f, CancellationToken ct)
     {
         if (f.Shared)
         {
-            var shared = SharedHit(f);
+            var shared = SharedHit(f) ?? AdoptShared(f);
             if (shared is not null)
             {
                 if (shared.RetiredAt is null) Enrich(shared, f);
-                return shared;
+                return [shared];
             }
             var system = await SystemNamedAsync(f.Name, ct);
             if (system is not null)
@@ -237,21 +259,72 @@ internal sealed class AtlasReconciler
                     .Where(s => s.ProductId == system.Id && s.RetiredAt == null)
                     .OrderBy(s => KindRank(s.Kind))
                     .FirstOrDefault();
-                if (main is not null) return main;
+                if (main is not null) return [main];
             }
-            return await CreateAsync(f, null, ct);
+            return await CreateOneAsync(f, null, ct);
         }
 
-        var candidates = _db.AtlasServices.Local
-            .Where(s => s.ProductId == _ctx.System.Id && s.EnvironmentId == null && NameEq(s.Name, f.Name))
-            .ToList();
+        var inSystem = _db.AtlasServices.Local.Where(s => s.ProductId == _ctx.System.Id).ToList();
+
+        var bySignature = inSystem.Where(s => s.RetiredAt is null && s.Signature == f.Signature).ToList();
+        if (bySignature.Count > 0)
+        {
+            foreach (var node in bySignature) Enrich(node, f);
+            return InEnvironmentOrder(bySignature);
+        }
+
+        var candidates = inSystem.Where(s => s.EnvironmentId == null && NameEq(s.Name, f.Name)).ToList();
         var own = candidates.FirstOrDefault(s => s.Signature == f.Signature) ?? candidates.FirstOrDefault();
         if (own is not null)
         {
             if (own.RetiredAt is null) Enrich(own, f);
-            return own;
+            return [own];
         }
-        return await CreateAsync(f, _ctx.System, ct);
+
+        var declared = inSystem
+            .Where(s => s.RetiredAt is null && s.Signature is null && s.Origin != AtlasOrigins.Discovered && s.Kind == f.Kind)
+            .ToList();
+        if (declared.Count > 0 && declared.GroupBy(s => s.EnvironmentId).All(g => g.Count() == 1))
+        {
+            foreach (var node in declared) Adopt(node, f);
+            return InEnvironmentOrder(declared);
+        }
+
+        return await CreateOneAsync(f, _ctx.System, ct);
+    }
+
+    private async Task<List<AtlasService>> CreateOneAsync(Finding f, Product? system, CancellationToken ct)
+    {
+        var created = await CreateAsync(f, system, ct);
+        return created is null ? [] : [created];
+    }
+
+    /// <summary>Without environment first, then by the slug of the environment.</summary>
+    private List<AtlasService> InEnvironmentOrder(IEnumerable<AtlasService> nodes) =>
+        nodes.OrderBy(s => s.EnvironmentId is null ? 0 : 1).ThenBy(EnvironmentSlug, StringComparer.Ordinal).ToList();
+
+    private string EnvironmentSlug(AtlasService s) =>
+        s.EnvironmentId is { } id ? _db.AtlasEnvironments.Local.FirstOrDefault(e => e.Id == id)?.Slug ?? "" : "";
+
+    /// <summary>A declared node takes the signature of the finding that matches it: the same node, not a new one.</summary>
+    private void Adopt(AtlasService node, Finding f)
+    {
+        node.Signature = f.Signature;
+        node.UpdatedAt = _ctx.Now;
+    }
+
+    /// <summary>The one declared shared node of the same kind whose provider is the finding's signature or provider.</summary>
+    private AtlasService? AdoptShared(Finding f)
+    {
+        var providers = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { f.Signature };
+        if (f.Provider is not null) providers.Add(f.Provider);
+        var matches = _db.AtlasServices.Local
+            .Where(s => s.ProductId == null && s.RetiredAt == null && s.Signature == null && s.Kind == f.Kind
+                && s.Provider is not null && providers.Contains(s.Provider))
+            .ToList();
+        if (matches.Count != 1) return null;
+        Adopt(matches[0], f);
+        return matches[0];
     }
 
     private AtlasService? SharedHit(Finding f)
