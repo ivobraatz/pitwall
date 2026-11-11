@@ -11,12 +11,13 @@ namespace Pitwall.Services.Atlas;
 public sealed class AtlasImporter(PitwallDb db, AtlasWriter writer)
 {
     public sealed record FileEnvironment(string? Slug, string? Name);
-    public sealed record FileLink(string? To, string? Kind, bool? Planned, string? Label);
+    public sealed record FileLink(string? To, string? Kind, bool? Planned, string? Label, string? Relation = null);
     public sealed record FileService(
         string? Name, string? Kind, string? Environment, string? Provider, string? ExternalRef, string? Url,
         string? Monitor, string? Notes, List<string>? Uses,
         string? Group = null, string? Condition = null, Dictionary<string, string>? Facts = null, List<string>? Items = null,
-        string? Impact = null, string? Owner = null, string? Task = null, List<FileLink>? Links = null);
+        string? Impact = null, string? Owner = null, string? Task = null, List<FileLink>? Links = null,
+        string? Engine = null, string? Signature = null);
     public sealed record FileSystem(
         string? Slug, string? Name, string? Description, string? WebsiteUrl, string? Color,
         List<string>? Repos, List<FileService>? Services);
@@ -29,7 +30,7 @@ public sealed class AtlasImporter(PitwallDb db, AtlasWriter writer)
 
     private static AtlasWriter.ServiceInput Input(string? system, FileService s) => new(
         system, s.Environment, s.Name, s.Kind, s.Provider, s.ExternalRef, s.Url, s.Monitor, s.Notes,
-        s.Group, s.Condition, s.Facts, s.Items, s.Impact, s.Owner, s.Task);
+        s.Group, s.Condition, s.Facts, s.Items, s.Impact, s.Owner, s.Task, Engine: s.Engine, Signature: s.Signature);
 
     private static IEnumerable<FileLink> LinksOf(FileService s) =>
         (s.Uses ?? []).Select(to => new FileLink(to, null, null, null)).Concat(s.Links ?? []);
@@ -75,7 +76,7 @@ public sealed class AtlasImporter(PitwallDb db, AtlasWriter writer)
         // Links last: a service may lean on one declared further down the file.
         foreach (var (from, link) in pending)
         {
-            if ((await writer.LinkAsync(from, link.To, link.Label, ct, link.Kind, link.Planned)).Error is { } error) errors.Add($"ligação {from} → {link.To}: {error}");
+            if ((await writer.LinkAsync(from, link.To, link.Label, ct, link.Kind, link.Planned, link.Relation)).Error is { } error) errors.Add($"ligação {from} → {link.To}: {error}");
             else links++;
         }
 

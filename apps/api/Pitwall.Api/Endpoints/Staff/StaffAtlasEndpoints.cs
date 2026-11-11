@@ -21,10 +21,13 @@ public static class StaffAtlasEndpoints
     public static readonly TimeSpan RunStaleAfter = TimeSpan.FromHours(6);
     private const int RunHistory = 30;
 
-    public sealed record LinkRequest(string? From, string? To, string? Label, string? Kind = null, bool? Planned = null);
-    public sealed record RepoRequest(string? FullName, string? System);
+    public sealed record LinkRequest(string? From, string? To, string? Label, string? Kind = null, bool? Planned = null, string? Relation = null);
+    public sealed record RepoRequest(string? FullName, string? System, string? Role = null, List<string>? Services = null);
     public sealed record EnvironmentRequest(string? Slug, string? Name);
-    public sealed record ActivityRequest(string? System, string? Component, string? Description);
+    public sealed record ActivityRequest(
+        string? System, string? Component, string? Description, string? Repo = null, string? Branch = null, string? HeadSha = null, string? Tool = null);
+    public sealed record RenameRequest(string? Name);
+    public sealed record RefRequest(string? Kind, string? Code, string? Note = null);
     public sealed record FinishRequest(string? Status, string? Result, List<RunLinkInput?>? Links);
     public sealed record RunLinkInput(string? Kind, string? Label, string? Url);
     public sealed record RegisterDiscoveryRequest(string? System, string? Environment, string? Name, string? Kind);
@@ -63,7 +66,8 @@ public static class StaffAtlasEndpoints
         writes.MapDelete("/environments/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
         {
             if (await db.AtlasServices.AnyAsync(s => s.EnvironmentId == id, ct)) return Results.Conflict(new { message = "Ainda há serviços nesse ambiente." });
-            await db.AtlasEnvironments.Where(e => e.Id == id).ExecuteDeleteAsync(ct);
+            if (await db.AtlasEnvironments.FindAsync([id], ct) is { } env) db.AtlasEnvironments.Remove(env);
+            await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
         writes.MapPost("/services", async (AtlasWriter.ServiceInput req, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
@@ -71,35 +75,82 @@ public static class StaffAtlasEndpoints
             var (service, created, error) = await writer.UpsertServiceAsync(req, ct);
             if (service is null) return Bad(error!);
             await db.SaveChangesAsync(ct);
-            return Results.Ok(new { service.Id, service.Name, created });
+            return Results.Ok(new { service.Id, service.Key, service.Name, service.Engine, created });
         });
-        writes.MapDelete("/services/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
+        // Removing a service retires it: the history keeps it, and it leaves the map.
+        writes.MapDelete("/services/{id:guid}", async (Guid id, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
         {
-            await db.AtlasServices.Where(s => s.Id == id).ExecuteDeleteAsync(ct);
+            if (await db.AtlasServices.FirstOrDefaultAsync(s => s.Id == id, ct) is { } service)
+            {
+                await writer.RetireServiceAsync(service, null, ct);
+                await db.SaveChangesAsync(ct);
+            }
+            return Results.NoContent();
+        });
+        writes.MapPost("/services/{id:guid}/restore", async (Guid id, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
+        {
+            if (await db.AtlasServices.FirstOrDefaultAsync(s => s.Id == id, ct) is not { } service) return NotFound("Serviço não encontrado.");
+            await writer.RestoreServiceAsync(service, ct);
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new { service.Id, service.Key, service.Name });
+        });
+        writes.MapPost("/services/{id:guid}/rename", async (Guid id, RenameRequest req, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
+        {
+            if (await db.AtlasServices.FirstOrDefaultAsync(s => s.Id == id && s.RetiredAt == null, ct) is not { } service) return NotFound("Serviço não encontrado.");
+            var (error, conflict) = await writer.RenameServiceAsync(service, req.Name, ct);
+            if (error is not null) return conflict ? Results.Conflict(new { message = error }) : Bad(error);
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new { service.Id, service.Key, service.Name });
+        });
+        // "Confirmed gone": the person says what the report only suspected. Retires it with that reason.
+        writes.MapPost("/services/{id:guid}/confirm-removal", async (Guid id, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
+        {
+            if (await db.AtlasServices.FirstOrDefaultAsync(s => s.Id == id && s.RetiredAt == null, ct) is not { } service) return NotFound("Serviço não encontrado.");
+            await writer.RetireServiceAsync(service, "remoção confirmada", ct);
+            await db.SaveChangesAsync(ct);
+            return Results.NoContent();
+        });
+        writes.MapPost("/services/{id:guid}/refs", async (Guid id, RefRequest req, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
+        {
+            if (await db.AtlasServices.FirstOrDefaultAsync(s => s.Id == id && s.RetiredAt == null, ct) is not { } service) return NotFound("Serviço não encontrado.");
+            var (reference, error) = await writer.AddRefAsync(service, req.Kind, req.Code, req.Note, ct);
+            if (reference is null) return Bad(error!);
+            await db.SaveChangesAsync(ct);
+            return Results.Ok(new { reference.Id, reference.Kind, reference.Code, reference.Note });
+        });
+        writes.MapDelete("/refs/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
+        {
+            if (await db.AtlasRefs.FirstOrDefaultAsync(r => r.Id == id, ct) is { } reference) db.AtlasRefs.Remove(reference);
+            await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
         writes.MapPost("/links", async (LinkRequest req, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
         {
-            var (link, error) = await writer.LinkAsync(req.From, req.To, req.Label, ct, req.Kind, req.Planned);
+            var (link, error) = await writer.LinkAsync(req.From, req.To, req.Label, ct, req.Kind, req.Planned, req.Relation);
             if (link is null) return Bad(error!);
             await db.SaveChangesAsync(ct);
-            return Results.Ok(new { link.Id, from = link.FromServiceId, to = link.ToServiceId, link.Label, link.Kind, link.Planned });
+            return Results.Ok(new { link.Id, from = link.FromServiceId, to = link.ToServiceId, link.Label, link.Kind, link.Planned, link.Relation });
         });
         writes.MapDelete("/links/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
         {
-            await db.AtlasLinks.Where(l => l.Id == id).ExecuteDeleteAsync(ct);
+            if (await db.AtlasLinks.FirstOrDefaultAsync(l => l.Id == id, ct) is { } link)
+            {
+                AtlasWriter.RetireLink(link);
+                await db.SaveChangesAsync(ct);
+            }
             return Results.NoContent();
         });
         writes.MapPost("/repos", async (RepoRequest req, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
         {
-            var (repo, error) = await writer.UpsertRepoAsync(req.FullName, req.System, ct);
+            var (repo, error) = await writer.UpsertRepoAsync(req.FullName, req.System, ct, req.Role, req.Services);
             if (repo is null) return Bad(error!);
             await db.SaveChangesAsync(ct);
-            return Results.Ok(new { repo.Id, repo.FullName });
+            return Results.Ok(new { repo.Id, repo.FullName, repo.Role, serviceIds = repo.ServiceIds });
         });
         writes.MapDelete("/repos/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
         {
-            await db.AtlasRepos.Where(r => r.Id == id).ExecuteDeleteAsync(ct);
+            if (await db.AtlasRepos.FirstOrDefaultAsync(r => r.Id == id, ct) is { } repo) db.AtlasRepos.Remove(repo);
+            await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
 
@@ -112,7 +163,8 @@ public static class StaffAtlasEndpoints
         });
         writes.MapDelete("/processes/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
         {
-            await db.AtlasProcesses.Where(p => p.Id == id).ExecuteDeleteAsync(ct);
+            if (await db.AtlasProcesses.FirstOrDefaultAsync(p => p.Id == id, ct) is { } process) db.AtlasProcesses.Remove(process);
+            await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
         writes.MapPost("/processes/{process}/steps", async (string process, AtlasWriter.StepInput req, AtlasWriter writer, PitwallDb db, CancellationToken ct) =>
@@ -126,7 +178,8 @@ public static class StaffAtlasEndpoints
         });
         writes.MapDelete("/steps/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
         {
-            await db.AtlasSteps.Where(s => s.Id == id).ExecuteDeleteAsync(ct);
+            if (await db.AtlasSteps.FirstOrDefaultAsync(s => s.Id == id, ct) is { } step) db.AtlasSteps.Remove(step);
+            await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
 
@@ -139,7 +192,8 @@ public static class StaffAtlasEndpoints
         });
         writes.MapDelete("/routines/{id:guid}", async (Guid id, PitwallDb db, CancellationToken ct) =>
         {
-            await db.AtlasRoutines.Where(r => r.Id == id).ExecuteDeleteAsync(ct);
+            if (await db.AtlasRoutines.FirstOrDefaultAsync(r => r.Id == id, ct) is { } routine) db.AtlasRoutines.Remove(routine);
+            await db.SaveChangesAsync(ct);
             return Results.NoContent();
         });
         writes.MapPost("/routines/{routine}/runs", StartRun);
@@ -161,8 +215,10 @@ public static class StaffAtlasEndpoints
         });
 
         // Loading a whole map at once is an admin's call, from the console only.
-        app.MapPost("/v1/staff/atlas/import", async (AtlasImporter.AtlasFile file, AtlasImporter importer, CancellationToken ct, [FromQuery] bool dryRun = false) =>
+        app.MapPost("/v1/staff/atlas/import", async (AtlasImporter.AtlasFile file, AtlasImporter importer, AtlasActor actor, HttpContext http, CancellationToken ct, [FromQuery] bool dryRun = false) =>
         {
+            actor.Name = Clean.Cut(http.StaffName(), 120) ?? AtlasActor.SystemName;
+            actor.Source = "import";
             var result = await importer.RunAsync(file, dryRun, ct);
             return result.Errors.Count == 0 ? Results.Ok(result) : Results.BadRequest(new { message = "O arquivo tem linhas inválidas. Nada foi gravado.", result.Errors });
         }).RequireAuthorization(Policies.StaffAdmin).WithTags("Staff");
@@ -176,8 +232,11 @@ public static class StaffAtlasEndpoints
         var now = DateTime.UtcNow;
         var products = await db.Products.AsNoTracking().Where(p => p.DisabledAt == null).OrderBy(p => p.Name).ToListAsync(ct);
         var environments = await db.AtlasEnvironments.AsNoTracking().OrderBy(e => e.Position).ThenBy(e => e.Slug).ToListAsync(ct);
-        var services = await db.AtlasServices.AsNoTracking().OrderBy(s => s.Name).ToListAsync(ct);
-        var links = await db.AtlasLinks.AsNoTracking().ToListAsync(ct);
+        // Retired services and the links that touch them are not on the map (the history still has them).
+        var services = await db.AtlasServices.AsNoTracking().Where(s => s.RetiredAt == null).OrderBy(s => s.Name).ToListAsync(ct);
+        var activeIds = services.Select(s => s.Id).ToHashSet();
+        var links = (await db.AtlasLinks.AsNoTracking().Where(l => l.RetiredAt == null).ToListAsync(ct))
+            .Where(l => activeIds.Contains(l.FromServiceId) && activeIds.Contains(l.ToServiceId)).ToList();
         var repos = await db.AtlasRepos.AsNoTracking().OrderBy(r => r.FullName).ToListAsync(ct);
         var discoveries = await db.AtlasDiscoveries.AsNoTracking().Where(d => d.DismissedAt == null).OrderBy(d => d.Source).ThenBy(d => d.Name).ToListAsync(ct);
 
@@ -234,11 +293,12 @@ public static class StaffAtlasEndpoints
             environments = environments.Select(e => new { e.Id, e.Slug, e.Name }),
             services = services.Select(s => new
             {
-                s.Id, s.ProductId, s.EnvironmentId, s.Name, s.Kind, s.Provider, s.ExternalRef, s.Url, monitor = s.MonitorRef, s.Notes,
-                s.Group, s.Condition, facts = s.Facts.Select(f => new { f.Key, f.Value }), s.Items, s.Impact, s.Owner, task = s.TaskCode,
-                s.State, s.MonitorStatus, s.DeployStatus, s.LastDeployAt, s.CommitSha, s.CheckedAt,
+                s.Id, s.Key, s.Engine, s.Signature, s.Origin, s.Aliases, s.ProductId, s.EnvironmentId, s.Name, s.Kind, s.Provider, s.ExternalRef, s.Url,
+                monitor = s.MonitorRef, s.Notes, s.Group, s.Condition, facts = s.Facts.Select(f => new { f.Key, f.Value }), s.Items, s.Impact, s.Owner,
+                task = s.TaskCode, s.State, s.MonitorStatus, s.DeployStatus, s.LastDeployAt, s.CommitSha, s.CheckedAt,
+                s.VerifiedAt, s.VerifiedBy, s.MissingSince, s.RemovalReportedAt,
             }),
-            links = links.Select(l => new { l.Id, from = l.FromServiceId, to = l.ToServiceId, l.Label, l.Kind, l.Planned }),
+            links = links.Select(l => new { l.Id, from = l.FromServiceId, to = l.ToServiceId, l.Label, l.Kind, l.Planned, l.Relation, l.Origin }),
             repos = repos.Select(r => new
             {
                 r.Id, r.ProductId, r.FullName, r.LastRunName, r.LastRunStatus, r.LastRunAt, r.LastRunUrl, r.LastRunSha,
@@ -295,7 +355,7 @@ public static class StaffAtlasEndpoints
         }
         var ids = products.Select(p => p.Id).ToList();
         var repos = await db.AtlasRepos.AsNoTracking().Where(r => r.ProductId != null && ids.Contains(r.ProductId.Value)).ToListAsync(ct);
-        var services = await db.AtlasServices.AsNoTracking().Where(s => s.ProductId != null && ids.Contains(s.ProductId.Value)).ToListAsync(ct);
+        var services = await db.AtlasServices.AsNoTracking().Where(s => s.RetiredAt == null && s.ProductId != null && ids.Contains(s.ProductId.Value)).ToListAsync(ct);
 
         async Task<Dictionary<Guid, int>> Count<T>(IQueryable<T> q, System.Linq.Expressions.Expression<Func<T, Guid>> key) where T : class =>
             await q.GroupBy(key).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Key, g => g.Count, ct);
@@ -387,7 +447,7 @@ public static class StaffAtlasEndpoints
     private static async Task<IResult> Attention(PitwallDb db, CancellationToken ct, [FromQuery] string? system = null)
     {
         var services = await db.AtlasServices.AsNoTracking().Include(s => s.Product)
-            .Where(s => s.Condition == AtlasConditions.Gap || s.Condition == AtlasConditions.Warn).ToListAsync(ct);
+            .Where(s => s.RetiredAt == null && (s.Condition == AtlasConditions.Gap || s.Condition == AtlasConditions.Warn)).ToListAsync(ct);
         var steps = await db.AtlasSteps.AsNoTracking().Include(s => s.Product).Include(s => s.Process).ThenInclude(p => p.Product)
             .Where(s => s.Status == AtlasStepStatuses.Gap || s.Status == AtlasStepStatuses.Warn).ToListAsync(ct);
         var items = services.Select(s => new AttentionItem(
@@ -497,13 +557,15 @@ public static class StaffAtlasEndpoints
         // The component names the node that pulses on the map, when it is one of the system's services.
         Guid? serviceId = null;
         if (system is not null && component is not null)
-            serviceId = (await db.AtlasServices.AsNoTracking().Where(s => s.ProductId == system.Id).ToListAsync(ct))
+            serviceId = (await db.AtlasServices.AsNoTracking().Where(s => s.ProductId == system.Id && s.RetiredAt == null).ToListAsync(ct))
                 .FirstOrDefault(s => AtlasCollect.Same(s.Name, component))?.Id;
         var who = Who(http);
         var activity = new AtlasActivity
         {
             Id = Guid.NewGuid(), ProductId = system?.Id, ServiceId = serviceId, Component = component, Description = description,
             ActorName = who.Name, Source = who.Source, StartedAt = DateTime.UtcNow,
+            Repo = Clean.Cut(req.Repo?.ToLowerInvariant(), 200), Branch = Clean.Cut(req.Branch, 200), HeadSha = Clean.Cut(req.HeadSha, 64),
+            Tool = Clean.Cut(req.Tool?.ToLowerInvariant(), 40),
         };
         db.AtlasActivities.Add(activity);
         await db.SaveChangesAsync(ct);

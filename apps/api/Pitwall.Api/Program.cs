@@ -222,6 +222,9 @@ if (args.Length > 0 && args[0] == "import-atlas")
 {
     if (args.Length < 2 || !File.Exists(args[1])) { Console.Error.WriteLine("Uso: import-atlas <arquivo.json> [--dry-run]"); Environment.ExitCode = 2; return; }
     using var scope = app.Services.CreateScope();
+    var actor = scope.ServiceProvider.GetRequiredService<AtlasActor>();
+    actor.Name = "Importação";
+    actor.Source = "import";
     var file = System.Text.Json.JsonSerializer.Deserialize<AtlasImporter.AtlasFile>(
         await File.ReadAllTextAsync(args[1]), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
     if (file is null) { Console.Error.WriteLine("O arquivo está vazio."); Environment.ExitCode = 2; return; }

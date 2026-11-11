@@ -10,14 +10,15 @@ namespace Pitwall.Services.Atlas;
 /// Every method is an upsert on the natural key and returns either the row or a message for
 /// whoever asked. Nothing is saved until the caller saves.
 /// </summary>
-public sealed class AtlasWriter(PitwallDb db)
+public sealed class AtlasWriter(PitwallDb db, AtlasActor actor)
 {
     public sealed record SystemInput(string? Slug, string? Name, string? Description = null, string? WebsiteUrl = null, string? Color = null);
     public sealed record ServiceInput(
         string? System, string? Environment, string? Name, string? Kind = null, string? Provider = null,
         string? ExternalRef = null, string? Url = null, string? Monitor = null, string? Notes = null,
         string? Group = null, string? Condition = null, Dictionary<string, string>? Facts = null, List<string>? Items = null,
-        string? Impact = null, string? Owner = null, string? Task = null);
+        string? Impact = null, string? Owner = null, string? Task = null,
+        string? Key = null, string? Engine = null, string? Signature = null, string? Origin = null);
     public sealed record StageInput(string? Key, string? Name, string? Description = null);
     public sealed record StepInput(
         string? Slug, string? Name, string? Status = null, string? System = null, string? Stage = null, string? Owner = null,
@@ -117,6 +118,17 @@ public sealed class AtlasWriter(PitwallDb db)
         if (input.Items is { Count: > 200 }) return (null, false, "No máximo 200 itens por serviço.");
 
         Guid? productId = system?.Id, envId = env?.Id;
+        var engine = Lower(input.Engine);
+        if (engine is { Length: > 0 } && !AtlasEngines.IsValid(engine))
+            return (null, false, $"Motor inválido. Use {string.Join(", ", AtlasEngines.All)}.");
+        var origin = Lower(input.Origin);
+        if (origin is { Length: > 0 } && !AtlasOrigins.IsValid(origin))
+            return (null, false, $"Origem inválida. Use {string.Join(", ", AtlasOrigins.All)}.");
+        var key = Lower(input.Key);
+        if (key is { Length: > 0 } && !System.Text.RegularExpressions.Regex.IsMatch(key, "^[a-z0-9][a-z0-9:-]{0,158}$"))
+            return (null, false, "A chave usa letras minúsculas, números, dois-pontos e hífen (até 160).");
+
+        // Found by the natural key, retired ones too: a service that comes back is the same node.
         var service = db.AtlasServices.Local.FirstOrDefault(s => s.ProductId == productId && s.EnvironmentId == envId && s.Name == name)
             ?? await db.AtlasServices.FirstOrDefaultAsync(s => s.ProductId == productId && s.EnvironmentId == envId && s.Name == name, ct);
         var now = DateTime.UtcNow;
@@ -124,20 +136,34 @@ public sealed class AtlasWriter(PitwallDb db)
         if (service is null)
         {
             var initialKind = kind is { Length: > 0 } ? kind : system is null ? AtlasServiceKinds.External : AtlasServiceKinds.Other;
+            if (key is { Length: > 0 } && await KeyTakenAsync(key, ct)) return (null, false, "Essa chave já é de outro serviço.");
             service = new AtlasService
             {
                 Id = Guid.NewGuid(), ProductId = productId, EnvironmentId = envId, Name = name, CreatedAt = now,
-                Kind = initialKind, Engine = AtlasEngines.ForKind(initialKind),
-                Key = await NewKeyAsync(system, env, name, ct),
+                Kind = initialKind, Engine = engine ?? AtlasEngines.ForKind(initialKind),
+                Origin = origin ?? AtlasOrigins.Declared,
+                Key = key is { Length: > 0 } ? key : await NewKeyAsync(system, env, name, ct),
             };
             db.AtlasServices.Add(service);
         }
-        // The map column follows the kind only while nobody chose one by hand.
-        else if (kind is { Length: > 0 } && kind != service.Kind)
+        else
         {
-            if (service.Engine == AtlasEngines.ForKind(service.Kind)) service.Engine = AtlasEngines.ForKind(kind);
-            service.Kind = kind;
+            if (service.RetiredAt is not null)
+            {
+                service.RetiredAt = null;
+                service.RetiredReason = null;
+            }
+            // The map column follows the kind only while nobody chose one by hand.
+            if (kind is { Length: > 0 } && kind != service.Kind)
+            {
+                if (service.Engine == AtlasEngines.ForKind(service.Kind)) service.Engine = AtlasEngines.ForKind(kind);
+                service.Kind = kind;
+            }
+            // An explicit engine always wins; an origin only gets stronger.
+            if (engine is { Length: > 0 }) service.Engine = engine;
+            if (origin is { Length: > 0 }) service.Origin = AtlasOrigins.Stronger(service.Origin, origin);
         }
+        if (input.Signature is not null) service.Signature = Clean.Cut(Lower(input.Signature), 60);
         if (input.Provider is not null) service.Provider = Clean.Cut(input.Provider, 40)?.ToLowerInvariant();
         if (input.ExternalRef is not null) service.ExternalRef = Clean.Cut(input.ExternalRef, 300);
         if (input.Url is not null) service.Url = Clean.Cut(input.Url, 500);
@@ -148,6 +174,7 @@ public sealed class AtlasWriter(PitwallDb db)
         if (input.Impact is not null) service.Impact = Lower(input.Impact) is { Length: > 0 } i ? i : null;
         if (input.Owner is not null) service.Owner = Lower(input.Owner) is { Length: > 0 } o ? o : null;
         if (input.Task is not null) service.TaskCode = Clean.Cut(input.Task, 20)?.ToUpperInvariant();
+        if (service.TaskCode is { } taskCode) await EnsureRefAsync(service, AtlasRefKinds.Task, taskCode, now, ct);
         if (input.Facts is not null)
             service.Facts = input.Facts
                 .Select(f => (Key: Clean.Cut(f.Key, 60), Value: Clean.Cut(f.Value, 500)))
@@ -206,27 +233,60 @@ public sealed class AtlasWriter(PitwallDb db)
     /// A service by id, or by name: <c>Name</c> for an outside service, <c>system/Name</c> or
     /// <c>system/environment/Name</c> for one of a system's.
     /// </summary>
-    public async Task<AtlasService?> FindServiceAsync(string? reference, CancellationToken ct)
+    /// <summary>
+    /// A service by id, by key, by name or by a former name (alias). Retired services are not found
+    /// unless <paramref name="includeRetired"/> is set.
+    /// </summary>
+    public async Task<AtlasService?> FindServiceAsync(string? reference, CancellationToken ct, bool includeRetired = false)
     {
         var r = reference?.Trim() ?? "";
         if (r.Length == 0) return null;
-        if (Guid.TryParse(r, out var id)) return await db.AtlasServices.FirstOrDefaultAsync(s => s.Id == id, ct);
+        AtlasService? found;
+        if (Guid.TryParse(r, out var id))
+        {
+            found = db.AtlasServices.Local.FirstOrDefault(s => s.Id == id) ?? await db.AtlasServices.FirstOrDefaultAsync(s => s.Id == id, ct);
+        }
+        else found = await FindByTextAsync(r, ct, includeRetired);
+        if (found is null) return null;
+        return !includeRetired && found.RetiredAt is not null ? null : found;
+    }
+
+    private async Task<AtlasService?> FindByTextAsync(string r, CancellationToken ct, bool includeRetired)
+    {
         var parts = r.Split('/', 3, StringSplitOptions.TrimEntries);
         var all = db.AtlasServices.Local.ToList();
         var stored = await db.AtlasServices.Include(s => s.Product).Include(s => s.Environment).ToListAsync(ct);
         all.AddRange(stored.Where(s => all.All(a => a.Id != s.Id)));
+        if (!includeRetired) all = all.Where(s => s.RetiredAt is null).ToList();
         bool Same(string? a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
-        if (parts.Length == 1) return all.FirstOrDefault(s => s.ProductId is null && Same(s.Name, parts[0])) ?? all.FirstOrDefault(s => Same(s.Name, parts[0]));
+
+        // A key is the stable name: it wins over anything that looks like a name.
+        if (all.FirstOrDefault(s => s.Key == r.ToLowerInvariant()) is { } byKey) return byKey;
+        if (parts.Length == 1)
+        {
+            return all.FirstOrDefault(s => s.ProductId is null && Same(s.Name, parts[0]))
+                ?? all.FirstOrDefault(s => Same(s.Name, parts[0]))
+                ?? all.FirstOrDefault(s => s.ProductId is null && s.Aliases.Any(a => Same(a, parts[0])))
+                ?? all.FirstOrDefault(s => s.Aliases.Any(a => Same(a, parts[0])));
+        }
         var system = await FindSystemAsync(parts[0], ct);
         if (system is null) return null;
         var own = all.Where(s => s.ProductId == system.Id);
-        if (parts.Length == 2) return own.FirstOrDefault(s => Same(s.Name, parts[1]));
+        if (parts.Length == 2)
+            return own.FirstOrDefault(s => Same(s.Name, parts[1])) ?? own.FirstOrDefault(s => s.Aliases.Any(a => Same(a, parts[1])));
         return own.FirstOrDefault(s => Same(s.Name, parts[2]) && s.EnvironmentId is { } e
-            && Same((db.AtlasEnvironments.Local.FirstOrDefault(x => x.Id == e) ?? s.Environment)?.Slug, parts[1]));
+                && Same((db.AtlasEnvironments.Local.FirstOrDefault(x => x.Id == e) ?? s.Environment)?.Slug, parts[1]))
+            ?? own.FirstOrDefault(s => s.Aliases.Any(a => Same(a, parts[2])) && s.EnvironmentId is { } e2
+                && Same((db.AtlasEnvironments.Local.FirstOrDefault(x => x.Id == e2) ?? s.Environment)?.Slug, parts[1]));
     }
 
+    /// <summary>
+    /// Links two services. With a <paramref name="relation"/> the link is that relation between the pair.
+    /// Without one (the old MCP, the old importer): the only active link of the pair is updated, or a new
+    /// one is made with the relation of its kind. A retired link of the same relation comes back.
+    /// </summary>
     public async Task<(AtlasLink? Link, string? Error)> LinkAsync(
-        string? from, string? to, string? label, CancellationToken ct, string? kind = null, bool? planned = null)
+        string? from, string? to, string? label, CancellationToken ct, string? kind = null, bool? planned = null, string? relation = null)
     {
         var a = await FindServiceAsync(from, ct);
         var b = await FindServiceAsync(to, ct);
@@ -235,21 +295,140 @@ public sealed class AtlasWriter(PitwallDb db)
         if (a.Id == b.Id) return (null, "Um serviço não se liga a si mesmo.");
         var k = Lower(kind);
         if (k is { Length: > 0 } && !AtlasLinkKinds.IsValid(k)) return (null, $"Tipo de ligação inválido. Use {string.Join(", ", AtlasLinkKinds.All)}.");
-        var link = db.AtlasLinks.Local.FirstOrDefault(l => l.FromServiceId == a.Id && l.ToServiceId == b.Id)
-            ?? await db.AtlasLinks.FirstOrDefaultAsync(l => l.FromServiceId == a.Id && l.ToServiceId == b.Id, ct);
+        var rel = Lower(relation);
+        if (rel is { Length: > 0 } && !AtlasRelations.IsValid(rel)) return (null, $"Relação inválida. Use {string.Join(", ", AtlasRelations.All)}.");
+
+        var all = await LinksBetweenAsync(a.Id, b.Id, ct);
+        AtlasLink? link;
+        if (rel is { Length: > 0 }) link = all.FirstOrDefault(l => l.Relation == rel);
+        else
+        {
+            var active = all.Where(l => l.RetiredAt is null).ToList();
+            if (active.Count > 1) return (null, "Há mais de uma ligação entre esses dois serviços. Diga a relação.");
+            link = active.Count == 1 ? active[0] : null;
+        }
+        var wanted = rel is { Length: > 0 } ? rel : AtlasRelations.FromLinkKind(k);
+        link ??= all.FirstOrDefault(l => l.Relation == wanted);
+
+        var now = DateTime.UtcNow;
         if (link is null)
         {
             link = new AtlasLink
             {
-                Id = Guid.NewGuid(), FromServiceId = a.Id, ToServiceId = b.Id, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+                Id = Guid.NewGuid(), FromServiceId = a.Id, ToServiceId = b.Id, CreatedAt = now, UpdatedAt = now,
+                Relation = wanted, Origin = AtlasOrigins.Declared,
             };
             db.AtlasLinks.Add(link);
         }
+        // Linking again brings a retired link back.
+        link.RetiredAt = null;
         if (label is not null) link.Label = Clean.Cut(label, 80);
         if (k is { Length: > 0 }) link.Kind = k;
         if (planned is { } p) link.Planned = p;
+        link.UpdatedAt = now;
         return (link, null);
     }
+
+    /// <summary>Every link between the two, retired or not, stored or only added in this unit of work.</summary>
+    private async Task<List<AtlasLink>> LinksBetweenAsync(Guid from, Guid to, CancellationToken ct)
+    {
+        var local = db.AtlasLinks.Local.Where(l => l.FromServiceId == from && l.ToServiceId == to);
+        var stored = await db.AtlasLinks.Where(l => l.FromServiceId == from && l.ToServiceId == to).ToListAsync(ct);
+        return local.Concat(stored).DistinctBy(l => l.Id).ToList();
+    }
+
+    private async Task<List<AtlasLink>> LinksOfAsync(Guid serviceId, CancellationToken ct)
+    {
+        var local = db.AtlasLinks.Local.Where(l => l.FromServiceId == serviceId || l.ToServiceId == serviceId);
+        var stored = await db.AtlasLinks.Where(l => l.FromServiceId == serviceId || l.ToServiceId == serviceId).ToListAsync(ct);
+        return local.Concat(stored).DistinctBy(l => l.Id).ToList();
+    }
+
+    /// <summary>Retires a service (soft delete): it leaves the map, its active links leave with it at the same instant.</summary>
+    public async Task RetireServiceAsync(AtlasService service, string? reason, CancellationToken ct)
+    {
+        var now = Instant();
+        service.RetiredAt = now;
+        service.RetiredReason = Clean.Cut(reason, 300);
+        service.UpdatedAt = now;
+        foreach (var link in await LinksOfAsync(service.Id, ct))
+        {
+            if (link.RetiredAt is null) link.RetiredAt = now;
+        }
+    }
+
+    /// <summary>Brings a retired service back, and the links that were retired with it (and only those).</summary>
+    public async Task RestoreServiceAsync(AtlasService service, CancellationToken ct)
+    {
+        var retiredAt = service.RetiredAt;
+        service.RetiredAt = null;
+        service.RetiredReason = null;
+        service.UpdatedAt = Instant();
+        if (retiredAt is null) return;
+        foreach (var link in await LinksOfAsync(service.Id, ct))
+        {
+            if (link.RetiredAt == retiredAt) link.RetiredAt = null;
+        }
+    }
+
+    /// <summary>Retires one link. Its services stay.</summary>
+    public static void RetireLink(AtlasLink link) => link.RetiredAt ??= Instant();
+
+    /// <summary>
+    /// A new name for a service. The old name becomes an alias, so references by it still find the node.
+    /// Returns an error: <c>conflict</c> when another active service of the same system and environment has the name.
+    /// </summary>
+    public async Task<(string? Error, bool Conflict)> RenameServiceAsync(AtlasService service, string? newName, CancellationToken ct)
+    {
+        var name = Clean.Cut(newName, 120);
+        if (name is null) return ("Dê um nome ao serviço (até 120 caracteres).", false);
+        if (string.Equals(name, service.Name, StringComparison.Ordinal)) return (null, false);
+        bool Same(string? a) => string.Equals(a, name, StringComparison.OrdinalIgnoreCase);
+        var clash = db.AtlasServices.Local.Any(s => s.Id != service.Id && s.RetiredAt is null && s.ProductId == service.ProductId
+                && s.EnvironmentId == service.EnvironmentId && Same(s.Name))
+            || await db.AtlasServices.AnyAsync(s => s.Id != service.Id && s.RetiredAt == null && s.ProductId == service.ProductId
+                && s.EnvironmentId == service.EnvironmentId && s.Name.ToLower() == name.ToLower(), ct);
+        if (clash) return ("Já existe outro serviço com esse nome neste sistema e ambiente.", true);
+        if (!service.Aliases.Any(a => string.Equals(a, service.Name, StringComparison.OrdinalIgnoreCase)))
+            service.Aliases = [.. service.Aliases, service.Name];
+        service.Name = name;
+        service.UpdatedAt = Instant();
+        return (null, false);
+    }
+
+    /// <summary>Attaches a task, ticket or error to a service. Attaching the same one again updates its note.</summary>
+    public async Task<(AtlasRef? Ref, string? Error)> AddRefAsync(AtlasService service, string? kind, string? code, string? note, CancellationToken ct)
+    {
+        var k = Lower(kind);
+        if (!AtlasRefKinds.IsValid(k)) return (null, $"Tipo de referência inválido. Use {string.Join(", ", AtlasRefKinds.All)}.");
+        var c = Clean.Cut(code, 80)?.ToUpperInvariant();
+        if (c is null) return (null, "Informe o código da referência (até 80 caracteres).");
+        var reference = await EnsureRefAsync(service, k!, c, Instant(), ct);
+        if (note is not null) reference.Note = Clean.Cut(note, 300);
+        return (reference, null);
+    }
+
+    /// <summary>The reference of a service with this kind and code, created when it is not there yet.</summary>
+    private async Task<AtlasRef> EnsureRefAsync(AtlasService service, string kind, string code, DateTime now, CancellationToken ct)
+    {
+        bool Same(AtlasRef r) => r.ServiceId == service.Id && r.Kind == kind && r.Code == code;
+        var existing = db.AtlasRefs.Local.FirstOrDefault(Same)
+            ?? await db.AtlasRefs.FirstOrDefaultAsync(r => r.ServiceId == service.Id && r.Kind == kind && r.Code == code, ct);
+        if (existing is not null) return existing;
+        var reference = new AtlasRef
+        {
+            Id = Guid.NewGuid(), ServiceId = service.Id, Kind = kind, Code = code, Source = actor.Source,
+            CreatedBy = actor.Name, CreatedAt = now,
+        };
+        db.AtlasRefs.Add(reference);
+        return reference;
+    }
+
+    private async Task<bool> KeyTakenAsync(string key, CancellationToken ct) =>
+        db.AtlasServices.Local.Any(s => s.Key == key) || await db.AtlasServices.AnyAsync(s => s.Key == key, ct);
+
+    /// <summary>Now, cut to the microsecond the database keeps: an instant read back must equal the one written.</summary>
+    public static DateTime Instant() => new(DateTime.UtcNow.Ticks / 10 * 10, DateTimeKind.Utc);
 
     public async Task<AtlasProcess?> FindProcessAsync(string? slugOrId, CancellationToken ct)
     {
@@ -370,8 +549,26 @@ public sealed class AtlasWriter(PitwallDb db)
         return (step, null);
     }
 
-    public async Task<(AtlasRepo? Repo, string? Error)> UpsertRepoAsync(string? fullName, string? system, CancellationToken ct)
+    /// <summary>
+    /// A repository of a system. <paramref name="services"/> (when sent) replaces the services it delivers,
+    /// each found the way a service reference is found; <paramref name="role"/> must be one of <see cref="AtlasRepoRoles"/>.
+    /// </summary>
+    public async Task<(AtlasRepo? Repo, string? Error)> UpsertRepoAsync(
+        string? fullName, string? system, CancellationToken ct, string? role = null, List<string>? services = null)
     {
+        var roleName = Lower(role);
+        if (roleName is { Length: > 0 } && !AtlasRepoRoles.IsValid(roleName))
+            return (null, $"Papel inválido. Use {string.Join(", ", AtlasRepoRoles.All)}.");
+        List<Guid>? serviceIds = null;
+        if (services is not null)
+        {
+            serviceIds = [];
+            foreach (var reference in services.Take(30))
+            {
+                if (await FindServiceAsync(reference, ct) is not { } svc) return (null, $"Serviço não encontrado: {Clean.Cut(reference, 120)}.");
+                if (!serviceIds.Contains(svc.Id)) serviceIds.Add(svc.Id);
+            }
+        }
         var name = fullName?.Trim().ToLowerInvariant() ?? "";
         var parts = name.Split('/');
         if (name.Length > 200 || parts.Length != 2 || parts.Any(p => p.Length == 0 || !p.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.')))
@@ -386,6 +583,8 @@ public sealed class AtlasWriter(PitwallDb db)
             db.AtlasRepos.Add(repo);
         }
         if (product is not null) repo.ProductId = product.Id;
+        if (roleName is { Length: > 0 }) repo.Role = roleName;
+        if (serviceIds is not null) repo.ServiceIds = serviceIds;
         return (repo, null);
     }
 

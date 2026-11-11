@@ -180,7 +180,7 @@ public sealed class RailwayCollector(HttpClient http, string? token, string? wor
 
     public async Task CollectAsync(PitwallDb db, CancellationToken ct)
     {
-        var services = await db.AtlasServices.Include(s => s.Environment).Where(s => s.Provider == "railway").ToListAsync(ct);
+        var services = await db.AtlasServices.Include(s => s.Environment).Where(s => s.RetiredAt == null && s.Provider == "railway").ToListAsync(ct);
         var unmatched = new List<AtlasCollect.Found>();
         var now = DateTime.UtcNow;
 
@@ -261,7 +261,7 @@ public sealed class GitHubCollector(HttpClient http, IAtlasGitHubAuth auth) : IA
 
     public async Task CollectAsync(PitwallDb db, CancellationToken ct)
     {
-        var repos = await db.AtlasRepos.ToListAsync(ct);
+        var repos = await db.AtlasRepos.Where(r => r.RetiredAt == null).ToListAsync(ct);
         var now = DateTime.UtcNow;
         var since = now.AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ssZ");
         foreach (var repo in repos)
@@ -344,7 +344,7 @@ public sealed partial class KumaCollector(HttpClient http, string? url, string? 
         if (!res.IsSuccessStatusCode) throw new HttpRequestException($"O Uptime Kuma respondeu {(int)res.StatusCode}.", null, res.StatusCode);
         var monitors = Parse(await res.Content.ReadAsStringAsync(ct));
 
-        var services = await db.AtlasServices.Where(s => s.MonitorRef != null).ToListAsync(ct);
+        var services = await db.AtlasServices.Where(s => s.RetiredAt == null && s.MonitorRef != null).ToListAsync(ct);
         var now = DateTime.UtcNow;
         var unmatched = new List<AtlasCollect.Found>();
         foreach (var m in monitors)
@@ -385,7 +385,7 @@ public sealed class VercelCollector(HttpClient http, string? token, string? team
 
     public async Task CollectAsync(PitwallDb db, CancellationToken ct)
     {
-        var services = await db.AtlasServices.Where(s => s.Provider == "vercel").ToListAsync(ct);
+        var services = await db.AtlasServices.Where(s => s.RetiredAt == null && s.Provider == "vercel").ToListAsync(ct);
         var now = DateTime.UtcNow;
         var unmatched = new List<AtlasCollect.Found>();
         var list = await AtlasCollect.GetJsonAsync(http, Get("/v10/projects?limit=100"), ct);
