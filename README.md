@@ -20,8 +20,13 @@ num único console.
 - **Novidades escritas sozinhas.** O CI de cada sistema manda os commits; o Claude Haiku 5.5
   escreve a nota em pt e en; ela vai para o changelog público e para o sino do produto. Commits que
   citam um código de chamado (`fix: … (20261016-7K3Q)`) resolvem o chamado e avisam o cliente.
-- **Atlas.** A operação viva: o que está no ar, o que roda agora, a esteira de cada repositório, as rotinas que rodam
-  sozinhas e o que apareceu nos provedores sem cadastro. Começa vazio; cada instalação cadastra o seu.
+- **Atlas.** O mapa operacional vivo: empresa, produto em colunas por motor e componente, com cinco modos sobre o mesmo
+  inventário (arquitetura, fluxos, operação, atenção e evolução). Cada afirmação traz a origem e a evidência, e nada
+  some sozinho.
+- **Atlas Agent Sync.** O agente envia o estado do repositório ao fim da sessão (`atlas_sync`), e hooks do git e a
+  action de CI mantêm o mapa mesmo sem agente. Lê só manifestos da lista branca, nunca `.env` ou chaves.
+- **Atlas: coletores e rotinas.** Railway, Vercel, Uptime Kuma, GitHub e Cloudflare com tokens só de leitura, webhook do
+  GitHub e as rotinas que rodam sozinhas. Começa vazio; cada instalação cadastra o seu.
 - **Um console para a equipe.** Fila única de todos os sistemas, dossiê com gravação + stack trace,
   erros agrupados, revisão das novidades, cadastro de sistemas, chaves e webhooks.
 
