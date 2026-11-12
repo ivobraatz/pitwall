@@ -130,7 +130,7 @@ public class AtlasConnectorStateTests(PitwallFixture fx) : IClassFixture<Pitwall
 
         // The provider fails on the first call of the run: nothing of the run is saved.
         var failing = new ConnectorKit.FakeProvider()
-            .On("projects", "{\"errors\":[{\"message\":\"Service unavailable\"}]}", HttpStatusCode.InternalServerError);
+            .On("query", "{\"errors\":[{\"message\":\"Service unavailable\"}]}", HttpStatusCode.InternalServerError);
         await ConnectorKit.Runner(fx, new RailwayCollector(new HttpClient(failing), ConnectorKit.Token)).RunAllAsync(CancellationToken.None);
 
         var failed = await SourceAsync("railway");
