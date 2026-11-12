@@ -1,0 +1,25 @@
+# Atlas do Pitwall: envia o estado do repositório a cada push na main.
+# Só roda quando o segredo PITWALL_TOKEN (pwt_ com escopo atlas) existe no repositório.
+name: Atlas sync
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  atlas:
+    runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN: ${{ secrets.PITWALL_TOKEN != '' }}
+    steps:
+      - if: env.HAS_TOKEN == 'true'
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - if: env.HAS_TOKEN == 'true'
+        uses: ivobraatz/pitwall/.github/actions/atlas-sync@main
+        with:
+          pitwall-url: https://pitwall.braatz.com.br
+          token: ${{ secrets.PITWALL_TOKEN }}
+          system: pitwall
+          scope: pushed

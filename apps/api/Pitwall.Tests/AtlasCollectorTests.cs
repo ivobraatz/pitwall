@@ -101,6 +101,7 @@ public class AtlasCollectorTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
         var project = Unique("acme");
         var api = await SeedServiceAsync(productId, production.Id, "API", "railway", $"{project}/api");
         var provider = new Provider()
+            .On("query { me {", """{"data":{"me":{"workspaces":[]}}}""")
             .On("projects", "{\"data\":{\"projects\":{\"edges\":[{\"node\":{\"id\":\"p1\",\"name\":\"" + project + "\"}}]}}}")
             .On("project(id", """{"data":{"project":{"services":{"edges":[{"node":{"id":"s1","name":"api"}},{"node":{"id":"s2","name":"worker"}}]},"environments":{"edges":[{"node":{"id":"e1","name":"production"}},{"node":{"id":"e2","name":"staging"}}]}}}}""")
             .On("deployments(first", """
@@ -144,10 +145,76 @@ public class AtlasCollectorTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
     [Fact]
     public async Task Railway_reports_a_refused_query_without_the_token()
     {
-        var provider = new Provider().On("projects", """{"errors":[{"message":"Not Authorized"}]}""");
+        var provider = new Provider()
+            .On("query { me {", """{"data":{"me":{"workspaces":[]}}}""")
+            .On("projects", """{"errors":[{"message":"Not Authorized"}]}""");
         var error = await Assert.ThrowsAsync<HttpRequestException>(() => CollectAsync(new RailwayCollector(new HttpClient(provider), Token)));
         Assert.Contains("Not Authorized", error.Message);
         Assert.DoesNotContain(Token, error.Message);
+    }
+
+    /// <summary>
+    /// A Railway account whose one service runs in production. The workspace is listed by its id, the personal
+    /// projects by the query without arguments; "me" names the workspace when asked.
+    /// </summary>
+    private static Provider RailwayRoundWithWorkspace(string workspace, string project, string personalEdges, string workspaceEdges, bool withMe = true)
+    {
+        var provider = new Provider()
+            .On(workspace, "{\"data\":{\"projects\":{\"edges\":" + workspaceEdges + "}}}")
+            .On("query { projects {", "{\"data\":{\"projects\":{\"edges\":" + personalEdges + "}}}")
+            .On("project(id", """{"data":{"project":{"services":{"edges":[{"node":{"id":"s1","name":"api"}}]},"environments":{"edges":[{"node":{"id":"e1","name":"production"}}]}}}}""")
+            .On("deployments(first", """{"data":{"d0":{"edges":[{"node":{"id":"d-1","status":"SUCCESS","createdAt":"2026-11-08T12:00:00.000Z","meta":{}}}]}}}""");
+        if (withMe)
+            provider.On("query { me {", "{\"data\":{\"me\":{\"workspaces\":[{\"id\":\"" + workspace + "\",\"name\":\"Time\"}]}}}");
+        return provider;
+    }
+
+    [Fact]
+    public async Task Railway_without_a_workspace_id_reads_the_projects_of_every_workspace()
+    {
+        var (productId, production) = await SeedSystemAsync();
+        var project = Unique("acme");
+        var api = await SeedServiceAsync(productId, production.Id, "API", "railway", $"{project}/api");
+        var workspace = Unique("ws");
+        var provider = RailwayRoundWithWorkspace(workspace, project, "[]", $"[{{\"node\":{{\"id\":\"pw1\",\"name\":\"{project}\"}}}}]");
+        await CollectAsync(new RailwayCollector(new HttpClient(provider), Token));
+
+        Assert.Single(provider.Requests, r => r.Body.Contains("query { me {"));
+        Assert.Contains(provider.Requests, r => r.Body.Contains(workspace));
+        var seen = await ReadAsync(db => db.AtlasServices.SingleAsync(s => s.Id == api.Id));
+        Assert.Equal("success", seen.DeployStatus);
+    }
+
+    [Fact]
+    public async Task Railway_counts_a_project_listed_as_personal_and_in_a_workspace_once()
+    {
+        var (productId, production) = await SeedSystemAsync();
+        var project = Unique("acme");
+        var api = await SeedServiceAsync(productId, production.Id, "API", "railway", $"{project}/api");
+        var workspace = Unique("ws");
+        var edges = $"[{{\"node\":{{\"id\":\"pw1\",\"name\":\"{project}\"}}}}]";
+        var provider = RailwayRoundWithWorkspace(workspace, project, edges, edges);
+        await CollectAsync(new RailwayCollector(new HttpClient(provider), Token));
+
+        Assert.Single(provider.Requests, r => r.Body.Contains("project(id"));
+        var seen = await ReadAsync(db => db.AtlasServices.SingleAsync(s => s.Id == api.Id));
+        Assert.Equal("success", seen.DeployStatus);
+    }
+
+    [Fact]
+    public async Task Railway_with_a_workspace_id_reads_only_that_workspace()
+    {
+        var (productId, production) = await SeedSystemAsync();
+        var project = Unique("acme");
+        var api = await SeedServiceAsync(productId, production.Id, "API", "railway", $"{project}/api");
+        var workspace = Unique("ws");
+        var provider = RailwayRoundWithWorkspace(workspace, project, "[]", $"[{{\"node\":{{\"id\":\"pw1\",\"name\":\"{project}\"}}}}]", withMe: false);
+        await CollectAsync(new RailwayCollector(new HttpClient(provider), Token, workspace));
+
+        Assert.DoesNotContain(provider.Requests, r => r.Body.Contains("query { me {"));
+        Assert.Contains(provider.Requests, r => r.Body.Contains($"projects(workspaceId: \\\"{workspace}\\\")"));
+        var seen = await ReadAsync(db => db.AtlasServices.SingleAsync(s => s.Id == api.Id));
+        Assert.Equal("success", seen.DeployStatus);
     }
 
     [Fact]

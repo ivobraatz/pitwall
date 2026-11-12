@@ -383,7 +383,7 @@ Os coletores leem provedores com tokens só de leitura, de hora em hora, e na ho
 
 | Coletor | Variáveis (`.env`) | Casa com o serviço ou repositório por | Grava |
 |---|---|---|---|
-| Railway | `ATLAS_RAILWAY_TOKEN`, `ATLAS_RAILWAY_WORKSPACE_ID` (opcional) | `provider` = `railway`, `externalRef` = `projeto/serviço`, e o ambiente pelo nome | verificação, estado e commit do último deploy, eventos de deploy, `MissingSince` |
+| Railway | `ATLAS_RAILWAY_TOKEN`, `ATLAS_RAILWAY_WORKSPACE_ID` (opcional: restringe a um workspace; sem ela, lê os projetos pessoais e de todos os workspaces da conta) | `provider` = `railway`, `externalRef` = `projeto/serviço`, e o ambiente pelo nome | verificação, estado e commit do último deploy, eventos de deploy, `MissingSince` |
 | GitHub | `ATLAS_GITHUB_APP_ID`, `ATLAS_GITHUB_APP_PRIVATE_KEY`, `ATLAS_GITHUB_APP_INSTALLATION_ID` (recomendado) ou `ATLAS_GITHUB_TOKEN` | repositório cadastrado, pelo id do GitHub (`ExternalId`) e, sem id, pelo `dono/nome` | id, branch padrão, linguagens, PRs abertos, última execução do Actions, eventos de CI, alertas do Dependabot |
 | Uptime Kuma | `ATLAS_KUMA_URL`, `ATLAS_KUMA_API_KEY` | `monitor` = nome do monitor | verificação e estado no ar ou fora, eventos `monitor.down` e `monitor.up`. Não marca `MissingSince` |
 | Vercel | `ATLAS_VERCEL_TOKEN`, `ATLAS_VERCEL_TEAM_ID` (opcional) | `provider` = `vercel`, `externalRef` = nome do projeto | verificação, estado e commit do último deploy de produção, eventos de deploy, `MissingSince` |
@@ -393,8 +393,8 @@ O token do Cloudflare só precisa de leitura de zonas, registros DNS, Workers, P
 
 Onde gerar cada token:
 
-- **Railway:** painel → *Account Settings → Tokens*. Token de conta ou de workspace (com o de workspace,
-  informe também `ATLAS_RAILWAY_WORKSPACE_ID`). O token de projeto não serve: usa outro cabeçalho.
+- **Railway:** painel → *Account Settings → Tokens*. Token de conta, de preferência: com ele o coletor
+  lê todos os workspaces da conta. Token de workspace só enxerga aquele workspace. O token de projeto não serve: usa outro cabeçalho.
 - **GitHub App (recomendado):** ver a seção abaixo.
 - **GitHub, token pessoal (alternativa):** *Settings → Developer settings → Fine-grained tokens*, só leitura em
   *Actions*, *Contents*, *Metadata* e *Dependabot alerts* dos repositórios. Sem a permissão de alertas, a

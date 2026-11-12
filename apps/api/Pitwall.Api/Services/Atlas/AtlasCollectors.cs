@@ -297,6 +297,38 @@ public sealed class RailwayCollector(HttpClient http, string? token, string? wor
     /// <summary>The key of a service in one environment, as the listing names it.</summary>
     private static string PairKey(string? reference, string? envSlug) => $"{reference}|{envSlug}".ToLowerInvariant();
 
+    /// <summary>The ids of the account's workspaces. A personal project is not listed under a workspace, so these are read too.</summary>
+    private async Task<List<string>> WorkspaceIdsAsync(CancellationToken ct)
+    {
+        var me = await QueryAsync("query { me { workspaces { id name } } }", ct);
+        return me.Items("me", "workspaces").Select(w => w.Str("id")).OfType<string>().ToList();
+    }
+
+    /// <summary>The projects to read, each once. With a workspace id only that workspace; without one, the personal projects and every workspace's.</summary>
+    private async Task<List<JsonElement>> ProjectsAsync(CancellationToken ct)
+    {
+        var listings = new List<string>();
+        if (!string.IsNullOrWhiteSpace(workspaceId))
+        {
+            listings.Add($"projects(workspaceId: {Id(workspaceId)})");
+        }
+        else
+        {
+            listings.Add("projects");
+            listings.AddRange((await WorkspaceIdsAsync(ct)).Select(wsId => $"projects(workspaceId: {Id(wsId)})"));
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var projects = new List<JsonElement>();
+        foreach (var listing in listings)
+        {
+            var data = await QueryAsync($"query {{ {listing} {{ edges {{ node {{ id name }} }} }} }}", ct);
+            foreach (var project in data.Items("projects", "edges").Select(e => e.GetProperty("node")))
+                if (project.Str("id") is { } id && seen.Add(id)) projects.Add(project);
+        }
+        return projects;
+    }
+
     public async Task<int> CollectAsync(PitwallDb db, CancellationToken ct)
     {
         var services = await db.AtlasServices.Include(s => s.Environment).Where(s => s.RetiredAt == null && s.Provider == "railway").ToListAsync(ct);
@@ -305,9 +337,7 @@ public sealed class RailwayCollector(HttpClient http, string? token, string? wor
         var seenPairs = new HashSet<string>(StringComparer.Ordinal);
         var now = DateTime.UtcNow;
 
-        var args = string.IsNullOrWhiteSpace(workspaceId) ? "" : $"(workspaceId: {Id(workspaceId)})";
-        var projects = await QueryAsync($"query {{ projects{args} {{ edges {{ node {{ id name }} }} }} }}", ct);
-        foreach (var project in projects.Items("projects", "edges").Select(e => e.GetProperty("node")))
+        foreach (var project in await ProjectsAsync(ct))
         {
             var projectId = project.Str("id");
             var projectName = project.Str("name") ?? "";
