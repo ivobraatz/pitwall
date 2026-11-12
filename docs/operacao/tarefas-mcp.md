@@ -110,12 +110,13 @@ API responde 401.
 O MCP não envia cabeçalhos de *service token* do Access (`CF-Access-Client-Id`), então a política
 **Service Auth** não serve aqui.
 
-1. Abra https://one.dash.cloudflare.com → **Access** → **Applications** → **Add an application** →
-   **Self-hosted**.
+1. Abra https://one.dash.cloudflare.com → **Access controls** → **Applications** → **Create new
+   application** → **Self-hosted and private** (os nomes do menu mudam com frequência; antes era
+   Access → Applications → Add an application → Self-hosted).
 2. *Application name*: `Pitwall MCP (tarefas)`.
-3. **Add public hostname** duas vezes, no mesmo subdomínio e domínio do console:
-   - *Subdomain* `pitwall`, *Domain* `<seu-dominio>`, *Path* `v1/staff/tasks`;
-   - *Subdomain* `pitwall`, *Domain* `<seu-dominio>`, *Path* `v1/staff/tasks/*`.
+3. **Add public hostname** duas vezes, no mesmo endereço do console, cada um com um caminho:
+   - `pitwall.<seu-dominio>`, caminho `v1/staff/tasks`;
+   - `pitwall.<seu-dominio>`, caminho `v1/staff/tasks/*`.
 4. Em **Policies** → **Add a policy**: *Policy name* `MCP com token`; *Action* **Bypass**;
    *Include* → *Selector* **Everyone**.
    Para as tools do Atlas, acrescente do mesmo jeito os caminhos `v1/staff/atlas` e `v1/staff/atlas/*`; para `list_errors`, `v1/staff/errors/recent`.
