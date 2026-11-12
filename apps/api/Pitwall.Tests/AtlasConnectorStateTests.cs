@@ -95,6 +95,7 @@ public class AtlasConnectorStateTests(PitwallFixture fx) : IClassFixture<Pitwall
             ? "{\"node\":{\"id\":\"s1\",\"name\":\"api\"}},{\"node\":{\"id\":\"s2\",\"name\":\"worker\"}}"
             : "{\"node\":{\"id\":\"s1\",\"name\":\"api\"}}";
         return new ConnectorKit.FakeProvider()
+            .On("query { me {", "{\"data\":{\"me\":{\"workspaces\":[]}}}")
             .On("projects", "{\"data\":{\"projects\":{\"edges\":[{\"node\":{\"id\":\"p1\",\"name\":\"" + project + "\"}}]}}}")
             .On("project(id", "{\"data\":{\"project\":{\"services\":{\"edges\":[" + services + "]},\"environments\":{\"edges\":[{\"node\":{\"id\":\"e1\",\"name\":\"production\"}}]}}}}")
             .On("deployments(first", "{\"data\":{"

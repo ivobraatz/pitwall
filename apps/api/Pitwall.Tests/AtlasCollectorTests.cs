@@ -212,7 +212,8 @@ public class AtlasCollectorTests(PitwallFixture fx) : IClassFixture<PitwallFixtu
         await CollectAsync(new RailwayCollector(new HttpClient(provider), Token, workspace));
 
         Assert.DoesNotContain(provider.Requests, r => r.Body.Contains("query { me {"));
-        Assert.Contains(provider.Requests, r => r.Body.Contains($"projects(workspaceId: \\\"{workspace}\\\")"));
+        // The query travels JSON-encoded (quotes become "), so match the argument and the id apart.
+        Assert.Contains(provider.Requests, r => r.Body.Contains("projects(workspaceId:") && r.Body.Contains(workspace));
         var seen = await ReadAsync(db => db.AtlasServices.SingleAsync(s => s.Id == api.Id));
         Assert.Equal("success", seen.DeployStatus);
     }
