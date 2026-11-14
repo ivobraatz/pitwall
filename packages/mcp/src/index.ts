@@ -3,7 +3,7 @@
  * pitwall-mcp: the team's Pitwall task board as MCP tools, over stdio.
  *
  *   PITWALL_URL    the public address of your installation's console (https://<seu-dominio>)
- *   PITWALL_TOKEN  a personal token, pwt_… (Configurações → Tokens pessoais)
+ *   PITWALL_TOKEN  a personal token, pwt_… (Conta e equipe → Tokens pessoais)
  *
  * stdout belongs to the protocol: everything this process says for people goes to stderr, and
  * the token is never part of it.

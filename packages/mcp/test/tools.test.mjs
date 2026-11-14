@@ -198,7 +198,7 @@ test('an empty atlas says so, and a token without the scope gets the api message
   const { client } = await connect({ respond: () => json(200, empty) });
   assert.match(text(await client.callTool({ name: 'atlas_overview', arguments: {} })), /Atlas está vazio/);
 
-  const message = 'O token não tem o escopo atlas. Gere outro em Configurações → Tokens pessoais.';
+  const message = 'O token não tem o escopo atlas. Marque atlas no token, em Conta e equipe → Tokens pessoais.';
   const denied = await connect({ respond: () => json(403, { message }) });
   const res = await denied.client.callTool({ name: 'register_system', arguments: { slug: 'acme', name: 'Acme' } });
   assert.equal(res.isError, true);
@@ -316,7 +316,7 @@ test('list_errors says so when there is nothing, and relays a missing scope', as
   const empty = await connect({ respond: () => json(200, { since: '2026-11-09T10:00:00Z', items: [] }) });
   assert.match(text(await empty.client.callTool({ name: 'list_errors', arguments: {} })), /Nenhum erro no período/);
 
-  const message = 'O token não tem o escopo errors. Gere outro em Configurações → Tokens pessoais.';
+  const message = 'O token não tem o escopo errors. Marque errors no token, em Conta e equipe → Tokens pessoais.';
   const denied = await connect({ respond: () => json(403, { message }) });
   const res = await denied.client.callTool({ name: 'list_errors', arguments: {} });
   assert.equal(res.isError, true);

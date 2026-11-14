@@ -7,8 +7,9 @@ using static Pitwall.Tests.TeamTaskKit;
 namespace Pitwall.Tests;
 
 /// <summary>
-/// Personal tokens: shown once, stored as a hash, good for the task board and nothing else, and
-/// dead the moment they are revoked, expire, or their owner is disabled.
+/// Personal tokens: shown once, stored as a hash, good for what their scopes say and nothing else,
+/// scopes changed only from the owner's console session, and dead the moment they are revoked,
+/// expire, or their owner is disabled.
 /// </summary>
 public class StaffTokenTests(PitwallFixture fx) : IClassFixture<PitwallFixture>
 {
@@ -196,6 +197,58 @@ public class StaffTokenTests(PitwallFixture fx) : IClassFixture<PitwallFixture>
         await SeedTokenAsync(fx, staff.Id, revokedAt: DateTime.UtcNow);
         var res = await session.PostAsJsonAsync("/v1/staff/me/tokens", new { name = "o décimo primeiro" });
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Scopes_change_in_place_and_count_at_once()
+    {
+        var (session, _, token, tokenId) = await SessionAndTokenAsync();
+        var mcp = TokenClient(fx, token);
+        Assert.Equal(HttpStatusCode.Forbidden, (await mcp.GetAsync("/v1/staff/atlas")).StatusCode);
+
+        var res = await session.PatchAsJsonAsync($"/v1/staff/me/tokens/{tokenId}", new { scopes = new[] { "atlas", "tasks", "atlas" } });
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Equal(["tasks", "atlas"], (await res.Json()).GetProperty("scopes").EnumerateArray().Select(s => s.GetString()));
+        // Immediately, with the same token: the change clears the cached lookup.
+        Assert.Equal(HttpStatusCode.OK, (await mcp.GetAsync("/v1/staff/atlas")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await mcp.GetAsync("/v1/staff/tasks/board")).StatusCode);
+
+        Assert.Equal(HttpStatusCode.OK, (await session.PatchAsJsonAsync($"/v1/staff/me/tokens/{tokenId}", new { scopes = new[] { "atlas" } })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await mcp.GetAsync("/v1/staff/tasks/board")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Scopes_need_one_known_scope_and_a_live_token()
+    {
+        var (session, _, _, tokenId) = await SessionAndTokenAsync();
+        var url = $"/v1/staff/me/tokens/{tokenId}";
+        Assert.Equal(HttpStatusCode.BadRequest, (await session.PatchAsJsonAsync(url, new { scopes = Array.Empty<string>() })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await session.PatchAsJsonAsync(url, new { scopes = new[] { "tickets" } })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await session.PatchAsJsonAsync(url, new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await session.PatchAsJsonAsync($"/v1/staff/me/tokens/{Guid.NewGuid()}", new { scopes = new[] { "tasks" } })).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await session.DeleteAsync(url)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await session.PatchAsJsonAsync(url, new { scopes = new[] { "tasks", "atlas" } })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Token_cannot_change_scopes()
+    {
+        var (_, _, token, tokenId) = await SessionAndTokenAsync();
+        var mcp = TokenClient(fx, token);
+        var res = await mcp.PatchAsJsonAsync($"/v1/staff/me/tokens/{tokenId}", new { scopes = new[] { "tasks", "atlas", "errors" } });
+        Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await mcp.GetAsync("/v1/staff/atlas")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Cannot_change_other_staff_token_scopes()
+    {
+        var (_, _, token, tokenId) = await SessionAndTokenAsync("Ana");
+        var (other, _) = await SignInAsync(fx, "Bia");
+        Assert.Equal(HttpStatusCode.NotFound, (await other.PatchAsJsonAsync($"/v1/staff/me/tokens/{tokenId}", new { scopes = new[] { "atlas" } })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await TokenClient(fx, token).GetAsync("/v1/staff/tasks/board")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await TokenClient(fx, token).GetAsync("/v1/staff/atlas")).StatusCode);
     }
 
     [Fact]

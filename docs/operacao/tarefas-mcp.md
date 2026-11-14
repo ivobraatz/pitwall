@@ -11,11 +11,13 @@ um token pessoal de quem está na sessão.
 1. No console da sua instalação, abra **Conta e equipe → Tokens pessoais**.
 2. Dê um nome que diga onde ele vai ser usado ("Claude Code no notebook") e escolha a validade:
    90 dias por padrão, ou 30 dias, 1 ano ou sem expiração.
-3. Clique em **Novo token**. O `pwt_…` aparece **uma vez**, junto com o comando `claude mcp add`
+3. Marque os escopos: **Tarefas** e **Atlas** já vêm marcados; **Erros** é opcional.
+4. Clique em **Novo token**. O `pwt_…` aparece **uma vez**, junto com o comando `claude mcp add`
    já preenchido com o endereço do console. Copie.
 
-Qualquer pessoa da equipe (atendente ou admin) cria os próprios tokens, até 10 ativos. O token vale só para `/v1/staff/tasks/*`: não lê chamados,
-nem a equipe, e não cria outros tokens. Com o escopo `atlas` (o console já inclui), alcança também `/v1/staff/atlas/*`: veja [atlas.md](atlas.md). Com o escopo `errors` (opcional, marcado ao criar o token), lê os erros do servidor agrupados em `/v1/staff/errors/recent` (tool `list_errors`) e nada além disso.
+Qualquer pessoa da equipe (atendente ou admin) cria os próprios tokens, até 10 ativos. O token alcança só o que os escopos dizem: `tasks` é `/v1/staff/tasks/*`, `atlas` é `/v1/staff/atlas/*` (veja [atlas.md](atlas.md)) e `errors` é a lista de erros do servidor agrupados em `/v1/staff/errors/recent` (tool `list_errors`). Nenhum lê chamados nem a equipe, e nenhum cria outros tokens.
+
+Para mudar os escopos de um token que já existe, clique em **Escopos** na linha dele, marque o que falta e salve. Vale na próxima chamada, com o mesmo `pwt_…`: nada muda no Claude Code. Só a sessão do console muda escopo; o próprio token nunca.
 
 ## 2. Conectar o Claude Code
 
@@ -95,7 +97,7 @@ Sistema neste repositório: product = "<slug>".
 | "Não consegui falar com …" | `PITWALL_URL` errada, sem `https://`, ou console fora do ar. |
 | "Tarefa ou produto não encontrado." em toda tool | `PITWALL_URL` aponta para o hostname público da **API**. Com `Pitwall:StaffHosts`, ele devolve 404 para `/v1/staff`. Use o endereço do console. |
 | "A resposta de … não é do Pitwall." | A URL abre outro site, ou há uma tela de login na frente do console (Cloudflare Access, Tailscale Funnel com autenticação, proxy com senha). O MCP não passa por login de navegador. Com Cloudflare Access, veja a seção abaixo. |
-| "O token não tem o escopo tasks." | Token criado direto no banco sem escopo. Crie pelo console. |
+| "O token não tem o escopo tasks." (ou `atlas`, `errors`) | Em **Conta e equipe → Tokens pessoais**, clique em **Escopos** no token e marque o que falta. Tokens criados antes de 10/11/2026 têm só `tasks`. |
 | "Limite de requisições." | 120 escritas por minuto por pessoa (console e tokens somados). Espere um minuto. |
 | `/mcp` mostra `pitwall` com erro | Rode o comando do `claude mcp add` à mão para ver o erro no stderr. O token nunca aparece nesse log. |
 

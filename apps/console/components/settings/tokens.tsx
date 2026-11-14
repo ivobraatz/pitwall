@@ -13,6 +13,33 @@ function state(t: StaffTokenInfo): { tone: string; label: string } {
   return { tone: 'ok', label: 'ativo' };
 }
 
+/** What a token reaches, in the order the API stores them (Domain/StaffToken.cs). */
+const SCOPES = [
+  { id: 'tasks', label: 'Tarefas', hint: 'ler e atualizar o quadro' },
+  { id: 'atlas', label: 'Atlas', hint: 'sistemas, rotinas e atividade' },
+  { id: 'errors', label: 'Erros', hint: 'ler os erros do servidor' },
+] as const;
+const DEFAULT_SCOPES = ['tasks', 'atlas'];
+
+function scopeLabel(scopes: string[]): string {
+  return SCOPES.filter((s) => scopes.includes(s.id)).map((s) => s.label).join(' + ') || 'sem escopo';
+}
+
+function ScopePicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2" role="group" aria-label="Escopos">
+      {SCOPES.map((sc) => (
+        <span key={sc.id} title={sc.hint}>
+          <Check checked={value.includes(sc.id)}
+            onChange={(on) => onChange(on ? SCOPES.map((s) => s.id).filter((id) => id === sc.id || value.includes(id)) : value.filter((x) => x !== sc.id))}>
+            {sc.label}
+          </Check>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CopyButton({ text, label = 'Copiar' }: { text: string; label?: string }) {
   const [done, setDone] = React.useState(false);
   const toast = useToast();
@@ -39,18 +66,28 @@ export function PersonalTokens() {
   const tokens = useQuery({ queryKey: ['me', 'tokens'], queryFn: () => api<StaffTokenInfo[]>('/staff/me/tokens') });
   const [name, setName] = React.useState('');
   const [days, setDays] = React.useState('90');
-  const [errors, setErrors] = React.useState(false);
+  const [scopes, setScopes] = React.useState<string[]>(DEFAULT_SCOPES);
   const [busy, setBusy] = React.useState(false);
   const [created, setCreated] = React.useState<Created | null>(null);
   const [confirming, setConfirming] = React.useState<string | null>(null);
+  const [editing, setEditing] = React.useState<{ id: string; scopes: string[] } | null>(null);
+  const [saving, setSaving] = React.useState(false);
 
   const create = async () => {
     setBusy(true);
     try {
-      const res = await api<Created>('/staff/me/tokens', { method: 'POST', json: { name, expiresInDays: days === 'never' ? null : Number(days), scopes: errors ? ['tasks', 'atlas', 'errors'] : ['tasks', 'atlas'] } });
-      setCreated(res); setName('');
+      const res = await api<Created>('/staff/me/tokens', { method: 'POST', json: { name, expiresInDays: days === 'never' ? null : Number(days), scopes } });
+      setCreated(res); setName(''); setScopes(DEFAULT_SCOPES);
       void tokens.refetch();
     } catch (e) { toast('error', e instanceof Error ? e.message : 'Erro.'); } finally { setBusy(false); }
+  };
+  const saveScopes = async () => {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      await api(`/staff/me/tokens/${editing.id}`, { method: 'PATCH', json: { scopes: editing.scopes } });
+      setEditing(null); toast('ok', 'Escopos salvos. O token já vale com eles, sem trocar nada no MCP.'); void tokens.refetch();
+    } catch (e) { toast('error', e instanceof Error ? e.message : 'Erro.'); } finally { setSaving(false); }
   };
   const revoke = async (id: string) => {
     try { await api(`/staff/me/tokens/${id}`, { method: 'DELETE' }); setConfirming(null); toast('ok', 'Token revogado.'); void tokens.refetch(); }
@@ -62,9 +99,9 @@ export function PersonalTokens() {
     <Card title="Tokens pessoais" subtitle="Para o Claude Code, pelo MCP do Pitwall." actions={<Pill tone="idle">{active}/10 ativos</Pill>}>
       <div className="flex flex-col gap-4 px-5 pt-1 pb-5 text-[14px]">
         <p className="max-w-xl leading-[1.5] text-fg-secondary">
-          Para o Claude Code ler e atualizar o quadro de <strong className="font-semibold text-fg">Tarefas</strong> em seu nome, pelo MCP do Pitwall.
-          Ele também registra sistemas, rotinas e atividade no <strong className="font-semibold text-fg">Atlas</strong>.
-          Com a opção de erros, também lê os erros do servidor (para a triagem diária). O token não lê chamados nem a equipe.
+          O que o Claude Code faz em seu nome, pelo MCP do Pitwall, depende dos escopos: <strong className="font-semibold text-fg">Tarefas</strong> lê e atualiza o quadro,
+          {' '}<strong className="font-semibold text-fg">Atlas</strong> registra sistemas, rotinas e atividade, e <strong className="font-semibold text-fg">Erros</strong> lê
+          os erros do servidor (para a triagem diária). Dá para mudar os escopos depois, sem trocar o token. Nenhum token lê chamados nem a equipe.
         </p>
 
         {created ? (
@@ -83,14 +120,18 @@ export function PersonalTokens() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-wrap items-end gap-2">
-            <Field label="Nome" className="min-w-56 flex-1"><Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="Claude Code no notebook" /></Field>
-            <Field label="Validade">
-              <Select value={days} onChange={(e) => setDays(e.target.value)}
-                options={[{ value: '30', label: '30 dias' }, { value: '90', label: '90 dias' }, { value: '365', label: '1 ano' }, { value: 'never', label: 'Sem expiração' }]} />
-            </Field>
-            <Check checked={errors} onChange={setErrors}>Ler erros do servidor</Check>
-            <Button variant="primary" loading={busy} disabled={!name.trim() || active >= 10} onClick={create}>Novo token</Button>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-end gap-2">
+              <Field label="Nome" className="min-w-56 flex-1"><Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="Claude Code no notebook" /></Field>
+              <Field label="Validade">
+                <Select value={days} onChange={(e) => setDays(e.target.value)}
+                  options={[{ value: '30', label: '30 dias' }, { value: '90', label: '90 dias' }, { value: '365', label: '1 ano' }, { value: 'never', label: 'Sem expiração' }]} />
+              </Field>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <ScopePicker value={scopes} onChange={setScopes} />
+              <Button variant="primary" className="ml-auto" loading={busy} disabled={!name.trim() || scopes.length === 0 || active >= 10} onClick={create}>Novo token</Button>
+            </div>
           </div>
         )}
 
@@ -103,11 +144,22 @@ export function PersonalTokens() {
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 items-center gap-2 text-[14px]"><span className="truncate font-medium text-fg">{t.name}</span><Pill tone={s.tone}>{s.label}</Pill></div>
                     <div className="mt-0.5 text-[13px] text-fg-muted">
-                      <code>{t.prefix}…</code> · criado {rel(t.createdAt)} · último uso {t.lastUsedAt ? rel(t.lastUsedAt) : 'nunca'}
+                      <code>{t.prefix}…</code> · <span data-scopes={t.scopes.join(' ')}>{scopeLabel(t.scopes)}</span> · criado {rel(t.createdAt)} · último uso {t.lastUsedAt ? rel(t.lastUsedAt) : 'nunca'}
                       {' · '}{t.revokedAt ? `revogado ${rel(t.revokedAt)}` : t.expiresAt ? <span title={dateTime(t.expiresAt)}>expira {rel(t.expiresAt)}</span> : 'sem expiração'}
                     </div>
                   </div>
-                  {!t.revokedAt && (confirming === t.id ? (
+                  {s.label === 'ativo' && editing?.id === t.id ? (
+                    <span className="flex w-full flex-wrap items-center gap-2">
+                      <ScopePicker value={editing.scopes} onChange={(v) => setEditing({ id: t.id, scopes: v })} />
+                      <span className="ml-auto flex items-center gap-1.5">
+                        <Button size="sm" variant="primary" loading={saving} disabled={editing.scopes.length === 0} onClick={saveScopes}>Salvar</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancelar</Button>
+                      </span>
+                    </span>
+                  ) : s.label === 'ativo' && confirming !== t.id && (
+                    <Button size="sm" variant="secondary" onClick={() => { setConfirming(null); setEditing({ id: t.id, scopes: t.scopes }); }}>Escopos</Button>
+                  )}
+                  {!t.revokedAt && editing?.id !== t.id && (confirming === t.id ? (
                     <span className="flex items-center gap-1.5">
                       <span className="text-[13px] text-fg-secondary">Revogar? O MCP para de funcionar.</span>
                       <Button size="sm" variant="danger" onClick={() => revoke(t.id)}>Revogar</Button>

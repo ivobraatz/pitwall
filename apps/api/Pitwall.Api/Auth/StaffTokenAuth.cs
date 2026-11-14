@@ -80,7 +80,7 @@ public sealed class StaffTokenAuthHandler(
     protected override Task HandleChallengeAsync(AuthenticationProperties properties)
     {
         Response.StatusCode = StatusCodes.Status401Unauthorized;
-        return Response.WriteAsJsonAsync(new { message = "Token inválido, expirado ou revogado. Gere outro em Configurações → Tokens pessoais." });
+        return Response.WriteAsJsonAsync(new { message = "Token inválido, expirado ou revogado. Gere outro em Conta e equipe → Tokens pessoais." });
     }
 
     protected override Task HandleForbiddenAsync(AuthenticationProperties properties)
@@ -88,6 +88,6 @@ public sealed class StaffTokenAuthHandler(
         Response.StatusCode = StatusCodes.Status403Forbidden;
         var scope = Request.Path.StartsWithSegments("/v1/staff/atlas") ? "atlas"
             : Request.Path.StartsWithSegments("/v1/staff/errors") ? "errors" : "tasks";
-        return Response.WriteAsJsonAsync(new { message = $"O token não tem o escopo {scope}. Gere outro em Configurações → Tokens pessoais." });
+        return Response.WriteAsJsonAsync(new { message = $"O token não tem o escopo {scope}. Marque {scope} no token, em Conta e equipe → Tokens pessoais." });
     }
 }

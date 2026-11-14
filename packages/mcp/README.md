@@ -11,7 +11,7 @@ usando um token pessoal. O token só alcança `/v1/staff/tasks/*` (escopo `tasks
 
 ## Instalar
 
-1. No console da sua instalação, abra **Configurações → Tokens pessoais → Novo token** e copie o
+1. No console da sua instalação, abra **Conta e equipe → Tokens pessoais → Novo token** e copie o
    `pwt_…`. Ele aparece uma vez só.
 2. No terminal:
 
@@ -48,7 +48,7 @@ inválido.
 | Variável | O que é |
 |---|---|
 | `PITWALL_URL` | Endereço público do console da instalação, como `https://<seu-dominio>`. A barra final é removida. |
-| `PITWALL_TOKEN` | Token pessoal `pwt_…`, de Configurações → Tokens pessoais. |
+| `PITWALL_TOKEN` | Token pessoal `pwt_…`, de Conta e equipe → Tokens pessoais. |
 
 Se faltar uma das duas, o servidor sobe assim mesmo e toda tool responde com a instrução de
 configuração. Os logs vão para stderr, porque o stdout é do protocolo. O token nunca aparece em

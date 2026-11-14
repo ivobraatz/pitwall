@@ -9,8 +9,8 @@ namespace Pitwall.Endpoints.Staff;
 
 /// <summary>
 /// Personal tokens: what someone on the team hands a tool (the Pitwall MCP) so it can work the
-/// task board on their behalf. Managed from a console session only — a token never mints another.
-/// The plaintext is in the creation response and nowhere else.
+/// task board and the Atlas on their behalf. Managed from a console session only — a token never
+/// mints another or changes its own scopes. The plaintext is in the creation response and nowhere else.
 /// </summary>
 public static class StaffTokenEndpoints
 {
@@ -22,6 +22,18 @@ public static class StaffTokenEndpoints
     /// <param name="ExpiresInDays">30, 90 or 365; <c>null</c> = never; left out = <see cref="DefaultLifetimeDays"/>.
     /// Raw JSON, because <c>int?</c> cannot tell "left out" from <c>null</c>.</param>
     public sealed record CreateTokenRequest(string? Name, JsonElement ExpiresInDays, string[]? Scopes);
+
+    public sealed record UpdateTokenRequest(string[]? Scopes);
+
+    private const string ScopeMessage = "Escolha um ou mais escopos entre tasks, atlas e errors.";
+
+    /// <summary>The known scopes asked for, in a fixed order; <c>null</c> when none is asked or one is unknown.</summary>
+    private static string[]? ParseScopes(IEnumerable<string?> raw)
+    {
+        var asked = raw.Select(s => s?.Trim().ToLowerInvariant()).ToHashSet();
+        if (asked.Count == 0 || !asked.All(StaffTokenScopes.IsValid)) return null;
+        return StaffTokenScopes.All.Where(s => asked.Contains(s)).ToArray();
+    }
 
     public static IEndpointRouteBuilder MapStaffTokenEndpoints(this IEndpointRouteBuilder app)
     {
@@ -50,9 +62,8 @@ public static class StaffTokenEndpoints
             };
             if (lifetime == -1)
                 return Results.BadRequest(new { message = "A validade é de 30, 90 ou 365 dias, ou sem expiração." });
-            var scopes = (req.Scopes ?? [StaffTokenScopes.Tasks]).Select(s => s?.Trim().ToLowerInvariant()).Distinct().ToArray();
-            if (scopes.Length == 0 || !scopes.All(StaffTokenScopes.IsValid))
-                return Results.BadRequest(new { message = "Escopo desconhecido. Use tasks, atlas, errors ou uma combinação." });
+            var scopes = ParseScopes(req.Scopes ?? [StaffTokenScopes.Tasks]);
+            if (scopes is null) return Results.BadRequest(new { message = ScopeMessage });
 
             var me = http.StaffId();
             var now = DateTime.UtcNow;
@@ -65,12 +76,32 @@ public static class StaffTokenEndpoints
             var row = new StaffToken
             {
                 Id = Guid.NewGuid(), StaffUserId = me, Name = name, Prefix = token[..12], Hash = Tokens.Hash(token),
-                Scopes = scopes!, CreatedAt = now, ExpiresAt = lifetime is { } d ? now.AddDays(d) : null,
+                Scopes = scopes, CreatedAt = now, ExpiresAt = lifetime is { } d ? now.AddDays(d) : null,
             };
             db.StaffTokens.Add(row);
             await db.SaveChangesAsync(ct);
             return Results.Created($"/v1/staff/me/tokens/{row.Id}", new { row.Id, row.Name, row.Prefix, row.Scopes, row.ExpiresAt, token });
         }).RequireRateLimiting("login");
+
+        // The scopes change in place, so the tool that holds the token keeps it: nothing new to paste.
+        // Like the rest of the group, only from a console session: a token never widens itself.
+        group.MapPatch("/{id:guid}", async (Guid id, UpdateTokenRequest req, HttpContext http, PitwallDb db, IMemoryCache cache, CancellationToken ct) =>
+        {
+            var scopes = req.Scopes is null ? null : ParseScopes(req.Scopes);
+            if (scopes is null) return Results.BadRequest(new { message = ScopeMessage });
+
+            var me = http.StaffId();
+            var row = await db.StaffTokens.FirstOrDefaultAsync(t => t.Id == id && t.StaffUserId == me, ct);
+            if (row is null) return Results.NotFound();
+            if (row.RevokedAt is not null || row.ExpiresAt is { } expires && expires <= DateTime.UtcNow)
+                return Results.Conflict(new { message = "Este token foi revogado ou venceu. Crie outro." });
+
+            row.Scopes = scopes;
+            await db.SaveChangesAsync(ct);
+            // Without this, the old scopes would hold until the cache entry ran out.
+            cache.Remove(StaffTokenAuthHandler.CacheKey(row.Hash));
+            return Results.Ok(new { row.Id, row.Name, row.Prefix, row.Scopes, row.CreatedAt, row.LastUsedAt, row.ExpiresAt, row.RevokedAt });
+        });
 
         group.MapDelete("/{id:guid}", async (Guid id, HttpContext http, PitwallDb db, IMemoryCache cache, CancellationToken ct) =>
         {

@@ -90,7 +90,7 @@ export function Select({ className, options, ...props }: React.SelectHTMLAttribu
 /** A filter chip that toggles: white pill at rest, ink when on. */
 export function Check({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode }) {
   return (
-    <label className={cn('inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border px-4 text-[14px] font-medium transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-focus',
+    <label className={cn('relative inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border px-4 text-[14px] font-medium transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-focus',
       checked ? 'border-btn bg-btn text-btn-fg' : 'border-border bg-surface text-fg-secondary hover:border-border-strong hover:text-fg')}>
       <input type="checkbox" className="sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       {checked && <IconCheck />}

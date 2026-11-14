@@ -15,7 +15,7 @@ export interface ClientOptions {
   timeoutMs?: number;
 }
 
-export const CONFIG_MESSAGE = 'Configure PITWALL_URL e PITWALL_TOKEN (Configurações → Tokens pessoais no console).';
+export const CONFIG_MESSAGE = 'Configure PITWALL_URL e PITWALL_TOKEN (Conta e equipe → Tokens pessoais no console).';
 
 /** An error whose message is meant for the model to read, as is. */
 export class PitwallError extends Error {
@@ -82,7 +82,7 @@ function apiMessage(data: unknown): string | undefined {
 
 export function errorMessage(status: number, data: unknown): string {
   switch (status) {
-    case 401: return 'Token inválido, expirado ou revogado. Gere outro em Configurações → Tokens pessoais.';
+    case 401: return 'Token inválido, expirado ou revogado. Gere outro em Conta e equipe → Tokens pessoais.';
     case 403: return apiMessage(data) ?? 'O token não tem o escopo necessário (tasks, atlas ou errors).';
     case 404: return apiMessage(data) ?? 'Não encontrado. Use list_tasks ou list_products.';
     case 413: return apiMessage(data) ?? 'Conteúdo grande demais (limite de 256 KB).';

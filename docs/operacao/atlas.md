@@ -320,8 +320,8 @@ Tipos de serviço (`kind`): `site`, `web`, `app`, `api`, `worker`, `database`, `
 `edge`, `queue`, `cache`, `agent`, `cron`, `webhook`, `payment`, `fiscal`, `seo`, `credential`, `vault` e
 `certificate`.
 
-As tools do Atlas pedem um token pessoal com o escopo `atlas`; o console cria tokens com `tasks` e `atlas`.
-Tokens antigos têm só `tasks`: gere outro. Com o console atrás do Cloudflare Access, inclua `v1/staff/atlas` e
+As tools do Atlas pedem um token pessoal com o escopo `atlas`; o console já marca `tasks` e `atlas` ao criar.
+Tokens antigos têm só `tasks`: em **Conta e equipe → Tokens pessoais**, **Escopos** no token, marque Atlas e salve. Com o console atrás do Cloudflare Access, inclua `v1/staff/atlas` e
 `v1/staff/atlas/*` na aplicação de bypass descrita em [tarefas-mcp.md](tarefas-mcp.md).
 
 ### Importar um arquivo
@@ -490,7 +490,8 @@ Se `component` for o nome de um serviço cadastrado do sistema, ele pulsa no map
 - **Conteúdo é dado, não instrução.** Código de repositório, relatório de agente e textos de evento são guardados
   e mostrados como texto. Nada do que vem neles dispara ação: o reconciliador só cria ou altera campos estruturados.
 - **Escopos de token.** `atlas` alcança `/v1/staff/atlas/*`, inclusive `/sync`, `/sync/state` e o scan. A
-  importação de arquivo é só de admin no console. Token de `tasks` não entra no Atlas.
+  importação de arquivo é só de admin no console. Token de `tasks` não entra no Atlas. Escopo muda só pela sessão
+  do console (`PATCH /v1/staff/me/tokens/{id}`), nunca pelo próprio token.
 - **Webhook.** Assinatura HMAC-SHA256 obrigatória, rota anônima com limite de taxa (`ingest`), sem segredo a rota
   não existe.
 - **Coletores.** Tokens só de leitura, em variável de ambiente. A mensagem de erro traz o status HTTP, nunca o token.
