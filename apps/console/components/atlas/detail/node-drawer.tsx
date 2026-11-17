@@ -6,6 +6,7 @@ import { api, ApiError } from '@/lib/api';
 import { useNode, type AttentionClass, type GraphNode } from '@/lib/atlas-graph';
 import { Button, ErrorBox, Field, IconButton, IconClose, Input, Pill, Shimmer, cn, useToast } from '@/components/ui';
 import { StateLabel, useWords } from '@/components/atlas/parts';
+import { ServiceLogo } from '@/components/atlas/service-logo';
 import type { AtlasWord } from '@/components/atlas/words';
 import {
   ChangeList, ChangeSetList, ClassPill, EdgeList, EventList, EvidenceList, FactList, ImpactList, ProcessList, RefList, RepoList, ScopeLine,
@@ -95,6 +96,7 @@ export function NodeDrawer({ nodeId, onClose, onNode, inMap = false }: NodeDrawe
       <aside ref={asideRef} tabIndex={-1} role={desktop ? 'region' : 'dialog'} aria-modal={desktop ? undefined : true} aria-labelledby="atlas-node-title" data-testid="atlas-node-drawer"
         className="pointer-events-auto flex max-h-[92dvh] w-full flex-col overflow-y-auto rounded-t-panel bg-overlay shadow-popover outline-none lg:h-full lg:max-h-none lg:rounded-panel">
         <header className="flex items-start gap-3 px-5 pt-5 pb-3">
+          {node && <ServiceLogo service={node} size={28} className="mt-0.5" />}
           <div className="min-w-0 flex-1">
             <h2 id="atlas-node-title" className="text-[24px] leading-[1.2] font-semibold tracking-[-0.02em] break-words text-fg">{title || '…'}</h2>
             {subtitle && <p className="mt-1 text-[13px] text-fg-muted">{subtitle}</p>}

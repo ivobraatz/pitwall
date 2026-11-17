@@ -12,6 +12,7 @@ import { LANE_HEADER, layoutEngines, planCompanyRoutes, type Box, type Route } f
 import { ProductMark } from '@/components/product';
 import { Card, cn } from '@/components/ui';
 import { StateGlyph, useWords } from '@/components/atlas/parts';
+import { ServiceLogo } from '@/components/atlas/service-logo';
 import { AttentionIcon, attentionLabel } from './legend';
 import { startViewport } from './model';
 import { useBox } from './viewport';
@@ -97,6 +98,7 @@ function SharedNode({ data }: NodeProps<Node<SharedData, 'shared'>>) {
       className="relative flex items-center gap-2.5 rounded-tile border border-border-loud bg-surface px-3">
       <Handle type="target" position={Position.Top} className={HANDLE} />
       <StateGlyph state={n.state} size={12} />
+      <ServiceLogo service={n} size={16} />
       <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-fg">{n.name}</span>
       {n.provider && <span className="shrink-0 text-[12px] text-fg-muted">{n.provider}</span>}
       <Handle type="source" position={Position.Bottom} className={HANDLE} />

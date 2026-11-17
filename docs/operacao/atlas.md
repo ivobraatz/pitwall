@@ -301,6 +301,11 @@ atualiza, não duplica.
 
 O ambiente é criado junto com o primeiro serviço que o cita.
 
+Cada serviço mostra o logotipo do fornecedor: pelo nome (Postgres, GA4, "Webhook Stripe", "R2 …") e, sem marca no nome,
+pelo `provider` (`railway`, `vercel`, `cloudflare`…). Pipeline encontrado no código aparece como GitHub Actions; domínio,
+pelo provedor do DNS. Os desenhos vêm do Simple Icons (CC0) em `apps/console/components/atlas/brand-icons.ts`; para
+incluir uma marca, acrescente o slug em `scripts/gen-brand-icons.mjs`, rode o script e ligue o nome em `service-logo.tsx`.
+
 ### O que os coletores não veem
 
 Os coletores dizem se um serviço está no ar. O resto é declarado no cadastro:

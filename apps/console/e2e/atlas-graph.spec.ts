@@ -215,6 +215,16 @@ test('the product map draws the engine columns in the order of the Atlas', async
   await expectNoSidewaysScroll(page);
 });
 
+test('a card shows the logo of its supplier, by name or by where it runs, and none for an unknown one', async ({ page }) => {
+  await serve(page);
+  await page.goto('/atlas?system=acme');
+  const node = (id: string) => page.locator(`[data-testid="atlas-graph-node"][data-node-id="${id}"]`);
+  await expect(node('stripe').locator('svg[data-brand="stripe"]')).toBeVisible();
+  await expect(node('api').locator('svg[data-brand="railway"]')).toBeVisible();
+  await expect(node('domain').locator('svg[data-brand="cloudflare"]')).toBeVisible();
+  await expect(node('db').locator('svg[data-brand]')).toHaveCount(0);
+});
+
 test('the search highlights what matches and the slash key goes to it', async ({ page }) => {
   await serve(page);
   await page.goto('/atlas?system=acme');

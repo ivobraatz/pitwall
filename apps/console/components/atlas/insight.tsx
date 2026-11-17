@@ -8,6 +8,7 @@ import {
   Drawer, DrawerSection, ImpactTag, MarkGlyph, OwnerTag, StateLabel, SystemChip, TaskLink, conditionMark, useWords, LINK_COLOR,
 } from './parts';
 import type { AtlasWord } from './words';
+import { BrandLogo, ServiceLogo, providerBrand } from './service-logo';
 
 // ── Pede atenção: what was declared as missing or working badly, the heaviest first ────
 
@@ -202,8 +203,8 @@ export function StepDrawer({ step, process, atlas, onClose, onService }: {
         {services.length === 0 ? <span className="text-fg-subtle">—</span> : (
           <ul className="flex flex-wrap gap-1.5">
             {services.map((s) => (
-              <li key={s.id}><button type="button" onClick={() => onService(s)} className="inline-flex items-center rounded-full bg-surface px-3 py-1 text-[14px] font-medium text-fg transition-colors hover:bg-hover">
-                {s.name}{s.provider && <span className="ml-1.5 font-normal text-fg-muted">{s.provider}</span>}
+              <li key={s.id}><button type="button" onClick={() => onService(s)} className="inline-flex items-center gap-1.5 rounded-full bg-surface px-3 py-1 text-[14px] font-medium text-fg transition-colors hover:bg-hover">
+                <ServiceLogo service={s} size={14} />{s.name}{s.provider && <span className="ml-1.5 font-normal text-fg-muted">{s.provider}</span>}
               </button></li>
             ))}
           </ul>
@@ -319,7 +320,9 @@ export function Suppliers({ atlas, onService }: { atlas: Atlas; onService: (s: A
             </div>
             {providers.map((p) => (
               <div role="row" className="contents" key={p} data-provider={p}>
-                <div role="rowheader" className="sticky left-0 z-10 flex items-center bg-surface px-1.5 py-2 font-medium text-fg">{p}</div>
+                <div role="rowheader" className="sticky left-0 z-10 flex items-center gap-2 bg-surface px-1.5 py-2 font-medium text-fg">
+                  <SupplierLogo provider={p} />{p}
+                </div>
                 {cols.map((c) => {
                   const here = withProvider.filter((s) => s.provider === p && s.productId === c.id);
                   return (
@@ -349,4 +352,10 @@ export function Suppliers({ atlas, onService }: { atlas: Atlas; onService: (s: A
       </Card>
     </div>
   );
+}
+
+/** A supplier row: its logo when the provider names a known brand. */
+function SupplierLogo({ provider }: { provider: string }) {
+  const brand = providerBrand(provider);
+  return brand ? <BrandLogo brand={brand} size={16} className="text-fg" /> : null;
 }

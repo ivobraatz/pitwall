@@ -6,6 +6,7 @@ import { ProductMark } from '@/components/product';
 import { Button, Card, Dot, Pill, cn } from '@/components/ui';
 import { Legend, MarkGlyph, StateGlyph, conditionMark, liveClass, shortSha, useAgo, useLive, useWords } from './parts';
 import type { AtlasWord } from './words';
+import { ServiceLogo } from './service-logo';
 
 const VERDICT_TONE: Record<Verdict, string> = { down: 'error', attention: 'warn', unread: 'idle', ok: 'ok', empty: 'idle' };
 
@@ -109,7 +110,8 @@ function ServiceLine({ service: s, live, onRemove, onOpen }: { service: AtlasSer
       className={cn('group/s flex items-start gap-2.5 rounded-tile bg-well px-3 py-2.5', gap && 'atlas-hatch-loud', planned && 'atlas-dashed', live)}>
       {gap || planned ? <MarkGlyph mark={conditionMark(s.condition)} className="mt-1" /> : <StateGlyph state={s.state} className="mt-1" />}
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <ServiceLogo service={s} size={16} />
           <button type="button" onClick={() => onOpen?.(s)} aria-label={`${t('service.details')}: ${s.name}`} className="text-left text-[14px] font-medium text-fg underline-offset-2 hover:underline">{s.name}</button>
           {s.provider && <span className="text-[13px] text-fg-muted">{s.provider}</span>}
           {gap && <span className="text-[13px] font-semibold text-danger">{t('cond.gap')}</span>}
@@ -236,6 +238,7 @@ export function Engine({ atlas, systemId, onRemoveService, onService }: { atlas:
                 <li key={x.id} data-testid="atlas-external" className="group/s rounded-tile bg-well px-4 py-3 text-[14px]">
                   <span className="flex items-center gap-2">
                     <StateGlyph state={x.state} />
+                    <ServiceLogo service={x} size={16} />
                     <button type="button" onClick={() => onService?.(x)} aria-label={`${t('service.details')}: ${x.name}`} className="text-left font-medium text-fg underline-offset-2 hover:underline">{x.name}</button>
                     {x.provider && <span className="text-[13px] text-fg-muted">{x.provider}</span>}
                     {onRemoveService && <button type="button" onClick={() => onRemoveService(x)} aria-label={`${t('action.remove')}: ${x.name}`}
