@@ -118,7 +118,11 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy(Policies.Errors, p => p.AddAuthenticationSchemes(StaffTokenAuthHandler.SessionOrToken)
         .RequireClaim(StaffSessionAuthHandler.StaffClaim)
         .RequireAssertion(ctx => !ctx.User.HasClaim(c => c.Type == StaffTokenAuthHandler.TokenClaim)
-                                 || ctx.User.HasClaim(ProductKeyAuthHandler.ScopeClaim, StaffTokenScopes.Errors)));
+                                 || ctx.User.HasClaim(ProductKeyAuthHandler.ScopeClaim, StaffTokenScopes.Errors)))
+    .AddPolicy(Policies.Notes, p => p.AddAuthenticationSchemes(StaffTokenAuthHandler.SessionOrToken)
+        .RequireClaim(StaffSessionAuthHandler.StaffClaim)
+        .RequireAssertion(ctx => !ctx.User.HasClaim(c => c.Type == StaffTokenAuthHandler.TokenClaim)
+                                 || ctx.User.HasClaim(ProductKeyAuthHandler.ScopeClaim, StaffTokenScopes.Notes)));
 
 builder.Services.AddRateLimiter(o =>
 {
@@ -183,6 +187,18 @@ app.UseWhen(http => http.Request.Path.StartsWithSegments("/v1/staff/tasks"), bra
         limit.MaxRequestBodySize = StaffTaskEndpoints.MaxBodyBytes;
     return next(http);
 }));
+// The notes take more: a long draft is still a page of text.
+app.UseWhen(http => http.Request.Path.StartsWithSegments("/v1/staff/notes"), branch => branch.Use((http, next) =>
+{
+    if (http.Request.ContentLength > StaffNoteEndpoints.MaxBodyBytes)
+    {
+        http.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+        return http.Response.WriteAsJsonAsync(new { message = "Corpo da requisição acima de 512 KB." });
+    }
+    if (http.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>() is { IsReadOnly: false } limit)
+        limit.MaxRequestBodySize = StaffNoteEndpoints.MaxBodyBytes;
+    return next(http);
+}));
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -200,6 +216,7 @@ app.MapStaffProductEndpoints();
 app.MapStaffReleaseEndpoints();
 app.MapStaffTokenEndpoints();
 app.MapStaffTaskEndpoints();
+app.MapStaffNoteEndpoints();
 app.MapStaffAtlasEndpoints();
 app.MapAtlasSync();
 app.MapAtlasGraph();

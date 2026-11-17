@@ -15,6 +15,7 @@ export function useMe() { return React.useContext(MeContext); }
 // The channels of the pit wall: radio (tickets), the board (the team's tasks), the track map (the Atlas), telemetry (errors), the bulletin (releases), the cars (systems).
 const IconTickets = () => <Icon size={18} d={<><path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1-1.5 1.5h-8.5L6 20v-3.5H5A1.5 1.5 0 0 1 3.5 15V7A1.5 1.5 0 0 1 5 5.5Z" /><path d="M8 10h8M8 13h5" /></>} />;
 const IconTasks = () => <Icon size={18} d={<><rect x="3.5" y="4.5" width="5" height="15" rx="1.5" /><rect x="10.5" y="4.5" width="5" height="10" rx="1.5" /><rect x="17.5" y="4.5" width="3" height="6" rx="1.2" /></>} />;
+const IconNotes = () => <Icon size={18} d={<><path d="M5 19c0-7 4.5-12.5 14-13.5-.5 9.5-5 14-12 14" /><path d="M5 19l7.5-7.5" /></>} />;
 const IconAtlas = () => <Icon size={18} d={<><rect x="4" y="4" width="6" height="5" rx="1.5" /><rect x="14" y="4" width="6" height="5" rx="1.5" /><rect x="9" y="15" width="6" height="5" rx="1.5" /><path d="M7 9v2.5h10V9M12 11.5V15" /></>} />;
 const IconErrors = () => <Icon size={18} d={<path d="M3 12.5h3.5l2.2-6 4.3 11.5 2.6-8 1.6 2.5H21" />} />;
 const IconReleases = () => <Icon size={18} d={<><rect x="5" y="3.5" width="14" height="17" rx="2" /><path d="M9 8.5h6M9 12h6M9 15.5h3" /></>} />;
@@ -28,6 +29,7 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
   { label: 'Atendimento', items: [
     { href: '/', label: 'Chamados', Icon: IconTickets, match: (p) => p === '/' || p.startsWith('/tickets') },
     { href: '/tasks', label: 'Tarefas', Icon: IconTasks, match: (p) => p.startsWith('/tasks') },
+    { href: '/notes', label: 'Anotações', Icon: IconNotes, match: (p) => p.startsWith('/notes') },
   ] },
   { label: 'Operação', items: [
     { href: '/atlas', label: 'Atlas', Icon: IconAtlas, match: (p) => p.startsWith('/atlas') },

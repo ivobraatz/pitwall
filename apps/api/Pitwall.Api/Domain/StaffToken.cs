@@ -33,7 +33,9 @@ public static class StaffTokenScopes
 
     /// <summary>Server errors, read only: <c>/v1/staff/errors/recent</c>.</summary>
     public const string Errors = "errors";
+    /// <summary>The team's notes: <c>/v1/staff/notes/*</c>. Converting a note into a task also needs <see cref="Tasks"/>.</summary>
+    public const string Notes = "notes";
 
-    public static readonly string[] All = [Tasks, Atlas, Errors];
+    public static readonly string[] All = [Tasks, Atlas, Errors, Notes];
     public static bool IsValid(string? s) => s is not null && All.Contains(s);
 }

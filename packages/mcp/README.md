@@ -1,13 +1,15 @@
 # pitwall-mcp
 
-Servidor MCP do [Pitwall](https://github.com/ivobraatz/pitwall): o quadro de tarefas da equipe e o Atlas.
-Numa sessão do Claude Code, o Claude registra as tarefas manuais que sobraram, como "configurar o
-webhook no painel" ou "testar o login no celular". Na sessão seguinte, ele lê o que a equipe
-moveu ou bloqueou, confere e comenta.
+Servidor MCP do [Pitwall](https://github.com/ivobraatz/pitwall): o quadro de tarefas da equipe, as
+anotações e o Atlas. Numa sessão do Claude Code, o Claude registra as tarefas manuais que sobraram,
+como "configurar o webhook no painel" ou "testar o login no celular". Na sessão seguinte, ele lê o
+que a equipe moveu ou bloqueou, confere e comenta.
 
 O servidor fala com o **console** da sua instalação, a mesma URL que você abre no navegador,
-usando um token pessoal. O token só alcança `/v1/staff/tasks/*` (escopo `tasks`) e `/v1/staff/atlas/*`
-(escopo `atlas`) e, com o escopo opcional `errors`, lê `/v1/staff/errors/recent`: não lê chamados nem a equipe.
+usando um token pessoal. O token só alcança `/v1/staff/tasks/*` (escopo `tasks`), `/v1/staff/notes/*`
+(escopo `notes`) e `/v1/staff/atlas/*` (escopo `atlas`) e, com o escopo opcional `errors`, lê
+`/v1/staff/errors/recent`: não lê chamados nem a equipe. Converter uma anotação em tarefa exige
+também o escopo `tasks`.
 
 ## Instalar
 
@@ -66,6 +68,21 @@ log, em mensagem de erro nem em resultado de tool.
 | `move_task` | Muda de coluna (vai para o topo). `blocked` exige `blockedNote`. |
 | `comment_task` | Registra o que foi verificado, o resultado e o próximo passo. |
 | `board_summary` | Contagem por coluna, atrasadas, e as tarefas em `blocked` e `doing`. Para o começo da sessão. |
+
+Anotações (escopo `notes`): ideias e achados ainda sem forma de tarefa. Quando estão estruturadas,
+viram tarefa.
+
+| Tool | Para quê |
+|---|---|
+| `list_note_folders` | Árvore de pastas com ids e contagens, mais a Entrada (sem pasta) e as arquivadas. |
+| `create_note_folder` | Cria uma pasta, na raiz ou dentro de `parentId`. |
+| `list_notes` | Busca por pasta (`inbox` = sem pasta), estágio, etiqueta, sistema, texto ou fixadas. Use antes de criar. |
+| `get_note` | A anotação inteira: corpo, quem a cita, quem ela cita e a tarefa gerada. |
+| `create_note` | Registra ideia, achado ou investigação. |
+| `update_note` | Edita campos. `append` acrescenta ao corpo sem reescrevê-lo. `folderId` e `product` aceitam `null`. |
+| `note_task_preview` | O rascunho da tarefa e a prontidão (0 a 100) com o que falta. |
+| `convert_note_to_task` | Cria a tarefa do quadro e marca a anotação como convertida. Cada anotação vira tarefa uma vez. |
+| `archive_note` | Arquiva a anotação; não apaga. |
 
 Atlas (escopo `atlas`):
 

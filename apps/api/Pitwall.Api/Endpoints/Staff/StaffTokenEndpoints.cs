@@ -25,7 +25,7 @@ public static class StaffTokenEndpoints
 
     public sealed record UpdateTokenRequest(string[]? Scopes);
 
-    private const string ScopeMessage = "Escolha um ou mais escopos entre tasks, atlas e errors.";
+    private const string ScopeMessage = "Escolha um ou mais escopos entre tasks, atlas, errors e notes.";
 
     /// <summary>The known scopes asked for, in a fixed order; <c>null</c> when none is asked or one is unknown.</summary>
     private static string[]? ParseScopes(IEnumerable<string?> raw)

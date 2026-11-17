@@ -87,7 +87,8 @@ public sealed class StaffTokenAuthHandler(
     {
         Response.StatusCode = StatusCodes.Status403Forbidden;
         var scope = Request.Path.StartsWithSegments("/v1/staff/atlas") ? "atlas"
-            : Request.Path.StartsWithSegments("/v1/staff/errors") ? "errors" : "tasks";
+            : Request.Path.StartsWithSegments("/v1/staff/errors") ? "errors"
+            : Request.Path.StartsWithSegments("/v1/staff/notes") ? "notes" : "tasks";
         return Response.WriteAsJsonAsync(new { message = $"O token não tem o escopo {scope}. Marque {scope} no token, em Conta e equipe → Tokens pessoais." });
     }
 }

@@ -48,11 +48,12 @@ test('lists the board and the atlas tools with schemas', async () => {
   const { client } = await connect();
   const { tools } = await client.listTools();
   assert.deepEqual(tools.map((t) => t.name).sort(), [
-    'atlas_attention', 'atlas_changes', 'atlas_graph', 'atlas_insights', 'atlas_node', 'atlas_overview', 'atlas_processes', 'atlas_sync',
-    'board_summary', 'comment_task', 'create_task', 'finish_activity',
-    'finish_routine_run', 'get_task', 'link_services', 'list_errors', 'list_products', 'list_routines', 'list_tasks', 'move_task',
+    'archive_note', 'atlas_attention', 'atlas_changes', 'atlas_graph', 'atlas_insights', 'atlas_node', 'atlas_overview', 'atlas_processes', 'atlas_sync',
+    'board_summary', 'comment_task', 'convert_note_to_task', 'create_note', 'create_note_folder', 'create_task', 'finish_activity',
+    'finish_routine_run', 'get_note', 'get_task', 'link_services', 'list_errors', 'list_note_folders', 'list_notes', 'list_products',
+    'list_routines', 'list_tasks', 'move_task', 'note_task_preview',
     'register_process', 'register_repo', 'register_routine', 'register_service', 'register_system', 'start_activity',
-    'start_routine_run', 'update_process_step', 'update_task',
+    'start_routine_run', 'update_note', 'update_process_step', 'update_task',
   ]);
   for (const t of tools) {
     assert.ok(t.description && t.description.length > 20, `${t.name} has a description`);

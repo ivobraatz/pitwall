@@ -167,3 +167,40 @@ export interface StaffTokenInfo {
   id: string; name: string; prefix: string; scopes: string[];
   createdAt: string; lastUsedAt: string | null; expiresAt: string | null; revokedAt: string | null;
 }
+
+// ── Notes (the team's working drafts, see docs/operacao/tarefas-mcp.md) ───────────
+
+export type NoteStage = 'idea' | 'shaping' | 'ready' | 'converted';
+export const NOTE_STAGES: NoteStage[] = ['idea', 'shaping', 'ready', 'converted'];
+/** What a person can set by hand: converted comes only from the conversion. */
+export type EditableStage = Exclude<NoteStage, 'converted'>;
+
+export interface NoteFolder { id: string; parentId: string | null; name: string; position: number; noteCount: number; createdAt: string; updatedAt: string }
+export interface NoteFolders { items: NoteFolder[]; inbox: number; archived: number }
+
+/** A note as the list carries it: no body, backlinks or links. */
+export interface NoteDto {
+  id: string; code: string; folder: { id: string; name: string } | null; folderPath: string;
+  product: TaskProductRef | null; title: string; excerpt: string; stage: NoteStage; labels: string[]; pinned: boolean;
+  source: 'claude' | 'manual'; createdBy: { ref: string; name: string }; updatedByName: string;
+  task: { id: string; code: string; title: string; status: TaskStatus } | null;
+  convertedAt: string | null; wordCount: number; createdAt: string; updatedAt: string; archivedAt: string | null;
+}
+export interface NoteDetail extends NoteDto {
+  body: string;
+  backlinks: Array<{ code: string; title: string }>;
+  linked: Array<{ code: string; title: string; missing: boolean }>;
+}
+export interface NotesPage { items: NoteDto[]; nextCursor: string | null; serverTime: string }
+export interface NotesMeta {
+  products: TaskProductRef[]; labels: Array<{ name: string; count: number }>; stages: Array<{ stage: NoteStage; count: number }>;
+}
+export interface NoteRevision { id: string; title: string; authorName: string; source: 'claude' | 'manual'; createdAt: string; length: number }
+export interface NoteRevisionDetail extends NoteRevision { body: string }
+
+/** The task a note would become, as the server drafts it from the note's saved text. */
+export interface TaskDraft {
+  title: string; body: string; checklist: string[]; checklistDone?: boolean[]; links: Array<{ label: string; url: string }>; labels: string[];
+  productSlug?: string | null; readiness: { score: number; ready: boolean; missing: string[] };
+}
+export interface NoteConversion { note: NoteDetail; task: { id: string; code: string; title: string; status: TaskStatus } }

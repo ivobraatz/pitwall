@@ -18,8 +18,9 @@ const SCOPES = [
   { id: 'tasks', label: 'Tarefas', hint: 'ler e atualizar o quadro' },
   { id: 'atlas', label: 'Atlas', hint: 'sistemas, rotinas e atividade' },
   { id: 'errors', label: 'Erros', hint: 'ler os erros do servidor' },
+  { id: 'notes', label: 'Anotações', hint: 'ler e escrever as anotações' },
 ] as const;
-const DEFAULT_SCOPES = ['tasks', 'atlas'];
+const DEFAULT_SCOPES = ['tasks', 'atlas', 'notes'];
 
 function scopeLabel(scopes: string[]): string {
   return SCOPES.filter((s) => scopes.includes(s.id)).map((s) => s.label).join(' + ') || 'sem escopo';
@@ -101,7 +102,8 @@ export function PersonalTokens() {
         <p className="max-w-xl leading-[1.5] text-fg-secondary">
           O que o Claude Code faz em seu nome, pelo MCP do Pitwall, depende dos escopos: <strong className="font-semibold text-fg">Tarefas</strong> lê e atualiza o quadro,
           {' '}<strong className="font-semibold text-fg">Atlas</strong> registra sistemas, rotinas e atividade, e <strong className="font-semibold text-fg">Erros</strong> lê
-          os erros do servidor (para a triagem diária). Dá para mudar os escopos depois, sem trocar o token. Nenhum token lê chamados nem a equipe.
+          os erros do servidor (para a triagem diária), e <strong className="font-semibold text-fg">Anotações</strong> lê e escreve as notas da equipe.
+          Dá para mudar os escopos depois, sem trocar o token. Nenhum token lê chamados nem a equipe.
         </p>
 
         {created ? (

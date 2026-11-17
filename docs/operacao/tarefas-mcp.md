@@ -11,11 +11,11 @@ um token pessoal de quem está na sessão.
 1. No console da sua instalação, abra **Conta e equipe → Tokens pessoais**.
 2. Dê um nome que diga onde ele vai ser usado ("Claude Code no notebook") e escolha a validade:
    90 dias por padrão, ou 30 dias, 1 ano ou sem expiração.
-3. Marque os escopos: **Tarefas** e **Atlas** já vêm marcados; **Erros** é opcional.
+3. Marque os escopos: **Tarefas**, **Anotações** e **Atlas** já vêm marcados; **Erros** é opcional.
 4. Clique em **Novo token**. O `pwt_…` aparece **uma vez**, junto com o comando `claude mcp add`
    já preenchido com o endereço do console. Copie.
 
-Qualquer pessoa da equipe (atendente ou admin) cria os próprios tokens, até 10 ativos. O token alcança só o que os escopos dizem: `tasks` é `/v1/staff/tasks/*`, `atlas` é `/v1/staff/atlas/*` (veja [atlas.md](atlas.md)) e `errors` é a lista de erros do servidor agrupados em `/v1/staff/errors/recent` (tool `list_errors`). Nenhum lê chamados nem a equipe, e nenhum cria outros tokens.
+Qualquer pessoa da equipe (atendente ou admin) cria os próprios tokens, até 10 ativos. O token alcança só o que os escopos dizem: `tasks` é `/v1/staff/tasks/*`, `notes` é `/v1/staff/notes/*` (veja [Anotações](#7-anotações)), `atlas` é `/v1/staff/atlas/*` (veja [atlas.md](atlas.md)) e `errors` é a lista de erros do servidor agrupados em `/v1/staff/errors/recent` (tool `list_errors`). Nenhum lê chamados nem a equipe, e nenhum cria outros tokens.
 
 Para mudar os escopos de um token que já existe, clique em **Escopos** na linha dele, marque o que falta e salve. Vale na próxima chamada, com o mesmo `pwt_…`: nada muda no Claude Code. Só a sessão do console muda escopo; o próprio token nunca.
 
@@ -89,6 +89,29 @@ Sistema neste repositório: product = "<slug>".
 - **Arquivar concluídas** tira do quadro as tarefas em Concluído. Elas continuam na busca
   (`list_tasks` com `includeArchived`).
 
+## 7. Anotações
+
+**Anotações** (`/notes` no console) guardam o que ainda não é uma ação: ideia, achado de
+investigação, procedimento em formação. Ficam fora do quadro e dos chamados, e viram tarefa quando
+estão estruturadas.
+
+- **Pastas:** árvore de até 4 níveis. Sem pasta, a anotação fica na **Entrada**. Apagar uma pasta
+  sobe as anotações e subpastas dela para a pasta de cima.
+- **Estágios:** Ideia → Estruturando → Pronta → Virou tarefa. O último só a conversão define.
+- **Ligações:** `[[N-7K2QM]]` no corpo cita outra anotação; a citada mostra "Citada por".
+- **Histórico:** cada mudança de título ou corpo guarda a versão anterior (edições seguidas da mesma
+  pessoa em 10 minutos contam como uma), até 50 por anotação, com **Restaurar**.
+- **Virar tarefa:** o Pitwall monta o rascunho a partir da anotação: linhas `- [ ] passo` viram a
+  checklist, links viram os links da tarefa, o resto vira o corpo, com "Origem: anotação N-…" no fim.
+  A prontidão (0 a 100) soma título com 3 palavras ou mais, corpo com 40 palavras ou mais, passos,
+  uma seção "Como verificar" e o sistema escolhido. Abaixo de 50, só com "Criar mesmo assim". A
+  anotação fica ligada à tarefa e não converte de novo. Pelo token, converter exige também o escopo
+  `tasks`.
+
+Tools: `list_note_folders`, `create_note_folder`, `list_notes`, `get_note`, `create_note`,
+`update_note` (com `append` para acrescentar um achado sem reescrever), `note_task_preview`,
+`convert_note_to_task` e `archive_note`.
+
 ## Problemas comuns
 
 | Sintoma | Causa e saída |
@@ -97,7 +120,7 @@ Sistema neste repositório: product = "<slug>".
 | "Não consegui falar com …" | `PITWALL_URL` errada, sem `https://`, ou console fora do ar. |
 | "Tarefa ou produto não encontrado." em toda tool | `PITWALL_URL` aponta para o hostname público da **API**. Com `Pitwall:StaffHosts`, ele devolve 404 para `/v1/staff`. Use o endereço do console. |
 | "A resposta de … não é do Pitwall." | A URL abre outro site, ou há uma tela de login na frente do console (Cloudflare Access, Tailscale Funnel com autenticação, proxy com senha). O MCP não passa por login de navegador. Com Cloudflare Access, veja a seção abaixo. |
-| "O token não tem o escopo tasks." (ou `atlas`, `errors`) | Em **Conta e equipe → Tokens pessoais**, clique em **Escopos** no token e marque o que falta. Tokens criados antes de 10/11/2026 têm só `tasks`. |
+| "O token não tem o escopo tasks." (ou `notes`, `atlas`, `errors`) | Em **Conta e equipe → Tokens pessoais**, clique em **Escopos** no token e marque o que falta. Tokens criados antes de 10/11/2026 têm só `tasks`. |
 | "Limite de requisições." | 120 escritas por minuto por pessoa (console e tokens somados). Espere um minuto. |
 | `/mcp` mostra `pitwall` com erro | Rode o comando do `claude mcp add` à mão para ver o erro no stderr. O token nunca aparece nesse log. |
 
@@ -121,7 +144,7 @@ O MCP não envia cabeçalhos de *service token* do Access (`CF-Access-Client-Id`
    - `pitwall.<seu-dominio>`, caminho `v1/staff/tasks/*`.
 4. Em **Policies** → **Add a policy**: *Policy name* `MCP com token`; *Action* **Bypass**;
    *Include* → *Selector* **Everyone**.
-   Para as tools do Atlas, acrescente do mesmo jeito os caminhos `v1/staff/atlas` e `v1/staff/atlas/*`; para `list_errors`, `v1/staff/errors/recent`.
+   Para as tools de anotações, acrescente do mesmo jeito os caminhos `v1/staff/notes` e `v1/staff/notes/*`; para as do Atlas, `v1/staff/atlas` e `v1/staff/atlas/*`; para `list_errors`, `v1/staff/errors/recent`.
    `v1/staff/atlas/*` já cobre `/v1/staff/atlas/sync` e `/sync/state`, usados pela tool `atlas_sync`, pelo `pitwall-atlas` e pela action de CI.
    O webhook do GitHub (`v1/hooks/github`) não passa pelo console: chega à API pública, com assinatura própria, e não precisa de bypass.
 5. Salve (**Save application**). Não mexa na aplicação `Pitwall console`.

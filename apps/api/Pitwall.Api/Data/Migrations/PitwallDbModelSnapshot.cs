@@ -1387,6 +1387,218 @@ namespace Pitwall.Data.Migrations
                     b.ToTable("atlas_steps", (string)null);
                 });
 
+            modelBuilder.Entity("Pitwall.Domain.Note", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(100000)
+                        .HasColumnType("character varying(100000)")
+                        .HasColumnName("body");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTime?>("ConvertedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("converted_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedByName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("created_by_name");
+
+                    b.Property<string>("CreatedByRef")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("created_by_ref");
+
+                    b.Property<Guid?>("FolderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("folder_id");
+
+                    b.PrimitiveCollection<string[]>("Labels")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("labels");
+
+                    b.Property<bool>("Pinned")
+                        .HasColumnType("boolean")
+                        .HasColumnName("pinned");
+
+                    b.Property<Guid?>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Stage")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("stage");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedByName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("updated_by_name");
+
+                    b.Property<string>("UpdatedBySource")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("updated_by_source");
+
+                    b.HasKey("Id")
+                        .HasName("pk_notes");
+
+                    b.HasIndex("ArchivedAt")
+                        .HasDatabaseName("ix_notes_archived_at");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_notes_code");
+
+                    b.HasIndex("FolderId")
+                        .HasDatabaseName("ix_notes_folder_id");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_notes_product_id");
+
+                    b.HasIndex("TaskId")
+                        .HasDatabaseName("ix_notes_task_id");
+
+                    b.HasIndex("UpdatedAt")
+                        .HasDatabaseName("ix_notes_updated_at");
+
+                    b.ToTable("notes", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.NoteFolder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("ParentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_id");
+
+                    b.Property<double>("Position")
+                        .HasColumnType("double precision")
+                        .HasColumnName("position");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_note_folders");
+
+                    b.HasIndex("ParentId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_note_folders_parent_id_name");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("ParentId", "Name"), false);
+
+                    b.ToTable("note_folders", (string)null);
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.NoteRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AuthorName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("author_name");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(100000)
+                        .HasColumnType("character varying(100000)")
+                        .HasColumnName("body");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("NoteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("note_id");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id")
+                        .HasName("pk_note_revisions");
+
+                    b.HasIndex("NoteId", "CreatedAt")
+                        .HasDatabaseName("ix_note_revisions_note_id_created_at");
+
+                    b.ToTable("note_revisions", (string)null);
+                });
+
             modelBuilder.Entity("Pitwall.Domain.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2782,6 +2994,56 @@ namespace Pitwall.Data.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("Pitwall.Domain.Note", b =>
+                {
+                    b.HasOne("Pitwall.Domain.NoteFolder", "Folder")
+                        .WithMany()
+                        .HasForeignKey("FolderId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_notes_note_folders_folder_id");
+
+                    b.HasOne("Pitwall.Domain.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_notes_products_product_id");
+
+                    b.HasOne("Pitwall.Domain.TeamTask", "Task")
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_notes_team_tasks_task_id");
+
+                    b.Navigation("Folder");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Task");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.NoteFolder", b =>
+                {
+                    b.HasOne("Pitwall.Domain.NoteFolder", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_note_folders_note_folders_parent_id");
+
+                    b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.NoteRevision", b =>
+                {
+                    b.HasOne("Pitwall.Domain.Note", "Note")
+                        .WithMany("Revisions")
+                        .HasForeignKey("NoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_note_revisions_notes_note_id");
+
+                    b.Navigation("Note");
+                });
+
             modelBuilder.Entity("Pitwall.Domain.Product", b =>
                 {
                     b.HasOne("Pitwall.Domain.StaffUser", "Owner")
@@ -3039,6 +3301,16 @@ namespace Pitwall.Data.Migrations
             modelBuilder.Entity("Pitwall.Domain.AtlasRoutine", b =>
                 {
                     b.Navigation("Runs");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.Note", b =>
+                {
+                    b.Navigation("Revisions");
+                });
+
+            modelBuilder.Entity("Pitwall.Domain.NoteFolder", b =>
+                {
+                    b.Navigation("Children");
                 });
 
             modelBuilder.Entity("Pitwall.Domain.Product", b =>

@@ -25,6 +25,9 @@ public class PitwallDb(DbContextOptions<PitwallDb> options) : DbContext(options)
     public DbSet<TeamTaskComment> TeamTaskComments => Set<TeamTaskComment>();
     public DbSet<TeamTaskEvent> TeamTaskEvents => Set<TeamTaskEvent>();
     public DbSet<StaffToken> StaffTokens => Set<StaffToken>();
+    public DbSet<NoteFolder> NoteFolders => Set<NoteFolder>();
+    public DbSet<Note> Notes => Set<Note>();
+    public DbSet<NoteRevision> NoteRevisions => Set<NoteRevision>();
     public DbSet<AtlasEnvironment> AtlasEnvironments => Set<AtlasEnvironment>();
     public DbSet<AtlasService> AtlasServices => Set<AtlasService>();
     public DbSet<AtlasLink> AtlasLinks => Set<AtlasLink>();
@@ -469,6 +472,46 @@ public class PitwallDb(DbContextOptions<PitwallDb> options) : DbContext(options)
             e.Property(x => x.Kind).HasMaxLength(16);
             e.Property(x => x.Data).HasColumnType("jsonb");
             e.HasOne(x => x.Task).WithMany(t => t.Events).HasForeignKey(x => x.TaskId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<NoteFolder>(e =>
+        {
+            // One name per parent. Top-level folders have a null parent: those names must be unique too.
+            e.HasIndex(f => new { f.ParentId, f.Name }).IsUnique().AreNullsDistinct(false);
+            e.Property(f => f.Name).HasMaxLength(80);
+            // The endpoint moves children up before a folder goes; the database refuses to drop a folder with children.
+            e.HasOne(f => f.Parent).WithMany(f => f.Children).HasForeignKey(f => f.ParentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Note>(e =>
+        {
+            e.HasIndex(n => n.Code).IsUnique();
+            e.HasIndex(n => n.FolderId);
+            e.HasIndex(n => n.UpdatedAt);
+            e.HasIndex(n => n.ArchivedAt);
+            e.HasIndex(n => n.ProductId);
+            e.Property(n => n.Code).HasMaxLength(12);
+            e.Property(n => n.Title).HasMaxLength(200);
+            e.Property(n => n.Body).HasMaxLength(100_000);
+            e.Property(n => n.Stage).HasMaxLength(16);
+            e.Property(n => n.Source).HasMaxLength(8);
+            e.Property(n => n.CreatedByRef).HasMaxLength(64);
+            e.Property(n => n.CreatedByName).HasMaxLength(120);
+            e.Property(n => n.UpdatedByName).HasMaxLength(120);
+            e.Property(n => n.UpdatedBySource).HasMaxLength(8);
+            e.HasOne(n => n.Folder).WithMany().HasForeignKey(n => n.FolderId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(n => n.Product).WithMany().HasForeignKey(n => n.ProductId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(n => n.Task).WithMany().HasForeignKey(n => n.TaskId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<NoteRevision>(e =>
+        {
+            e.HasIndex(r => new { r.NoteId, r.CreatedAt });
+            e.Property(r => r.Title).HasMaxLength(200);
+            e.Property(r => r.Body).HasMaxLength(100_000);
+            e.Property(r => r.AuthorName).HasMaxLength(120);
+            e.Property(r => r.Source).HasMaxLength(8);
+            e.HasOne(r => r.Note).WithMany(n => n.Revisions).HasForeignKey(r => r.NoteId).OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<StaffToken>(e =>

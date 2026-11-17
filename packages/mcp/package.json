@@ -1,6 +1,6 @@
 {
   "name": "pitwall-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "MCP server and Atlas Agent Sync for Pitwall: Claude Code works the team's task board, reports to the Atlas, and syncs the repository's services into it (pitwall-atlas).",
   "repository": {
     "type": "git",
