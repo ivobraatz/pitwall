@@ -108,7 +108,7 @@ function ServiceLine({ service: s, live, onRemove, onOpen }: { service: AtlasSer
   return (
     <li data-testid="atlas-service" data-state={s.state} data-condition={s.condition}
       className={cn('group/s flex items-start gap-2.5 rounded-tile bg-well px-3 py-2.5', gap && 'atlas-hatch-loud', planned && 'atlas-dashed', live)}>
-      {gap || planned ? <MarkGlyph mark={conditionMark(s.condition)} className="mt-1" /> : <StateGlyph state={s.state} className="mt-1" />}
+      {gap || planned ? <MarkGlyph mark={conditionMark(s.condition)} className="mt-1" /> : <StateGlyph state={s.state} kind={s.kind} className="mt-1" />}
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <ServiceLogo service={s} size={16} />

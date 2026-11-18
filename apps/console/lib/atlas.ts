@@ -111,6 +111,15 @@ export function verdict(s: AtlasSystem): Verdict {
 }
 const ORDER: Record<Verdict, number> = { down: 0, attention: 1, unread: 2, ok: 3, empty: 4 };
 
+/** Kinds that run and can say whether they are up. Mirrors AtlasServiceKinds.Measurable in the API. */
+export const MEASURABLE_KINDS: ReadonlySet<string> = new Set(['api', 'web', 'site', 'worker', 'queue', 'cron', 'edge', 'database', 'cache']);
+
+/** Unread, and of a kind with nothing to measure (a credential, a pipeline, an integration): it has no state to show. */
+export function nothingToMeasure(kind: string | null | undefined, state: ServiceState): boolean {
+  return state === 'unknown' && !!kind && !MEASURABLE_KINDS.has(kind);
+}
+
+/** Counts only what can be measured: the API leaves credentials, pipelines and integrations out. */
 export interface Health { total: number; up: number; down: number; degraded: number; deploying: number; unknown: number }
 export type HealthReading =
   | { kind: 'none' }

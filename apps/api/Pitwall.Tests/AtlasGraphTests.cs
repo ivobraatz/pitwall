@@ -185,6 +185,36 @@ public class AtlasGraphTests(AtlasGraphFixture fx)
     }
 
     [Fact]
+    public async Task Health_counts_only_what_can_be_measured()
+    {
+        var c = await GraphKit.TokenAsync(fx, StaffTokenScopes.Atlas);
+        var sys = await GraphKit.SystemAsync(c);
+        var (api, _) = await GraphKit.ServiceAsync(c, sys, "API");
+        await GraphKit.ServiceAsync(c, sys, "Worker", kind: "worker");
+        await GraphKit.ServiceAsync(c, sys, "STRIPE_SECRET_KEY", environment: null, kind: "credential");
+        await GraphKit.ServiceAsync(c, sys, "CI", environment: null, kind: "pipeline");
+        await GraphKit.DbAsync(fx, async db =>
+        {
+            (await db.AtlasServices.SingleAsync(s => s.Id == api)).MonitorStatus = "up";
+            await db.SaveChangesAsync();
+        });
+
+        // The credential and the pipeline have nothing to measure; the unread worker is a blind spot and stays counted.
+        var card = (await GraphKit.GetAsync(c, "/v1/staff/atlas/graph/company")).GetProperty("systems").EnumerateArray()
+            .Single(s => s.GetProperty("slug").GetString() == sys);
+        var health = card.GetProperty("health");
+        Assert.Equal(2, health.GetProperty("total").GetInt32());
+        Assert.Equal(1, health.GetProperty("up").GetInt32());
+        Assert.Equal(1, health.GetProperty("unknown").GetInt32());
+        Assert.Equal("up", card.GetProperty("state").GetString());
+
+        var row = (await GraphKit.GetAsync(c, "/v1/staff/atlas")).GetProperty("systems").EnumerateArray()
+            .Single(s => s.GetProperty("slug").GetString() == sys);
+        Assert.Equal(2, row.GetProperty("health").GetProperty("total").GetInt32());
+        Assert.Equal(1, row.GetProperty("health").GetProperty("unknown").GetInt32());
+    }
+
+    [Fact]
     public async Task Company_cards_and_node_detail_have_every_field()
     {
         var c = await GraphKit.TokenAsync(fx, StaffTokenScopes.Atlas);

@@ -106,7 +106,7 @@ function NodeButton({ node, trailing, onNode, dashed }: { node: NodeRef; trailin
   return (
     <button type="button" onClick={() => onNode(node.id)} data-testid="atlas-node-link" data-node-id={node.id}
       className={cn('flex w-full min-w-0 items-center gap-2.5 rounded-tile px-2.5 py-2 text-left transition-colors duration-150 hover:bg-hover', dashed && 'atlas-dashed')}>
-      <StateGlyph state={node.state} size={12} />
+      <StateGlyph state={node.state} kind={node.kind} size={12} />
       <span className="min-w-0 flex-1 truncate font-medium text-fg">{node.name}</span>
       {trailing && <span className="shrink-0 text-right text-[13px] text-fg-muted">{trailing}</span>}
     </button>

@@ -92,7 +92,7 @@ function CardNode({ data }: NodeProps<Node<CardData, 'card'>>) {
       <Handle type="target" position={Position.Left} className={hidden} />
       <div className="flex min-w-0 items-center gap-2">
         {n.type === 'repo' ? <span className="shrink-0 rounded-full bg-chip px-1.5 text-[11px] font-semibold text-fg-secondary">repo</span>
-          : <StateGlyph state={n.state} size={12} />}
+          : <StateGlyph state={n.state} kind={n.kind} size={12} />}
         <ServiceLogo service={n} size={14} />
         <span className="min-w-0 flex-1 truncate text-[14px] leading-5 font-medium text-fg">{n.name}</span>
         {data.step !== null && <span className="grid size-5 shrink-0 place-items-center rounded-full bg-btn text-[11px] font-semibold text-btn-fg tabular-nums">{data.step}</span>}

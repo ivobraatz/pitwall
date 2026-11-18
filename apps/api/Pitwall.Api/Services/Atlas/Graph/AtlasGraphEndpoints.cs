@@ -57,16 +57,17 @@ internal static class AtlasGraphEndpoints
         {
             var nodes = data.ActiveNodes.Where(n => n.ProductId == p.Id).ToList();
             var services = nodes.Where(n => !n.IsRepo).ToList();
+            var measured = services.Where(s => AtlasServiceKinds.CountsForHealth(s.Kind, s.State)).ToList();
             var repos = nodes.Where(n => n.IsRepo).ToList();
             var alerts = repos.Where(r => r.Repo!.OpenAlerts is not null).Select(r => r.Repo!.OpenAlerts!.Value).ToList();
             var attention = nodes.Aggregate(AttentionDto.None, (sum, n) => Add(sum, n.Attention));
             cards.Add(new SystemCardDto(
-                p.Id, p.Slug, p.Name, p.Color, p.Description, SystemState(services),
+                p.Id, p.Slug, p.Name, p.Color, p.Description, SystemState(measured),
                 data.DependentSystems.GetValueOrDefault(p.Id) >= 2, nodes.Count,
-                new HealthDto(services.Count,
-                    services.Count(s => s.State == AtlasStates.Up), services.Count(s => s.State == AtlasStates.Down),
-                    services.Count(s => s.State == AtlasStates.Degraded), services.Count(s => s.State == AtlasStates.Deploying),
-                    services.Count(s => s.State == AtlasStates.Unknown)),
+                new HealthDto(measured.Count,
+                    measured.Count(s => s.State == AtlasStates.Up), measured.Count(s => s.State == AtlasStates.Down),
+                    measured.Count(s => s.State == AtlasStates.Degraded), measured.Count(s => s.State == AtlasStates.Deploying),
+                    measured.Count(s => s.State == AtlasStates.Unknown)),
                 attention,
                 new RunningDto(
                     services.Count(s => s.Activity.Kind == "deploy"),
@@ -375,7 +376,8 @@ internal static class AtlasGraphEndpoints
         if (list.Any(s => s.State == AtlasStates.Down)) return AtlasStates.Down;
         if (list.Any(s => s.State == AtlasStates.Deploying)) return AtlasStates.Deploying;
         if (list.Any(s => s.State == AtlasStates.Degraded)) return AtlasStates.Degraded;
-        return list.All(s => s.State == AtlasStates.Up) ? AtlasStates.Up : AtlasStates.Unknown;
+        // Green when what is read is up; the unread ones are named in the health text, not painted grey over it.
+        return list.Any(s => s.State == AtlasStates.Up) ? AtlasStates.Up : AtlasStates.Unknown;
     }
 
     private static AttentionDto Add(AttentionDto a, AttentionDto b) => new(

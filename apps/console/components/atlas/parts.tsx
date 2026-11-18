@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useT, useLocale, ago } from '@/lib/i18n';
-import type { Atlas, Condition, Impact, LinkKind, NowItem, Owner, ServiceState, SystemRef } from '@/lib/atlas';
+import { nothingToMeasure, type Atlas, type Condition, type Impact, type LinkKind, type NowItem, type Owner, type ServiceState, type SystemRef } from '@/lib/atlas';
 import { ProductStripe } from '@/components/product';
 import { Dot, IconButton, IconClose, Pill, cn } from '@/components/ui';
 import { WORDS, type AtlasWord } from './words';
@@ -22,7 +22,9 @@ const STATE_TONE: Record<ServiceState, string> = { up: 'ok', down: 'error', depl
 const STATE_SWATCH: Record<ServiceState, string> = { up: 'bg-success', down: 'bg-danger', deploying: 'bg-running', degraded: 'bg-warning', unknown: 'bg-border-loud' };
 const STATES: ServiceState[] = ['up', 'down', 'deploying', 'degraded', 'unknown'];
 
-export function StateGlyph({ state, size = 14, className }: { state: ServiceState; size?: number; className?: string }) {
+export function StateGlyph({ state, kind, size = 14, className }: { state: ServiceState; kind?: string | null; size?: number; className?: string }) {
+  // Nothing to measure (a credential, a pipeline): keep the room, show no dot rather than a grey one.
+  if (nothingToMeasure(kind, state)) return <span aria-hidden data-state="none" className={cn('inline-block shrink-0', className)} style={{ width: size, height: size }} />;
   return (
     <span aria-hidden data-state={state} className={cn('inline-grid shrink-0 place-items-center', className)} style={{ width: size, height: size }}>
       <Dot tone={STATE_TONE[state]} className={state === 'deploying' ? 'atlas-pulse' : undefined} />

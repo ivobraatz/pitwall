@@ -256,6 +256,7 @@ public static class StaffAtlasEndpoints
         var systems = products.Select(p =>
         {
             var own = services.Where(s => s.ProductId == p.Id).ToList();
+            var measured = own.Where(s => AtlasServiceKinds.CountsForHealth(s.Kind, s.State)).ToList();
             var steps = openSteps.Where(s => s.ProductId == p.Id).ToList();
             return new
             {
@@ -268,12 +269,13 @@ public static class StaffAtlasEndpoints
                 },
                 health = new
                 {
-                    total = own.Count,
-                    up = own.Count(s => s.State == AtlasStates.Up),
-                    down = own.Count(s => s.State == AtlasStates.Down),
-                    degraded = own.Count(s => s.State == AtlasStates.Degraded),
-                    deploying = own.Count(s => s.State == AtlasStates.Deploying),
-                    unknown = own.Count(s => s.State == AtlasStates.Unknown),
+                    // Only what can be measured: a credential or a pipeline is never "not monitored".
+                    total = measured.Count,
+                    up = measured.Count(s => s.State == AtlasStates.Up),
+                    down = measured.Count(s => s.State == AtlasStates.Down),
+                    degraded = measured.Count(s => s.State == AtlasStates.Degraded),
+                    deploying = measured.Count(s => s.State == AtlasStates.Deploying),
+                    unknown = measured.Count(s => s.State == AtlasStates.Unknown),
                 },
                 pending = new
                 {

@@ -375,6 +375,15 @@ public static class AtlasServiceKinds
         "seo", "credential", "vault", "certificate",
     ];
     public static bool IsValid(string? s) => s is not null && All.Contains(s);
+
+    /// <summary>Kinds that run and can say whether they are up. Unread, one of these is a blind spot.</summary>
+    public static readonly string[] Measurable = ["api", "web", "site", "worker", "queue", "cron", "edge", "database", "cache"];
+
+    /// <summary>
+    /// Whether a service enters the health of its system: anything with a state read, and the measurable kinds even
+    /// unread. A credential, a pipeline or an integration has nothing to measure and stays out of the count.
+    /// </summary>
+    public static bool CountsForHealth(string kind, string state) => state != AtlasStates.Unknown || Measurable.Contains(kind);
 }
 
 public static class AtlasConditions

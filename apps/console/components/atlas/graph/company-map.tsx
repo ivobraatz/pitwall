@@ -97,7 +97,7 @@ function SharedNode({ data }: NodeProps<Node<SharedData, 'shared'>>) {
     <div data-testid="atlas-company-shared" data-engine={n.engine} data-state={n.state} style={{ width: SHARED_W, height: SHARED_H }}
       className="relative flex items-center gap-2.5 rounded-tile border border-border-loud bg-surface px-3">
       <Handle type="target" position={Position.Top} className={HANDLE} />
-      <StateGlyph state={n.state} size={12} />
+      <StateGlyph state={n.state} kind={n.kind} size={12} />
       <ServiceLogo service={n} size={16} />
       <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-fg">{n.name}</span>
       {n.provider && <span className="shrink-0 text-[12px] text-fg-muted">{n.provider}</span>}
