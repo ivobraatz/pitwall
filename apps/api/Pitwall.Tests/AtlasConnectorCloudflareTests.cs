@@ -95,5 +95,7 @@ public class AtlasConnectorCloudflareTests(PitwallFixture fx) : IClassFixture<Pi
             Assert.StartsWith("https://api.cloudflare.com/client/v4/", r.Url);
             Assert.DoesNotContain(ConnectorKit.Token, r.Url + r.Body);
         });
+        // Pages answers 400 to per_page above 10.
+        Assert.Contains(provider.Requests, r => r.Url.Contains("/pages/projects?per_page=10&", StringComparison.Ordinal));
     }
 }

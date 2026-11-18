@@ -43,8 +43,13 @@ public sealed class CloudflareCollector(HttpClient http, string? token, string? 
             var body = await GetAsync($"{path}{separator}per_page={perPage}&page={page}", ct);
             if (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Array)
                 items.AddRange(result.EnumerateArray());
-            var total = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("result_info", out var info)
-                        && info.TryGetProperty("total_pages", out var t) && t.TryGetInt32(out var n) ? n : 1;
+            // Some listings (Pages) give only total_count; derive the pages from it.
+            var total = 1;
+            if (body.ValueKind == JsonValueKind.Object && body.TryGetProperty("result_info", out var info))
+            {
+                if (info.TryGetProperty("total_pages", out var t) && t.TryGetInt32(out var n)) total = n;
+                else if (info.TryGetProperty("total_count", out var c) && c.TryGetInt32(out var count)) total = (count + perPage - 1) / perPage;
+            }
             if (page >= total) break;
         }
         return items;
@@ -79,7 +84,8 @@ public sealed class CloudflareCollector(HttpClient http, string? token, string? 
             var workerName = script.Str("id");
             if (workerName is not null) listed.Add(new($"worker:{workerName}", workerName, "worker", "cloudflare-worker", [workerName, "Worker " + workerName]));
         }
-        foreach (var project in await ListAsync($"/accounts/{accountId}/pages/projects", 100, ct))
+        // Pages refuses per_page above 10 (error 8000024) and fails the whole run.
+        foreach (var project in await ListAsync($"/accounts/{accountId}/pages/projects", 10, ct))
         {
             var pagesName = project.Str("name");
             if (pagesName is not null) listed.Add(new($"pages:{pagesName}", pagesName, "pages", null, []));
