@@ -66,7 +66,11 @@ gravadas, a menos que você passe outras. Sem tabelas, o teste de restauração 
 `preparar-banco.sh pitwall` liga o Postgres local do Pitwall, com as tabelas dele.
 
 Depois, acrescente `PUSH_ACME` ao `backups.env` (o nome em maiúsculas, hífen trocado por `_`) com a URL de um
-monitor do tipo Push no Kuma.
+monitor do tipo Push no Kuma. Na VM, este comando cria o monitor no grupo Backups e grava a linha sem mostrar a URL:
+
+```bash
+cd /opt/monitor && sudo setup/run.sh 10-push.js '"Backup Acme" 90000 PUSH_ACME' | grep '^PUSH_ACME=' | sudo tee -a /opt/backups/backups.env >/dev/null
+```
 
 ## Restaurar
 
