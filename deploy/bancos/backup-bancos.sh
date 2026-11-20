@@ -147,7 +147,10 @@ fazer_backup() {
   fi
 
   tamanho=$(stat -c %s "$dump")
-  if ((tamanho < minimo)); then motivo="dump com só $tamanho bytes"; return 1; fi
+  # Banco novo e quase vazio pode ter um mínimo menor, em MINIMO_BYTES= no .env do sistema.
+  local minimo_sistema
+  minimo_sistema=$(valor "$env" MINIMO_BYTES)
+  if ((tamanho < ${minimo_sistema:-$minimo})); then motivo="dump com só $tamanho bytes"; return 1; fi
 
   tabelas=$(docker run --rm -i "$imagem" pg_restore --list < "$dump" | grep -c 'TABLE DATA')
   if ((tabelas == 0)); then motivo="dump sem dados de tabela"; return 1; fi

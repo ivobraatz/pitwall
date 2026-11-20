@@ -47,7 +47,7 @@ a política de privacidade de cada sistema.
 |---|---|
 | `/opt/backups/bin/` | Os scripts de `deploy/bancos` |
 | `/opt/backups/backups.env` | Chave pública, token do R2 e URLs do Kuma (modelo em `backups.env.example`) |
-| `/opt/backups/bancos/<sistema>.env` | Conexão de cada sistema e, em `TABELAS=`, as tabelas conferidas na restauração |
+| `/opt/backups/bancos/<sistema>.env` | Conexão de cada sistema e, em `TABELAS=`, as tabelas conferidas na restauração. `MINIMO_BYTES=` baixa o tamanho mínimo do dump (padrão 10 KB) para um banco ainda quase vazio |
 | `/opt/backups/logs/backup.log` | O que aconteceu em cada execução |
 
 ## Ligar um sistema
